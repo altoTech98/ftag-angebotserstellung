@@ -5,13 +5,12 @@ Supports both simple keyword matching (fallback) and AI-powered matching with fe
 
 import os
 import re
+import math
 import logging
-import numpy as np
 import pandas as pd
+from collections import Counter
 from functools import lru_cache
 from typing import Optional
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
 from services.feedback_store import find_relevant_feedback
 
@@ -156,8 +155,81 @@ def _find_header_row(df: pd.DataFrame) -> Optional[int]:
 
 
 # ─────────────────────────────────────────────
-# TF-IDF SEMANTIC SEARCH
+# LIGHTWEIGHT TF-IDF SEMANTIC SEARCH
+# (replaces scikit-learn to reduce memory usage)
 # ─────────────────────────────────────────────
+
+_TOKEN_PATTERN = re.compile(r"(?u)\b\w[\w\-/]+\b")
+
+
+class LightTfidfVectorizer:
+    """Lightweight TF-IDF vectorizer — drop-in replacement for sklearn's TfidfVectorizer."""
+
+    def __init__(self, max_features=5000, ngram_range=(1, 2), sublinear_tf=True):
+        self.max_features = max_features
+        self.ngram_range = ngram_range
+        self.sublinear_tf = sublinear_tf
+        self.vocabulary_ = {}
+        self.idf_ = {}
+        self._doc_count = 0
+
+    def _tokenize(self, text: str) -> list[str]:
+        tokens = _TOKEN_PATTERN.findall(text.lower())
+        result = list(tokens)
+        if self.ngram_range[1] >= 2:
+            for i in range(len(tokens) - 1):
+                result.append(f"{tokens[i]} {tokens[i+1]}")
+        return result
+
+    def _tfidf_vec(self, tf: Counter) -> dict[str, float]:
+        vec = {}
+        for term, count in tf.items():
+            if term in self.vocabulary_:
+                tf_val = (1 + math.log(count)) if (self.sublinear_tf and count > 0) else count
+                vec[term] = tf_val * self.idf_.get(term, 0)
+        # L2 normalize
+        norm = math.sqrt(sum(v * v for v in vec.values())) if vec else 1.0
+        if norm > 0:
+            vec = {k: v / norm for k, v in vec.items()}
+        return vec
+
+    def fit_transform(self, texts: list[str]) -> list[dict]:
+        doc_freq: Counter = Counter()
+        all_tf: list[Counter] = []
+        for text in texts:
+            tokens = self._tokenize(text)
+            tf = Counter(tokens)
+            all_tf.append(tf)
+            for term in set(tokens):
+                doc_freq[term] += 1
+        self._doc_count = len(texts)
+
+        top_terms = doc_freq.most_common(self.max_features)
+        self.vocabulary_ = {term: i for i, (term, _) in enumerate(top_terms)}
+
+        for term, df in doc_freq.items():
+            if term in self.vocabulary_:
+                self.idf_[term] = math.log((1 + self._doc_count) / (1 + df)) + 1
+
+        return [self._tfidf_vec(tf) for tf in all_tf]
+
+    def transform(self, texts: list[str]) -> list[dict]:
+        result = []
+        for text in texts:
+            tokens = self._tokenize(text)
+            tf = Counter(tokens)
+            result.append(self._tfidf_vec(tf))
+        return result
+
+
+def _cosine_similarity_light(vec: dict, matrix: list[dict]) -> list[float]:
+    """Cosine similarity between one vector and a matrix of vectors (all L2-normalized)."""
+    scores = []
+    for mat_vec in matrix:
+        dot = sum(vec.get(k, 0) * v for k, v in mat_vec.items() if k in vec)
+        scores.append(dot)
+    return scores
+
 
 def _build_product_text(row, columns) -> str:
     """Combine all product columns into a single text for TF-IDF vectorization."""
@@ -185,17 +257,14 @@ def _get_tfidf_matrix():
     for _, row in df.iterrows():
         product_texts.append(_build_product_text(row, df.columns))
 
-    _tfidf_vectorizer = TfidfVectorizer(
-        analyzer="word",
-        lowercase=True,
-        token_pattern=r"(?u)\b\w[\w\-/]+\b",
+    _tfidf_vectorizer = LightTfidfVectorizer(
         max_features=5000,
         sublinear_tf=True,
         ngram_range=(1, 2),
     )
 
     _tfidf_matrix = _tfidf_vectorizer.fit_transform(product_texts)
-    logger.info(f"TF-IDF matrix built: {_tfidf_matrix.shape[0]} products, {_tfidf_matrix.shape[1]} features")
+    logger.info(f"TF-IDF matrix built: {len(_tfidf_matrix)} products, {len(_tfidf_vectorizer.vocabulary_)} features")
     return _tfidf_vectorizer, _tfidf_matrix
 
 
@@ -205,10 +274,11 @@ def tfidf_score_candidates(requirement_text: str, top_n: int = 100) -> list[tupl
     Returns list of (row_index, score) tuples, sorted by score descending.
     """
     vectorizer, matrix = _get_tfidf_matrix()
-    req_vector = vectorizer.transform([requirement_text.lower()])
-    scores = cosine_similarity(req_vector, matrix).flatten()
-    top_indices = np.argsort(scores)[::-1][:top_n]
-    return [(int(idx), float(scores[idx])) for idx in top_indices if scores[idx] > 0.0]
+    req_vec = vectorizer.transform([requirement_text.lower()])[0]
+    scores = _cosine_similarity_light(req_vec, matrix)
+    indexed = [(i, s) for i, s in enumerate(scores) if s > 0.0]
+    indexed.sort(key=lambda x: x[1], reverse=True)
+    return indexed[:top_n]
 
 
 def invalidate_tfidf_cache():
@@ -273,13 +343,13 @@ def match_requirements_ai(requirements: dict) -> dict:
         })
 
     # Collect feedback once (shared across all positions)
-    all_text = " ".join(pd["req_text"] for pd in positions_data)
+    all_text = " ".join(p["req_text"] for p in positions_data)
     feedback_examples = find_relevant_feedback(all_text, {}, limit=8)
 
     # Stage 2: Batch AI matching (single Claude call)
     try:
         # Only send positions that have candidates to Claude
-        batch_indices = [i for i, pd in enumerate(positions_data) if pd["candidate_indices"]]
+        batch_indices = [i for i, p in enumerate(positions_data) if p["candidate_indices"]]
         batch_data = [positions_data[i] for i in batch_indices]
 
         if batch_data:
