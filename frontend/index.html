@@ -339,6 +339,53 @@
     </main>
   </div>
 
+  <!-- Correction Modal -->
+  <div class="modal-overlay hidden" id="correction-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Produktzuordnung korrigieren</h3>
+        <button class="modal-close" onclick="closeCorrection()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="correction-section">
+          <p class="correction-label">Anforderung:</p>
+          <p class="correction-value" id="correction-requirement">---</p>
+        </div>
+        <div class="correction-section">
+          <p class="correction-label">Aktuelle Zuordnung:</p>
+          <p class="correction-value" id="correction-current-product">---</p>
+        </div>
+        <div class="correction-section">
+          <p class="correction-label">Richtiges Produkt suchen:</p>
+          <div class="search-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" id="correction-search-input" class="search-input"
+                   placeholder="Suchen: T30, Stahltuer, RC2..."
+                   oninput="searchCorrectionProducts()" />
+          </div>
+        </div>
+        <div id="correction-results" class="correction-results"></div>
+        <div class="correction-section" style="margin-top:1rem;">
+          <label class="correction-label" for="correction-note-input">Bemerkung (optional):</label>
+          <input type="text" id="correction-note-input" class="search-input"
+                 placeholder="z.B. Kunde meint immer T30 wenn er Brandschutz sagt" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="cta-btn secondary slim" onclick="closeCorrection()">Abbrechen</button>
+        <button class="cta-btn slim" id="btn-save-correction" onclick="saveCorrection()" disabled>
+          Korrektur speichern
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

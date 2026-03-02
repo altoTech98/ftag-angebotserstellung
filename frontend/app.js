@@ -235,6 +235,7 @@ function showResults(analysis, offer) {
 
     const rows = items.map(item => {
       const pos = item.original_position || item;
+      const matchedJson = esc(JSON.stringify(item.matched_products || []));
       return `
         <tr>
           <td><strong>${esc(item.position || pos.position || '—')}</strong></td>
@@ -244,6 +245,19 @@ function showResults(analysis, offer) {
           <td>${pos.brandschutz ? `<span class="tag tag-red">${esc(pos.brandschutz)}</span>` : '<span style="color:var(--gray-300)">—</span>'}</td>
           <td>${pos.einbruchschutz ? `<span class="tag tag-blue">${esc(pos.einbruchschutz)}</span>` : '<span style="color:var(--gray-300)">—</span>'}</td>
           <td style="font-size:.75rem;color:var(--gray-500);max-width:200px;">${esc(item.reason || '')}</td>
+          <td>
+            <button class="correction-btn"
+              data-position="${esc(item.position || pos.position || '')}"
+              data-beschreibung="${esc(item.beschreibung || pos.beschreibung || '')}"
+              data-tuertyp="${esc(pos.tuertyp || '')}"
+              data-brandschutz="${esc(pos.brandschutz || '')}"
+              data-einbruchschutz="${esc(pos.einbruchschutz || '')}"
+              data-breite="${esc(String(pos.breite || ''))}"
+              data-hoehe="${esc(String(pos.hoehe || ''))}"
+              data-status="${esc(item.status || cls)}"
+              data-matched-product="${matchedJson}"
+              onclick="openCorrection(this)">Korrektur</button>
+          </td>
         </tr>`;
     }).join('');
 
@@ -258,7 +272,7 @@ function showResults(analysis, offer) {
           <table class="data-table">
             <thead><tr>
               <th>Pos.</th><th>Beschreibung</th><th>Menge</th>
-              <th>Türtyp</th><th>Brandschutz</th><th>Einbruchschutz</th><th>Hinweis</th>
+              <th>Türtyp</th><th>Brandschutz</th><th>Einbruchschutz</th><th>Hinweis</th><th>Aktion</th>
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>
@@ -397,4 +411,161 @@ async function api(path, opts = {}) {
     throw new Error(msg);
   }
   return res.json();
+}
+
+// ─────────────────────────────────────────────
+// CORRECTION SYSTEM (Feedback / Training)
+// ─────────────────────────────────────────────
+
+let correctionState = {
+  positionData: null,
+  selectedProduct: null,
+};
+
+function openCorrection(btn) {
+  const d = btn.dataset;
+  correctionState.positionData = { ...d };
+  correctionState.selectedProduct = null;
+
+  // Show current match info
+  let products = [];
+  try { products = JSON.parse(d.matchedProduct || '[]'); } catch {}
+  const currentProduct = products.length > 0
+    ? Object.values(products[0]).join(' | ')
+    : 'Kein Produkt zugeordnet';
+  document.getElementById('correction-current-product').textContent = currentProduct;
+
+  const reqParts = [d.beschreibung, d.tuertyp, d.brandschutz, d.einbruchschutz].filter(Boolean);
+  document.getElementById('correction-requirement').textContent = reqParts.join(' | ') || '---';
+
+  // Reset search
+  document.getElementById('correction-search-input').value = '';
+  document.getElementById('correction-results').innerHTML = '';
+  document.getElementById('correction-note-input').value = '';
+  document.getElementById('btn-save-correction').disabled = true;
+  document.getElementById('btn-save-correction').textContent = 'Korrektur speichern';
+
+  // Show modal
+  document.getElementById('correction-modal').classList.remove('hidden');
+
+  // Pre-populate search with tuertyp + brandschutz
+  const autoSearch = [d.tuertyp, d.brandschutz].filter(Boolean).join(' ');
+  if (autoSearch) {
+    document.getElementById('correction-search-input').value = autoSearch;
+    searchCorrectionProducts();
+  }
+}
+
+function closeCorrection() {
+  document.getElementById('correction-modal').classList.add('hidden');
+  correctionState = { positionData: null, selectedProduct: null };
+}
+
+let _corrSearchTimer;
+function searchCorrectionProducts() {
+  clearTimeout(_corrSearchTimer);
+  _corrSearchTimer = setTimeout(async () => {
+    const q = document.getElementById('correction-search-input').value.trim();
+    if (!q) {
+      document.getElementById('correction-results').innerHTML = '';
+      return;
+    }
+    try {
+      const data = await api(`/products/search?q=${encodeURIComponent(q)}&limit=15`);
+      renderCorrectionResults(data.products);
+    } catch (err) {
+      document.getElementById('correction-results').innerHTML =
+        `<p class="error-inline" style="padding:0.75rem;">Fehler: ${esc(err.message)}</p>`;
+    }
+  }, 350);
+}
+
+function renderCorrectionResults(products) {
+  const container = document.getElementById('correction-results');
+  if (!products?.length) {
+    container.innerHTML = '<p class="info-inline" style="padding:0.75rem;">Keine Produkte gefunden</p>';
+    return;
+  }
+  container.innerHTML = products.map(p => `
+    <div class="correction-product-item"
+         data-row-index="${p._row_index}"
+         data-summary="${esc(p._summary)}"
+         onclick="selectCorrectionProduct(this)">
+      <div class="correction-product-summary">${esc(p._summary)}</div>
+      <div class="correction-product-details">
+        ${Object.entries(p)
+          .filter(([k]) => !k.startsWith('_'))
+          .slice(0, 6)
+          .map(([k, v]) => `<span class="tag tag-blue">${esc(k)}: ${esc(v)}</span>`)
+          .join(' ')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function selectCorrectionProduct(el) {
+  document.querySelectorAll('.correction-product-item.selected')
+    .forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  correctionState.selectedProduct = {
+    row_index: parseInt(el.dataset.rowIndex),
+    product_summary: el.dataset.summary,
+  };
+  document.getElementById('btn-save-correction').disabled = false;
+}
+
+async function saveCorrection() {
+  if (!correctionState.selectedProduct || !correctionState.positionData) return;
+
+  const d = correctionState.positionData;
+  let matchedProducts = [];
+  try { matchedProducts = JSON.parse(d.matchedProduct || '[]'); } catch {}
+  const wrongProduct = matchedProducts.length > 0
+    ? { row_index: null, product_summary: Object.values(matchedProducts[0]).join(' | ') }
+    : { row_index: null, product_summary: 'Kein Produkt' };
+
+  const body = {
+    requirement_text: [d.beschreibung, d.tuertyp, d.brandschutz, d.einbruchschutz]
+      .filter(Boolean).join(' | '),
+    requirement_fields: {
+      tuertyp: d.tuertyp || null,
+      brandschutz: d.brandschutz || null,
+      einbruchschutz: d.einbruchschutz || null,
+      breite: d.breite ? parseInt(d.breite) : null,
+      hoehe: d.hoehe ? parseInt(d.hoehe) : null,
+    },
+    wrong_product: wrongProduct,
+    correct_product: correctionState.selectedProduct,
+    position_id: d.position || '?',
+    match_status_was: d.status || 'unknown',
+    user_note: document.getElementById('correction-note-input').value.trim(),
+  };
+
+  try {
+    const btn = document.getElementById('btn-save-correction');
+    btn.disabled = true;
+    btn.textContent = 'Wird gespeichert...';
+    await api('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    closeCorrection();
+    showToast('Korrektur gespeichert – wird beim nächsten Matching berücksichtigt.');
+  } catch (err) {
+    showToast(`Fehler: ${err.message}`);
+    const btn = document.getElementById('btn-save-correction');
+    btn.disabled = false;
+    btn.textContent = 'Korrektur speichern';
+  }
+}
+
+function showToast(message) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
 }

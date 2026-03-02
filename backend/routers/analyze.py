@@ -5,12 +5,20 @@ GET  /api/products
 """
 
 import os
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from services.document_parser import parse_document
 from services.claude_client import extract_requirements_from_text
-from services.product_matcher import get_products_summary, load_product_catalog, match_requirements
+from services.product_matcher import (
+    get_products_summary,
+    load_product_catalog,
+    match_requirements,
+    match_requirements_ai,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -61,16 +69,20 @@ async def analyze_document(request: AnalyzeRequest):
             detail=f"KI-Analyse fehlgeschlagen: {str(e)}",
         )
 
-    # Match against product catalog
+    # Match against product catalog (AI-powered with keyword fallback)
     try:
-        match_result = match_requirements(requirements)
+        match_result = match_requirements_ai(requirements)
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Produkt-Matching fehlgeschlagen: {str(e)}",
-        )
+        logger.warning(f"AI matching failed, falling back to keyword matching: {e}")
+        try:
+            match_result = match_requirements(requirements)
+        except Exception as e2:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Produkt-Matching fehlgeschlagen: {str(e2)}",
+            )
 
     return {
         "file_id": request.file_id,

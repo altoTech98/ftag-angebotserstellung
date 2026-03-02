@@ -3,7 +3,11 @@ Claude API Client – Wraps Anthropic SDK for document analysis and offer genera
 """
 
 import os
+import json
+import logging
 import anthropic
+
+logger = logging.getLogger(__name__)
 
 _client = None
 
@@ -95,7 +99,6 @@ Extrahiere alle Türpositionen als strukturiertes JSON."""
     elif "```" in response_text:
         response_text = response_text.split("```")[1].split("```")[0].strip()
 
-    import json
     return json.loads(response_text)
 
 
@@ -109,7 +112,6 @@ def generate_offer_text(
     """
     client = get_client()
 
-    import json
     from datetime import datetime, timedelta
 
     today = datetime.now().strftime("%d.%m.%Y")
@@ -168,8 +170,6 @@ def generate_gap_report_text(
     """
     client = get_client()
 
-    import json
-
     system_prompt = """Du bist ein technischer Berater der Frank Türen AG.
 Erstelle professionelle Gap-Reports auf Deutsch, die fehlende Produkte und mögliche Alternativen aufzeigen."""
 
@@ -200,3 +200,124 @@ Erstelle einen detaillierten Gap-Report mit:
     )
 
     return message.content[0].text
+
+
+def ai_match_products(
+    requirement_text: str,
+    requirement_fields: dict,
+    candidates_text: str,
+    candidate_indices: list[int],
+    feedback_examples: list[dict],
+) -> dict:
+    """
+    Stage 2: Use Claude to semantically match a requirement against pre-filtered candidates.
+    Includes past corrections as few-shot learning examples.
+    """
+    client = get_client()
+
+    # Build few-shot examples from feedback
+    feedback_block = ""
+    if feedback_examples:
+        feedback_block = "\n\n## BISHERIGE KORREKTUREN (Lernbeispiele)\n"
+        feedback_block += "Folgende Korrekturen wurden von Fachpersonal vorgenommen. Beachte diese Muster bei deiner Entscheidung:\n\n"
+        for i, fb in enumerate(feedback_examples, 1):
+            feedback_block += (
+                f"Korrektur {i}:\n"
+                f"  Anforderung: {fb.get('requirement_text', '')}\n"
+                f"  FALSCHES Produkt: {fb.get('wrong_product', {}).get('product_summary', '?')}\n"
+                f"  RICHTIGES Produkt: {fb.get('correct_product', {}).get('product_summary', '?')}\n"
+            )
+            if fb.get("user_note"):
+                feedback_block += f"  Bemerkung: {fb['user_note']}\n"
+            feedback_block += "\n"
+
+    system_prompt = f"""Du bist ein erfahrener Türen-Fachberater der Frank Türen AG in Buochs NW, Schweiz.
+Du kennst das gesamte FTAG-Produktsortiment und hilfst beim Matching von Ausschreibungsanforderungen
+zu den richtigen Produkten.
+
+## DEINE AUFGABE
+Gegeben eine Türanforderung aus einer Ausschreibung und eine Liste von Produktkandidaten aus dem
+FTAG-Katalog, bestimme das beste passende Produkt.
+
+## BEWERTUNGSKRITERIEN (Priorität)
+1. Türtyp (Stahl, Holz, Alu) muss übereinstimmen
+2. Brandschutzklasse (T30/EI30, T60/EI60, T90/EI90) muss mindestens erfüllt werden
+3. Einbruchschutzklasse (RC2/WK2, RC3/WK3) muss mindestens erfüllt werden
+4. Masse (Breite x Höhe) sollten passen oder anpassbar sein
+5. Weitere Spezifikationen (Schallschutz, Verglasung, Oberfläche)
+
+## REGELN
+- T30 und EI30 sind gleichwertig, ebenso T60/EI60, T90/EI90
+- RC und WK sind gleichwertig (RC2 = WK2, RC3 = WK3)
+- Ein Produkt mit HÖHERER Klasse erfüllt NIEDRIGERE Anforderungen (T60 erfüllt T30)
+- Wenn kein Kandidat passt, sage "unmatched" – erfinde keine Matches
+- Bei Unsicherheit sage "partial" und erkläre warum
+{feedback_block}
+## ANTWORTFORMAT
+Antworte NUR mit validem JSON:
+{{
+  "best_match_rank": <Nummer des besten Kandidaten (1-basiert) oder null>,
+  "confidence": <0.0 bis 1.0>,
+  "status": "matched" | "partial" | "unmatched",
+  "reason": "<kurze deutsche Begründung, max 2 Sätze>",
+  "alternative_ranks": [<bis zu 2 weitere Kandidaten-Nummern>]
+}}"""
+
+    user_message = f"""## ANFORDERUNG
+{requirement_text}
+
+Strukturierte Felder:
+{json.dumps(requirement_fields, ensure_ascii=False, indent=2)}
+
+## PRODUKTKANDIDATEN AUS FTAG-KATALOG
+{candidates_text}
+
+Welcher Kandidat passt am besten zur Anforderung?"""
+
+    message = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=512,
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_message}],
+    )
+
+    response_text = message.content[0].text.strip()
+
+    # Parse JSON response
+    if "```json" in response_text:
+        response_text = response_text.split("```json")[1].split("```")[0].strip()
+    elif "```" in response_text:
+        response_text = response_text.split("```")[1].split("```")[0].strip()
+
+    try:
+        result = json.loads(response_text)
+    except json.JSONDecodeError:
+        logger.warning(f"AI match returned invalid JSON: {response_text[:200]}")
+        return {
+            "best_match_index": candidate_indices[0] if candidate_indices else None,
+            "best_match_rank": 1 if candidate_indices else None,
+            "confidence": 0.3,
+            "status": "partial",
+            "reason": "KI-Antwort konnte nicht verarbeitet werden – Vorfilter-Ergebnis verwendet",
+            "alternative_indices": [],
+        }
+
+    # Map rank back to DataFrame index
+    best_rank = result.get("best_match_rank")
+    best_index = None
+    if best_rank and 1 <= best_rank <= len(candidate_indices):
+        best_index = candidate_indices[best_rank - 1]
+
+    alternative_indices = []
+    for alt_rank in result.get("alternative_ranks", []):
+        if isinstance(alt_rank, int) and 1 <= alt_rank <= len(candidate_indices):
+            alternative_indices.append(candidate_indices[alt_rank - 1])
+
+    return {
+        "best_match_index": best_index,
+        "best_match_rank": best_rank,
+        "confidence": result.get("confidence", 0.0),
+        "status": result.get("status", "unmatched"),
+        "reason": result.get("reason", ""),
+        "alternative_indices": alternative_indices,
+    }
