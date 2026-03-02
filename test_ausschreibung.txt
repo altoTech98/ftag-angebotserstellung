@@ -1,0 +1,56 @@
+AUSSCHREIBUNG – TÜREN UND TORE
+Projekt: Neubau Bürogebäude Zentralstrasse 14, 6300 Zug
+Auftraggeber: Musterbau AG, Zug
+Datum: 02.03.2026
+Gültigkeit: 60 Tage
+
+=== LEISTUNGSVERZEICHNIS ===
+
+Position 1.1
+Bezeichnung: Stahltür einflügelig, Brandschutz T30
+Menge: 4 Stk
+Masse: B 900 x H 2100 mm
+Brandschutzklasse: T30 (EI30)
+Oberfläche: Pulverbeschichtung RAL 9016 (weiss)
+Zubehör: Türdrücker Edelstahl, Türschließer
+Besonderheiten: Selbstschliessend
+
+Position 1.2
+Bezeichnung: Stahltür zweiflügelig, Brandschutz T60
+Menge: 2 Stk
+Masse: B 1600 x H 2200 mm
+Brandschutzklasse: T60 (EI60)
+Einbruchschutz: RC2
+Oberfläche: Pulverbeschichtung RAL 7016 (anthrazit)
+Zubehör: Panikstange, Türschließer, elektrischer Türöffner
+Besonderheiten: Fluchttüre, elektrisch gesichert
+
+Position 1.3
+Bezeichnung: Sicherheitstür Eingang Technikraum
+Menge: 3 Stk
+Masse: B 1000 x H 2100 mm
+Einbruchschutz: RC3
+Schallschutz: Rw = 42 dB
+Oberfläche: Pulverbeschichtung RAL 7035
+Zubehör: Zylinderschloss, Türdrücker
+
+Position 1.4
+Bezeichnung: Stahltür Kellergeschoss, einfache Ausführung
+Menge: 6 Stk
+Masse: B 875 x H 2000 mm
+Oberfläche: Grundiert
+Zubehör: Türdrücker Standard, Schloss
+
+Position 1.5
+Bezeichnung: Brandschutztür T90 Treppenhaus
+Menge: 8 Stk
+Masse: B 1000 x H 2100 mm
+Brandschutzklasse: T90 (EI90)
+Schallschutz: Rw = 37 dB
+Oberfläche: Pulverbeschichtung RAL 9010
+Zubehör: Türschließer, Feststellanlage
+
+=== KONDITIONEN ===
+Zahlungsbedingungen: 30 Tage netto
+Lieferung: inkl. Montage
+Ausführung: ab Auftragserteilung ca. 8 Wochen

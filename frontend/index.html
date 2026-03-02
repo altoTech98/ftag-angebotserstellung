@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Frank Türen AG – KI-Angebotserstellung</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo">FT</div>
+      <div class="brand-text">
+        <span class="brand-name">Frank Türen AG</span>
+        <span class="brand-sub">KI-Angebotserstellung</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button class="nav-item active" id="nav-offer" onclick="switchView('offer', this)">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        <span>Angebot erstellen</span>
+      </button>
+      <button class="nav-item" id="nav-products" onclick="switchView('products', this)">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+        <span>Produktkatalog</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="ai-badge">
+        <div class="ai-dot"></div>
+        <span>Claude AI aktiv</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-wrapper">
+
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="topbar-title" id="topbar-title">Angebot erstellen</h1>
+        <p class="topbar-sub" id="topbar-sub">Ausschreibung hochladen und KI-Analyse starten</p>
+      </div>
+      <div class="topbar-right">
+        <div class="status-chip" id="server-status">
+          <div class="status-dot"></div>
+          <span>Server verbunden</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <main class="content">
+
+      <!-- ===== OFFER VIEW ===== -->
+      <div id="view-offer" class="view active">
+
+        <!-- STEP 1: Upload -->
+        <div id="panel-upload" class="panel active-panel">
+
+          <!-- Progress pills -->
+          <div class="progress-pills">
+            <div class="pill active" id="pill-1">
+              <span class="pill-num">1</span>
+              <span class="pill-label">Upload</span>
+            </div>
+            <div class="pill-connector"></div>
+            <div class="pill" id="pill-2">
+              <span class="pill-num">2</span>
+              <span class="pill-label">KI-Analyse</span>
+            </div>
+            <div class="pill-connector"></div>
+            <div class="pill" id="pill-3">
+              <span class="pill-num">3</span>
+              <span class="pill-label">Ergebnis</span>
+            </div>
+          </div>
+
+          <div class="panel-grid">
+            <!-- Upload card -->
+            <div class="glass-card upload-card">
+              <div class="card-header-row">
+                <div class="card-icon-wrap blue">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                </div>
+                <div>
+                  <h2 class="card-title">Ausschreibung hochladen</h2>
+                  <p class="card-desc">PDF, Excel, Word oder Text</p>
+                </div>
+              </div>
+
+              <div class="drop-zone" id="drop-zone"
+                ondragover="handleDragOver(event)"
+                ondragleave="handleDragLeave(event)"
+                ondrop="handleDrop(event)"
+                onclick="document.getElementById('file-input').click()">
+                <div class="drop-visual">
+                  <div class="drop-circle">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="17 8 12 3 7 8"/>
+                      <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                  </div>
+                  <p class="drop-main">Datei hier ablegen</p>
+                  <p class="drop-hint">oder <span class="drop-link" onclick="document.getElementById('file-input').click(); event.stopPropagation()">auswählen</span> · PDF, XLSX, DOCX, TXT · max. 50 MB</p>
+                </div>
+                <input type="file" id="file-input" accept=".pdf,.xlsx,.xls,.docx,.doc,.txt" onchange="handleFileSelect(event)" hidden />
+              </div>
+
+              <div id="file-preview" class="file-preview hidden">
+                <div class="file-preview-icon" id="file-type-icon">📄</div>
+                <div class="file-preview-info">
+                  <p class="file-preview-name" id="file-name"></p>
+                  <p class="file-preview-size" id="file-size"></p>
+                </div>
+                <button class="remove-btn" onclick="clearFile()" title="Entfernen">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+
+              <button class="cta-btn" id="btn-upload" onclick="runFullWorkflow()" disabled>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                Hochladen &amp; Analysieren
+              </button>
+            </div>
+
+            <!-- Info cards -->
+            <div class="info-col">
+              <div class="info-card">
+                <div class="info-icon green">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="info-title">Automatische Erkennung</p>
+                  <p class="info-text">Claude erkennt Türtypen, Massen, Brandschutz- und Sicherheitsklassen</p>
+                </div>
+              </div>
+              <div class="info-card">
+                <div class="info-icon blue">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="info-title">886 Produkte</p>
+                  <p class="info-text">Abgleich mit der vollständigen FTAG-Produktmatrix</p>
+                </div>
+              </div>
+              <div class="info-card">
+                <div class="info-icon orange">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="info-title">Excel &amp; Word Export</p>
+                  <p class="info-text">Angebot und Gap-Report in beiden Formaten</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2: Processing -->
+        <div id="panel-processing" class="panel">
+          <div class="glass-card processing-card">
+            <div class="processing-header">
+              <div class="processing-spinner"></div>
+              <div>
+                <h2 class="card-title">Verarbeitung läuft</h2>
+                <p class="card-desc" id="processing-subtitle">Bitte warten...</p>
+              </div>
+            </div>
+            <div class="steps-list">
+              <div class="step-item" id="step-upload">
+                <div class="step-dot pending"></div>
+                <div class="step-body">
+                  <p class="step-name">Datei hochladen & parsen</p>
+                  <p class="step-status" id="status-upload">Warte...</p>
+                </div>
+              </div>
+              <div class="step-item" id="step-ai">
+                <div class="step-dot pending"></div>
+                <div class="step-body">
+                  <p class="step-name">Claude KI-Analyse</p>
+                  <p class="step-status" id="status-ai">Warte...</p>
+                </div>
+              </div>
+              <div class="step-item" id="step-match">
+                <div class="step-dot pending"></div>
+                <div class="step-body">
+                  <p class="step-name">Produkt-Matching</p>
+                  <p class="step-status" id="status-match">Warte...</p>
+                </div>
+              </div>
+              <div class="step-item" id="step-gen">
+                <div class="step-dot pending"></div>
+                <div class="step-body">
+                  <p class="step-name">Angebot &amp; Gap-Report erstellen</p>
+                  <p class="step-status" id="status-gen">Warte...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3: Results -->
+        <div id="panel-results" class="panel">
+
+          <!-- Stat cards -->
+          <div class="stat-grid" id="stat-grid"></div>
+
+          <!-- Match rate bar -->
+          <div class="glass-card" id="match-rate-card" style="margin-bottom:1.5rem;">
+            <div class="match-rate-header">
+              <span class="match-rate-label">Erfüllungsrate</span>
+              <span class="match-rate-value" id="match-rate-pct">0%</span>
+            </div>
+            <div class="match-bar-bg">
+              <div class="match-bar-fill" id="match-bar" style="width:0%"></div>
+            </div>
+            <p class="match-rate-sub" id="match-rate-sub"></p>
+          </div>
+
+          <!-- Download section -->
+          <div class="glass-card download-card-new" id="download-card">
+            <div class="card-header-row">
+              <div class="card-icon-wrap green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </div>
+              <div>
+                <h2 class="card-title">Dokumente herunterladen</h2>
+                <p class="card-desc">Angebot und Gap-Report in Excel oder Word</p>
+              </div>
+            </div>
+            <div class="download-grid" id="download-grid"></div>
+          </div>
+
+          <!-- Positions -->
+          <div id="positions-container"></div>
+
+          <!-- Reset -->
+          <div style="display:flex; justify-content:center; margin-top:2rem;">
+            <button class="reset-btn" onclick="resetAll()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/>
+              </svg>
+              Neue Analyse starten
+            </button>
+          </div>
+        </div>
+
+        <!-- Error -->
+        <div id="panel-error" class="panel">
+          <div class="glass-card error-card">
+            <div class="error-icon-big">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <h2 class="error-title">Fehler aufgetreten</h2>
+            <p class="error-msg" id="error-msg"></p>
+            <button class="cta-btn secondary" onclick="resetAll()">Erneut versuchen</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ===== PRODUCTS VIEW ===== -->
+      <div id="view-products" class="view">
+        <div class="glass-card">
+          <div class="card-header-row">
+            <div class="card-icon-wrap blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+            </div>
+            <div>
+              <h2 class="card-title">Produktkatalog</h2>
+              <p class="card-desc">FTAG-Produktmatrix durchsuchen</p>
+            </div>
+          </div>
+          <div class="search-row">
+            <div class="search-wrap">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input type="text" id="product-search" class="search-input" placeholder="Suchen: T30, RC2, Stahltür..." oninput="searchProducts()" />
+            </div>
+            <button class="cta-btn slim" onclick="loadProducts()">Laden</button>
+          </div>
+          <div id="products-loading" class="loading-state hidden">
+            <div class="mini-spinner"></div>
+            <span>Produkte werden geladen...</span>
+          </div>
+          <p id="products-error" class="error-inline hidden"></p>
+          <p id="products-info" class="info-inline hidden"></p>
+          <div id="products-table-wrap" class="table-wrap hidden">
+            <table class="data-table">
+              <thead id="products-thead"></thead>
+              <tbody id="products-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

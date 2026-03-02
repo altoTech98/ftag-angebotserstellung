@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic Tac Toe</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* --- Dark (default) --- */
+    :root {
+      --bg:        #1a1a2e;
+      --cell-bg:   #16213e;
+      --cell-hover:#0f3460;
+      --cell-win:  #0f3460;
+      --text:      #eee;
+      --muted:     #888;
+      --status:    #a8dadc;
+      --accent:    #e94560;
+      --accent-h:  #c73652;
+      --btn-border:#0f3460;
+      --btn-color: #aaa;
+    }
+
+    /* --- Light --- */
+    body.light {
+      --bg:        #f0f4f8;
+      --cell-bg:   #ffffff;
+      --cell-hover:#dde8f5;
+      --cell-win:  #cce0ff;
+      --text:      #1a1a2e;
+      --muted:     #666;
+      --status:    #1a6fa8;
+      --accent:    #e94560;
+      --accent-h:  #c73652;
+      --btn-border:#b0c4de;
+      --btn-color: #555;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      font-family: 'Segoe UI', sans-serif;
+      color: var(--text);
+      transition: background 0.3s, color 0.3s;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    #status {
+      font-size: 1.2rem;
+      margin-bottom: 1.5rem;
+      height: 1.5em;
+      color: var(--status);
+      font-weight: 600;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 110px);
+      grid-template-rows: repeat(3, 110px);
+      gap: 8px;
+    }
+
+    .cell {
+      background: var(--cell-bg);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      font-weight: 900;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      user-select: none;
+    }
+
+    .cell:hover:not(.taken) {
+      background: var(--cell-hover);
+      transform: scale(1.05);
+    }
+
+    .cell.x { color: #e94560; }
+    .cell.o { color: #a8dadc; }
+
+    .cell.win {
+      background: var(--cell-win);
+      animation: pulse 0.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to   { transform: scale(1.08); }
+    }
+
+    #scores {
+      display: flex;
+      gap: 3rem;
+      margin: 1.5rem 0;
+      font-size: 1rem;
+    }
+
+    .score-box {
+      text-align: center;
+    }
+
+    .score-box .label {
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .score-box .value {
+      font-size: 2rem;
+      font-weight: 700;
+    }
+
+    .score-box.x-score .value { color: #e94560; }
+    .score-box.o-score .value { color: #1a9ab0; }
+    .score-box.draw-score .value { color: var(--muted); }
+
+    #restart, #reset-scores {
+      padding: 0.6rem 2rem;
+      font-size: 1rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    #restart:hover, #reset-scores:hover {
+      background: var(--accent-h);
+      transform: scale(1.05);
+    }
+
+    #reset-scores {
+      background: transparent;
+      color: var(--muted);
+      border: 2px solid var(--btn-border);
+    }
+
+    #reset-scores:hover {
+      background: var(--cell-hover);
+      color: var(--text);
+    }
+
+    #mode-toggle {
+      margin-bottom: 0.5rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .mode-btn {
+      padding: 0.4rem 1.2rem;
+      border: 2px solid var(--btn-border);
+      background: transparent;
+      color: var(--btn-color);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .mode-btn.active {
+      background: var(--cell-hover);
+      color: var(--text);
+      border-color: var(--status);
+    }
+
+    /* --- Theme toggle button --- */
+    #theme-toggle {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      background: var(--cell-bg);
+      border: 2px solid var(--btn-border);
+      color: var(--text);
+      border-radius: 50px;
+      padding: 0.35rem 0.9rem;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    #theme-toggle:hover {
+      background: var(--cell-hover);
+    }
+  </style>
+</head>
+<body>
+  <button id="theme-toggle" title="Toggle dark/light mode">🌙</button>
+  <h1>Tic Tac Toe</h1>
+
+  <div id="mode-toggle">
+    <button class="mode-btn active" id="btn-2p">2 Players</button>
+    <button class="mode-btn" id="btn-ai">vs AI</button>
+  </div>
+
+  <div id="status">X's turn</div>
+
+  <div id="board">
+    <div class="cell" data-i="0"></div>
+    <div class="cell" data-i="1"></div>
+    <div class="cell" data-i="2"></div>
+    <div class="cell" data-i="3"></div>
+    <div class="cell" data-i="4"></div>
+    <div class="cell" data-i="5"></div>
+    <div class="cell" data-i="6"></div>
+    <div class="cell" data-i="7"></div>
+    <div class="cell" data-i="8"></div>
+  </div>
+
+  <div id="scores">
+    <div class="score-box x-score">
+      <div class="label">X</div>
+      <div class="value" id="score-x">0</div>
+    </div>
+    <div class="score-box draw-score">
+      <div class="label">Draw</div>
+      <div class="value" id="score-d">0</div>
+    </div>
+    <div class="score-box o-score">
+      <div class="label">O</div>
+      <div class="value" id="score-o">0</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:0.75rem;margin-top:1.5rem">
+    <button id="restart">New Game</button>
+    <button id="reset-scores">Reset Scores</button>
+  </div>
+
+  <script>
+    const WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+    let board, current, gameOver, vsAI;
+    let scores = { X: 0, O: 0, D: 0 };
+
+    const cells   = document.querySelectorAll('.cell');
+    const status  = document.getElementById('status');
+    const btn2p   = document.getElementById('btn-2p');
+    const btnAI   = document.getElementById('btn-ai');
+
+    function init(mode) {
+      vsAI = mode ?? vsAI;
+      board = Array(9).fill('');
+      current = 'X';
+      gameOver = false;
+      cells.forEach(c => { c.textContent = ''; c.className = 'cell'; });
+      status.textContent = "X's turn";
+    }
+
+    function checkWinner() {
+      for (const [a,b,c] of WINS) {
+        if (board[a] && board[a] === board[b] && board[a] === board[c])
+          return { winner: board[a], line: [a,b,c] };
+      }
+      if (board.every(Boolean)) return { winner: null, line: [] };
+      return null;
+    }
+
+    function applyResult(result) {
+      gameOver = true;
+      if (result.winner) {
+        result.line.forEach(i => cells[i].classList.add('win'));
+        status.textContent = `${result.winner} wins!`;
+        scores[result.winner]++;
+      } else {
+        status.textContent = "It's a draw!";
+        scores.D++;
+      }
+      document.getElementById('score-x').textContent = scores.X;
+      document.getElementById('score-o').textContent = scores.O;
+      document.getElementById('score-d').textContent = scores.D;
+    }
+
+    function mark(i) {
+      board[i] = current;
+      cells[i].textContent = current;
+      cells[i].classList.add(current.toLowerCase(), 'taken');
+      const result = checkWinner();
+      if (result) { applyResult(result); return; }
+      current = current === 'X' ? 'O' : 'X';
+      status.textContent = `${current}'s turn`;
+    }
+
+    // Minimax AI
+    function minimax(b, isMax) {
+      for (const [a,x,c] of WINS) {
+        if (b[a] && b[a] === b[x] && b[a] === b[c])
+          return b[a] === 'O' ? 10 : -10;
+      }
+      if (b.every(Boolean)) return 0;
+
+      if (isMax) {
+        let best = -Infinity;
+        b.forEach((v, i) => {
+          if (!v) {
+            b[i] = 'O';
+            best = Math.max(best, minimax(b, false));
+            b[i] = '';
+          }
+        });
+        return best;
+      } else {
+        let best = Infinity;
+        b.forEach((v, i) => {
+          if (!v) {
+            b[i] = 'X';
+            best = Math.min(best, minimax(b, true));
+            b[i] = '';
+          }
+        });
+        return best;
+      }
+    }
+
+    function aiMove() {
+      let bestScore = -Infinity, bestIdx = -1;
+      board.forEach((v, i) => {
+        if (!v) {
+          board[i] = 'O';
+          const s = minimax(board, false);
+          board[i] = '';
+          if (s > bestScore) { bestScore = s; bestIdx = i; }
+        }
+      });
+      if (bestIdx !== -1) mark(bestIdx);
+    }
+
+    cells.forEach(cell => {
+      cell.addEventListener('click', () => {
+        const i = +cell.dataset.i;
+        if (gameOver || board[i]) return;
+        if (vsAI && current === 'O') return;
+        mark(i);
+        if (!gameOver && vsAI && current === 'O') {
+          setTimeout(aiMove, 300);
+        }
+      });
+    });
+
+    btn2p.addEventListener('click', () => {
+      btn2p.classList.add('active');
+      btnAI.classList.remove('active');
+      init(false);
+    });
+
+    btnAI.addEventListener('click', () => {
+      btnAI.classList.add('active');
+      btn2p.classList.remove('active');
+      init(true);
+    });
+
+    document.getElementById('restart').addEventListener('click', () => init());
+
+    document.getElementById('reset-scores').addEventListener('click', () => {
+      scores = { X: 0, O: 0, D: 0 };
+      document.getElementById('score-x').textContent = 0;
+      document.getElementById('score-o').textContent = 0;
+      document.getElementById('score-d').textContent = 0;
+    });
+
+    const themeBtn = document.getElementById('theme-toggle');
+    themeBtn.addEventListener('click', () => {
+      document.body.classList.toggle('light');
+      themeBtn.textContent = document.body.classList.contains('light') ? '☀️' : '🌙';
+    });
+
+    init(false);
+  </script>
+</body>
+</html>

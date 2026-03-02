@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Uploads & generated outputs (runtime files)
+uploads/
+outputs/
+backend/uploads/
+backend/outputs/
+
+# Environment
+.env
+*.env
+
+# Claude Code settings
+.claude/
+
+# Screenshots & temp files
+screenshot*.ps1
+screenshot*.png
+test_offer_payload*.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
