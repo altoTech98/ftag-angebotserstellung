@@ -48,4 +48,5 @@ if os.path.exists(frontend_path):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "service": "Frank Türen AG Angebotserstellung"}
+    api_key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    return {"status": "ok", "service": "Frank Türen AG Angebotserstellung", "api_key_set": api_key_set}
