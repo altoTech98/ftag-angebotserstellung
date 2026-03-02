@@ -3,7 +3,9 @@
  * Modern Frontend App
  */
 
-const API = 'http://localhost:8000/api';
+const API = window.location.hostname === 'localhost'
+  ? 'http://localhost:8000/api'
+  : `${window.location.origin}/api`;
 
 let state = {
   file: null,
