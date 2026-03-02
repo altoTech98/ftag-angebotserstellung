@@ -4,12 +4,19 @@ FastAPI Backend Entry Point
 """
 
 import os
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from routers import upload, analyze, offer, feedback
+from routers import upload, analyze, offer, feedback, history
 
 # Ensure output directories exist (absolute paths, consistent with routers/services)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -36,6 +43,7 @@ app.include_router(upload.router, prefix="/api")
 app.include_router(analyze.router, prefix="/api")
 app.include_router(offer.router, prefix="/api")
 app.include_router(feedback.router, prefix="/api")
+app.include_router(history.router, prefix="/api")
 
 # Serve frontend static files
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")

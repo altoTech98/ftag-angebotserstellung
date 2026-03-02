@@ -39,11 +39,12 @@ def save_feedback_entry(entry: dict) -> dict:
 def find_relevant_feedback(
     requirement_text: str,
     requirement_fields: dict,
-    limit: int = 5,
+    limit: int = 8,
 ) -> list[dict]:
     """
-    Find past corrections most relevant to the current requirement.
+    Find past corrections AND confirmations most relevant to the current requirement.
     Uses keyword overlap scoring to find similar past requirements.
+    Returns both corrections (negative) and confirmations (positive) examples.
     """
     entries = load_feedback()
     if not entries:
@@ -61,21 +62,45 @@ def find_relevant_feedback(
         )
         overlap = len(current_keywords & past_keywords)
         if overlap > 0:
-            scored.append((overlap, entry))
+            # Corrections get a slight boost (more actionable)
+            weight = overlap * 1.2 if entry.get("type") != "confirmation" else overlap
+            scored.append((weight, entry))
 
     scored.sort(key=lambda x: x[0], reverse=True)
     return [entry for _, entry in scored[:limit]]
 
 
+def save_confirmation(
+    requirement_text: str,
+    requirement_fields: dict,
+    confirmed_product: dict,
+    position_id: str = "",
+    match_status_was: str = "",
+) -> dict:
+    """Save a positive confirmation (user accepted the match)."""
+    return save_feedback_entry({
+        "type": "confirmation",
+        "requirement_text": requirement_text,
+        "requirement_fields": requirement_fields,
+        "confirmed_product": confirmed_product,
+        "position_id": position_id,
+        "match_status_was": match_status_was,
+    })
+
+
 def get_feedback_stats() -> dict:
     """Return summary statistics about stored feedback."""
     entries = load_feedback()
+    corrections = [e for e in entries if e.get("type") != "confirmation"]
+    confirmations = [e for e in entries if e.get("type") == "confirmation"]
     return {
-        "total_corrections": len(entries),
+        "total_corrections": len(corrections),
+        "total_confirmations": len(confirmations),
+        "total_feedback": len(entries),
         "unique_requirements": len(
             set(e.get("requirement_text", "") for e in entries)
         ),
-        "latest_correction": entries[-1]["timestamp"] if entries else None,
+        "latest_feedback": entries[-1]["timestamp"] if entries else None,
     }
 
 

@@ -202,6 +202,345 @@ Erstelle einen detaillierten Gap-Report mit:
     return message.content[0].text
 
 
+def normalize_door_positions(
+    doors: list[dict],
+    supplementary_context: str = "",
+    unmapped_columns_sample: dict = None,
+) -> dict:
+    """
+    Use Claude to normalize/enrich ALREADY STRUCTURED door data from Excel parsing.
+
+    Instead of extracting from raw text, Claude only normalizes inconsistent values,
+    fills in missing fields from context, and standardizes the output format.
+
+    Args:
+        doors: Structured door dicts from excel_parser
+        supplementary_context: Additional text from PDF specs
+        unmapped_columns_sample: {column_name: [sample_values]} for unknown columns
+
+    Returns:
+        Standard requirements dict compatible with match_requirements_ai()
+    """
+    client = get_client()
+
+    # Batch doors in groups of ~100 to stay within token limits
+    BATCH_SIZE = 100
+    all_positions = []
+
+    for batch_start in range(0, len(doors), BATCH_SIZE):
+        batch = doors[batch_start:batch_start + BATCH_SIZE]
+        batch_positions = _normalize_batch(client, batch, supplementary_context, unmapped_columns_sample)
+        all_positions.extend(batch_positions)
+
+    # Build standard output format
+    projekt = ""
+    auftraggeber = ""
+    if all_positions:
+        # Try to infer project name from door numbers
+        first_nr = all_positions[0].get("position", "")
+        if first_nr:
+            projekt = f"Projekt (Türliste: {len(all_positions)} Positionen)"
+
+    return {
+        "projekt": projekt,
+        "auftraggeber": auftraggeber,
+        "positionen": all_positions,
+        "gesamtanzahl_tueren": sum(p.get("menge", 1) for p in all_positions),
+        "hinweise": f"Strukturiert aus Excel extrahiert ({len(doors)} Zeilen). "
+                    + (f"PDF-Kontext: {len(supplementary_context)} Zeichen." if supplementary_context else ""),
+    }
+
+
+def _normalize_batch(
+    client,
+    doors: list[dict],
+    supplementary_context: str,
+    unmapped_columns_sample: dict | None,
+) -> list[dict]:
+    """Normalize a batch of doors via Claude."""
+
+    # Build compact door data (exclude _raw_row and _merge_conflicts)
+    compact_doors = []
+    for d in doors:
+        compact = {k: v for k, v in d.items() if not k.startswith("_") and v is not None}
+        compact_doors.append(compact)
+
+    doors_json = json.dumps(compact_doors, ensure_ascii=False, indent=1)
+
+    context_block = ""
+    if supplementary_context:
+        context_block = f"\n\n## ZUSÄTZLICHER KONTEXT AUS PDF-SPEZIFIKATIONEN\n{supplementary_context[:8000]}\n"
+
+    unmapped_block = ""
+    if unmapped_columns_sample:
+        unmapped_block = "\n\n## NICHT ZUGEORDNETE SPALTEN (Beispielwerte)\n"
+        for col, values in list(unmapped_columns_sample.items())[:10]:
+            unmapped_block += f"- {col}: {', '.join(str(v) for v in values[:5])}\n"
+        unmapped_block += "\nFalls diese Spalten relevante Türdaten enthalten, integriere die Informationen.\n"
+
+    system_prompt = f"""Du bist ein erfahrener Türen-Fachberater der Frank Türen AG in Buochs NW, Schweiz.
+
+## AUFGABE
+Du erhältst BEREITS STRUKTURIERTE Türdaten aus einer Excel-Türliste. Deine Aufgabe ist NUR:
+1. Werte normalisieren (z.B. "Stahl T30 1flg" → tuertyp="Stahltür", brandschutz="T30")
+2. Fehlende Felder aus Beschreibung/Besonderheiten ableiten
+3. Brandschutz standardisieren: T30→EI30, T60→EI60 etc. (bevorzuge EI-Format)
+4. Einbruchschutz standardisieren: WK2→RC2, WK3→RC3 etc. (bevorzuge RC-Format)
+5. Masse in mm sicherstellen
+6. Zusatzinformationen aus dem PDF-Kontext einfliessen lassen
+
+## WICHTIG
+- Du EXTRAHIERST NICHT aus Rohdaten – die Daten sind bereits strukturiert!
+- Verändere tuer_nr NICHT (das ist die Original-ID)
+- Wenn ein Feld leer/null ist und du es nicht ableiten kannst, lasse es null
+- Erstelle eine kurze beschreibung aus den vorhandenen Feldern
+{context_block}{unmapped_block}
+## ANTWORTFORMAT
+Antworte NUR mit einem JSON-Array. Pro Tür ein Objekt im Standardformat:
+[
+  {{
+    "position": "<tuer_nr>",
+    "beschreibung": "<kurze Zusammenfassung>",
+    "menge": <int>,
+    "einheit": "Stk",
+    "tuertyp": "<Stahltür|Holztür|Alutür|Brandschutztür|...>",
+    "breite": <mm oder null>,
+    "hoehe": <mm oder null>,
+    "brandschutz": "<EI30|EI60|EI90|... oder null>",
+    "schallschutz": "<Rw=32dB|... oder null>",
+    "einbruchschutz": "<RC2|RC3|... oder null>",
+    "verglasung": "<Beschreibung oder null>",
+    "oberflaechenbehandlung": "<RAL xxxx|... oder null>",
+    "zubehoer": "<Beschläge, Schliesser, etc. oder null>",
+    "besonderheiten": "<Zusätzliche Anforderungen>"
+  }}
+]"""
+
+    user_message = f"""Normalisiere folgende {len(doors)} Türpositionen:
+
+{doors_json}"""
+
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=8192,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+        )
+
+        response_text = message.content[0].text.strip()
+
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+
+        positions = json.loads(response_text)
+        if not isinstance(positions, list):
+            positions = [positions]
+
+        # Ensure menge defaults
+        for p in positions:
+            if not p.get("menge"):
+                p["menge"] = 1
+            if not p.get("einheit"):
+                p["einheit"] = "Stk"
+
+        return positions
+
+    except Exception as e:
+        logger.warning(f"Claude normalization failed for batch: {e}")
+        # Fallback: convert raw data to standard format without Claude
+        return _fallback_normalize(doors)
+
+
+def _fallback_normalize(doors: list[dict]) -> list[dict]:
+    """Convert structured door dicts to standard format without Claude."""
+    positions = []
+    for d in doors:
+        parts = []
+        if d.get("tuertyp"):
+            parts.append(d["tuertyp"])
+        if d.get("brandschutz"):
+            parts.append(d["brandschutz"])
+        if d.get("breite") and d.get("hoehe"):
+            parts.append(f"{d['breite']}x{d['hoehe']}mm")
+
+        positions.append({
+            "position": d.get("tuer_nr", ""),
+            "beschreibung": " ".join(parts) if parts else "Tür",
+            "menge": d.get("menge", 1),
+            "einheit": "Stk",
+            "tuertyp": d.get("tuertyp"),
+            "breite": d.get("breite"),
+            "hoehe": d.get("hoehe"),
+            "brandschutz": d.get("brandschutz"),
+            "schallschutz": d.get("schallschutz"),
+            "einbruchschutz": d.get("einbruchschutz"),
+            "verglasung": d.get("verglasung"),
+            "oberflaechenbehandlung": d.get("oberflaechenbehandlung"),
+            "zubehoer": d.get("beschlaege"),
+            "besonderheiten": d.get("besonderheiten", ""),
+        })
+    return positions
+
+
+def ai_match_products_batch(
+    positions_data: list[dict],
+    feedback_examples: list[dict],
+) -> list[dict]:
+    """
+    Batch matching: Match ALL positions in a single Claude call.
+    Each entry in positions_data: {req_text, req_fields, candidates_text, candidate_indices}
+    Returns list of match results (one per position).
+    """
+    client = get_client()
+
+    # Build few-shot examples from feedback
+    feedback_block = ""
+    if feedback_examples:
+        feedback_block = "\n\n## BISHERIGE KORREKTUREN & BESTÄTIGUNGEN (Lernbeispiele)\n"
+        for i, fb in enumerate(feedback_examples, 1):
+            fb_type = fb.get("type", "correction")
+            if fb_type == "confirmation":
+                feedback_block += (
+                    f"Bestätigung {i}: Anforderung '{fb.get('requirement_text', '')}' "
+                    f"→ RICHTIGES Produkt: {fb.get('confirmed_product', {}).get('product_summary', '?')}\n"
+                )
+            else:
+                feedback_block += (
+                    f"Korrektur {i}: Anforderung '{fb.get('requirement_text', '')}' "
+                    f"→ FALSCH: {fb.get('wrong_product', {}).get('product_summary', '?')} "
+                    f"→ RICHTIG: {fb.get('correct_product', {}).get('product_summary', '?')}"
+                )
+                if fb.get("user_note"):
+                    feedback_block += f" (Bemerkung: {fb['user_note']})"
+                feedback_block += "\n"
+
+    # Build positions block
+    positions_block = ""
+    for i, pos_data in enumerate(positions_data):
+        positions_block += f"\n### POSITION {i+1}: {pos_data['req_text']}\n"
+        positions_block += f"Felder: {json.dumps(pos_data['req_fields'], ensure_ascii=False)}\n"
+        positions_block += f"Kandidaten:\n{pos_data['candidates_text']}\n"
+
+    system_prompt = f"""Du bist ein erfahrener Türen-Fachberater der Frank Türen AG in Buochs NW, Schweiz.
+
+## AUFGABE
+Matche ALLE folgenden Positionen aus einer Ausschreibung gegen die jeweiligen Produktkandidaten.
+
+## BEWERTUNGSKRITERIEN (Priorität)
+1. Türtyp (Stahl, Holz, Alu) muss übereinstimmen
+2. Brandschutzklasse (T30/EI30, T60/EI60, T90/EI90) muss mindestens erfüllt werden
+3. Einbruchschutzklasse (RC2/WK2, RC3/WK3) muss mindestens erfüllt werden
+4. Masse (Breite x Höhe) sollten passen oder anpassbar sein
+5. Weitere Spezifikationen (Schallschutz, Verglasung, Oberfläche)
+
+## REGELN
+- T30=EI30, T60=EI60, T90=EI90 (gleichwertig)
+- RC2=WK2, RC3=WK3, RC4=WK4 (gleichwertig)
+- HÖHERE Klasse erfüllt NIEDRIGERE (T60 erfüllt T30)
+- Wenn kein Kandidat passt → "unmatched"
+- Bei Unsicherheit → "partial"
+
+## CONFIDENCE-KALIBRIERUNG
+- 0.9–1.0: ALLE Kriterien (Türtyp, Brandschutz, Einbruchschutz, Masse) exakt erfüllt
+- 0.7–0.9: Hauptkriterien (Türtyp + Brandschutz/Einbruchschutz) erfüllt, Nebenkriterien offen
+- 0.5–0.7: Türtyp stimmt, aber Brand-/Einbruchschutz weicht ab oder ist unklar
+- 0.3–0.5: Nur grobe Ähnlichkeit, wesentliche Anforderungen nicht erfüllt
+- 0.0–0.3: Kein sinnvoller Match
+WICHTIG: Setze confidence NICHT höher als 0.6 wenn Brandschutz oder Einbruchschutz NICHT erfüllt sind.
+{feedback_block}
+## ANTWORTFORMAT
+Antworte NUR mit einem JSON-Array. Pro Position ein Objekt:
+[
+  {{
+    "position_index": 0,
+    "best_match_rank": <1-basiert oder null>,
+    "confidence": <0.0-1.0>,
+    "status": "matched" | "partial" | "unmatched",
+    "reason": "<kurze deutsche Begründung>",
+    "match_criteria": [
+      {{"kriterium": "Türtyp", "status": "ok", "detail": "Stahl = Stahl"}},
+      {{"kriterium": "Brandschutz", "status": "ok", "detail": "T60 erfüllt T30"}},
+      {{"kriterium": "Einbruchschutz", "status": "fehlt", "detail": "RC3 gefordert, nicht verfügbar"}}
+    ],
+    "alternative_ranks": []
+  }}
+]"""
+
+    user_message = f"""Matche folgende {len(positions_data)} Positionen:\n{positions_block}"""
+
+    message = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=4096,
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_message}],
+    )
+
+    response_text = message.content[0].text.strip()
+
+    if "```json" in response_text:
+        response_text = response_text.split("```json")[1].split("```")[0].strip()
+    elif "```" in response_text:
+        response_text = response_text.split("```")[1].split("```")[0].strip()
+
+    try:
+        results = json.loads(response_text)
+        if not isinstance(results, list):
+            results = [results]
+    except json.JSONDecodeError:
+        logger.warning(f"Batch AI match returned invalid JSON: {response_text[:300]}")
+        # Return fallback for all positions
+        return [
+            {
+                "best_match_index": pd["candidate_indices"][0] if pd["candidate_indices"] else None,
+                "confidence": 0.3,
+                "status": "partial",
+                "reason": "KI-Batch-Antwort konnte nicht verarbeitet werden",
+                "match_criteria": [],
+                "alternative_indices": [],
+            }
+            for pd in positions_data
+        ]
+
+    # Map ranks back to DataFrame indices
+    mapped_results = []
+    for i, pos_data in enumerate(positions_data):
+        # Find matching result (by position_index or by order)
+        result = None
+        for r in results:
+            if r.get("position_index") == i:
+                result = r
+                break
+        if result is None and i < len(results):
+            result = results[i]
+        if result is None:
+            result = {"status": "unmatched", "confidence": 0.0, "reason": "Keine KI-Antwort"}
+
+        candidates = pos_data["candidate_indices"]
+        best_rank = result.get("best_match_rank")
+        best_index = None
+        if best_rank and 1 <= best_rank <= len(candidates):
+            best_index = candidates[best_rank - 1]
+
+        alt_indices = []
+        for alt_rank in result.get("alternative_ranks", []):
+            if isinstance(alt_rank, int) and 1 <= alt_rank <= len(candidates):
+                alt_indices.append(candidates[alt_rank - 1])
+
+        mapped_results.append({
+            "best_match_index": best_index,
+            "confidence": result.get("confidence", 0.0),
+            "status": result.get("status", "unmatched"),
+            "reason": result.get("reason", ""),
+            "match_criteria": result.get("match_criteria", []),
+            "alternative_indices": alt_indices,
+        })
+
+    return mapped_results
+
+
 def ai_match_products(
     requirement_text: str,
     requirement_fields: dict,
@@ -252,6 +591,14 @@ FTAG-Katalog, bestimme das beste passende Produkt.
 - Ein Produkt mit HÖHERER Klasse erfüllt NIEDRIGERE Anforderungen (T60 erfüllt T30)
 - Wenn kein Kandidat passt, sage "unmatched" – erfinde keine Matches
 - Bei Unsicherheit sage "partial" und erkläre warum
+
+## CONFIDENCE-KALIBRIERUNG
+- 0.9–1.0: ALLE Kriterien (Türtyp, Brandschutz, Einbruchschutz, Masse) exakt erfüllt
+- 0.7–0.9: Hauptkriterien erfüllt, Nebenkriterien offen
+- 0.5–0.7: Türtyp stimmt, aber Brand-/Einbruchschutz weicht ab
+- 0.3–0.5: Nur grobe Ähnlichkeit
+- 0.0–0.3: Kein sinnvoller Match
+WICHTIG: Setze confidence NICHT höher als 0.6 wenn Brandschutz oder Einbruchschutz NICHT erfüllt sind.
 {feedback_block}
 ## ANTWORTFORMAT
 Antworte NUR mit validem JSON:

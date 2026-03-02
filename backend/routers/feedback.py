@@ -11,7 +11,7 @@ from typing import Optional
 
 import pandas as pd
 
-from services.feedback_store import save_feedback_entry, get_feedback_stats
+from services.feedback_store import save_feedback_entry, save_confirmation, get_feedback_stats
 from services.product_matcher import load_product_catalog
 
 router = APIRouter()
@@ -35,6 +35,31 @@ async def submit_feedback(request: FeedbackRequest):
         "status": "saved",
         "feedback_id": entry["id"],
         "message": "Korrektur gespeichert – wird bei zukünftigen Matches berücksichtigt.",
+    }
+
+
+class ConfirmRequest(BaseModel):
+    requirement_text: str
+    requirement_fields: dict
+    confirmed_product: dict
+    position_id: str = ""
+    match_status_was: str = ""
+
+
+@router.post("/feedback/confirm")
+async def submit_confirmation(request: ConfirmRequest):
+    """Save a positive match confirmation."""
+    entry = save_confirmation(
+        requirement_text=request.requirement_text,
+        requirement_fields=request.requirement_fields,
+        confirmed_product=request.confirmed_product,
+        position_id=request.position_id,
+        match_status_was=request.match_status_was,
+    )
+    return {
+        "status": "saved",
+        "feedback_id": entry["id"],
+        "message": "Bestätigung gespeichert.",
     }
 
 

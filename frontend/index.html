@@ -39,6 +39,13 @@
         </svg>
         <span>Produktkatalog</span>
       </button>
+      <button class="nav-item" id="nav-history" onclick="switchView('history', this)">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span>Historie</span>
+      </button>
     </nav>
 
     <div class="sidebar-footer">
@@ -75,7 +82,7 @@
         <!-- STEP 1: Upload -->
         <div id="panel-upload" class="panel active-panel">
 
-          <!-- Progress pills -->
+          <!-- Progress pills (4 steps for project workflow) -->
           <div class="progress-pills">
             <div class="pill active" id="pill-1">
               <span class="pill-num">1</span>
@@ -84,11 +91,16 @@
             <div class="pill-connector"></div>
             <div class="pill" id="pill-2">
               <span class="pill-num">2</span>
-              <span class="pill-label">KI-Analyse</span>
+              <span class="pill-label">Klassifikation</span>
             </div>
             <div class="pill-connector"></div>
             <div class="pill" id="pill-3">
               <span class="pill-num">3</span>
+              <span class="pill-label">KI-Analyse</span>
+            </div>
+            <div class="pill-connector"></div>
+            <div class="pill" id="pill-4">
+              <span class="pill-num">4</span>
               <span class="pill-label">Ergebnis</span>
             </div>
           </div>
@@ -106,29 +118,60 @@
                 </div>
                 <div>
                   <h2 class="card-title">Ausschreibung hochladen</h2>
-                  <p class="card-desc">PDF, Excel, Word oder Text</p>
+                  <p class="card-desc">Gesamten Ausschreibungsordner oder einzelne Dateien</p>
                 </div>
+              </div>
+
+              <!-- Upload mode toggle -->
+              <div class="upload-mode-toggle">
+                <button class="toggle-btn active" id="toggle-folder" onclick="setUploadMode('folder')">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  Ordner
+                </button>
+                <button class="toggle-btn" id="toggle-files" onclick="setUploadMode('files')">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                  Dateien
+                </button>
               </div>
 
               <div class="drop-zone" id="drop-zone"
                 ondragover="handleDragOver(event)"
                 ondragleave="handleDragLeave(event)"
                 ondrop="handleDrop(event)"
-                onclick="document.getElementById('file-input').click()">
+                onclick="triggerFileInput()">
                 <div class="drop-visual">
                   <div class="drop-circle">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                      <polyline points="17 8 12 3 7 8"/>
-                      <line x1="12" y1="3" x2="12" y2="15"/>
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                     </svg>
                   </div>
-                  <p class="drop-main">Datei hier ablegen</p>
-                  <p class="drop-hint">oder <span class="drop-link" onclick="document.getElementById('file-input').click(); event.stopPropagation()">auswählen</span> · PDF, XLSX, DOCX, TXT · max. 50 MB</p>
+                  <p class="drop-main" id="drop-main-text">Ordner hier ablegen</p>
+                  <p class="drop-hint" id="drop-hint-text">oder <span class="drop-link" onclick="triggerFileInput(); event.stopPropagation()">auswählen</span> · PDF, XLSX, DOCX und mehr · max. 500 MB</p>
                 </div>
-                <input type="file" id="file-input" accept=".pdf,.xlsx,.xls,.docx,.doc,.txt" onchange="handleFileSelect(event)" hidden />
+                <input type="file" id="folder-input" webkitdirectory directory onchange="handleFolderSelect(event)" hidden />
+                <input type="file" id="files-input" multiple accept=".pdf,.xlsx,.xls,.xlsm,.docx,.doc,.txt,.jpg,.jpeg,.png,.dwg,.crbx" onchange="handleFilesSelect(event)" hidden />
               </div>
 
+              <!-- Multi-file preview list -->
+              <div id="files-preview" class="files-preview hidden">
+                <div class="files-preview-header">
+                  <span id="files-count" class="files-count">0 Dateien</span>
+                  <span id="files-total-size" class="files-total-size">0 KB</span>
+                  <button class="remove-btn" onclick="clearFiles()" title="Alle entfernen">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+                <div id="files-list" class="files-list"></div>
+              </div>
+
+              <!-- Legacy single file preview (hidden in project mode) -->
               <div id="file-preview" class="file-preview hidden">
                 <div class="file-preview-icon" id="file-type-icon">📄</div>
                 <div class="file-preview-info">
@@ -142,11 +185,13 @@
                 </button>
               </div>
 
-              <button class="cta-btn" id="btn-upload" onclick="runFullWorkflow()" disabled>
+              <button class="cta-btn" id="btn-upload" onclick="startUpload()" disabled>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
-                Hochladen &amp; Analysieren
+                Hochladen &amp; Klassifizieren
               </button>
             </div>
 
@@ -189,7 +234,35 @@
           </div>
         </div>
 
-        <!-- STEP 2: Processing -->
+        <!-- STEP 2: Classification Review -->
+        <div id="panel-classify" class="panel">
+          <div class="glass-card">
+            <div class="card-header-row">
+              <div class="card-icon-wrap blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+              </div>
+              <div>
+                <h2 class="card-title">Datei-Klassifikation</h2>
+                <p class="card-desc" id="classify-subtitle">Dateien wurden automatisch klassifiziert</p>
+              </div>
+            </div>
+            <div class="classify-summary" id="classify-summary"></div>
+            <div id="classification-grid" class="classification-grid"></div>
+            <div style="display:flex;gap:1rem;margin-top:1.5rem;">
+              <button class="cta-btn" id="btn-start-analysis" onclick="startProjectAnalysis()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                Analyse starten
+              </button>
+              <button class="cta-btn secondary" onclick="resetAll()">Abbrechen</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3: Processing -->
         <div id="panel-processing" class="panel">
           <div class="glass-card processing-card">
             <div class="processing-header">
@@ -203,14 +276,14 @@
               <div class="step-item" id="step-upload">
                 <div class="step-dot pending"></div>
                 <div class="step-body">
-                  <p class="step-name">Datei hochladen & parsen</p>
+                  <p class="step-name">Dateien hochladen &amp; klassifizieren</p>
                   <p class="step-status" id="status-upload">Warte...</p>
                 </div>
               </div>
               <div class="step-item" id="step-ai">
                 <div class="step-dot pending"></div>
                 <div class="step-body">
-                  <p class="step-name">Claude KI-Analyse</p>
+                  <p class="step-name">Excel parsen &amp; KI-Normalisierung</p>
                   <p class="step-status" id="status-ai">Warte...</p>
                 </div>
               </div>
@@ -291,7 +364,8 @@
               </svg>
             </div>
             <h2 class="error-title">Fehler aufgetreten</h2>
-            <p class="error-msg" id="error-msg"></p>
+            <div class="error-detail" id="error-msg" style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:1rem;margin-bottom:1.25rem;font-size:0.9375rem;color:var(--red-600);line-height:1.6;text-align:left;word-break:break-word;"></div>
+            <p style="color:var(--gray-500);font-size:0.8125rem;margin-bottom:1.25rem;">Tipp: Browser-Konsole (F12) zeigt weitere Details.</p>
             <button class="cta-btn secondary" onclick="resetAll()">Erneut versuchen</button>
           </div>
         </div>
@@ -332,6 +406,58 @@
               <thead id="products-thead"></thead>
               <tbody id="products-tbody"></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== HISTORY VIEW ===== -->
+      <div id="view-history" class="view">
+        <div class="glass-card">
+          <div class="card-header-row">
+            <div class="card-icon-wrap blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+            <div>
+              <h2 class="card-title">Analyse-Historie</h2>
+              <p class="card-desc">Vergangene Analysen einsehen und vergleichen</p>
+            </div>
+          </div>
+          <div id="history-loading" class="loading-state hidden">
+            <div class="mini-spinner"></div>
+            <span>Historie wird geladen...</span>
+          </div>
+          <p id="history-error" class="error-inline hidden"></p>
+          <p id="history-empty" class="info-inline hidden">Noch keine Analysen durchgeführt.</p>
+          <div id="history-table-wrap" class="table-wrap hidden">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Datum</th>
+                  <th>Datei</th>
+                  <th>Projekt</th>
+                  <th>Positionen</th>
+                  <th>Rate</th>
+                  <th>Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="history-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="history-detail" class="hidden" style="margin-top:1.5rem;">
+          <div class="glass-card">
+            <div class="card-header-row" style="justify-content:space-between;">
+              <div>
+                <h2 class="card-title" id="history-detail-title">Analyse-Details</h2>
+                <p class="card-desc" id="history-detail-sub"></p>
+              </div>
+              <button class="cta-btn slim secondary" onclick="closeHistoryDetail()">Schliessen</button>
+            </div>
+            <div id="history-detail-stats" class="stat-grid"></div>
+            <div id="history-detail-positions"></div>
           </div>
         </div>
       </div>

@@ -12,6 +12,12 @@ let state = {
   fileId: null,
   analysis: null,
   offer: null,
+  // Project mode (folder upload)
+  uploadMode: 'folder',  // 'folder' | 'files'
+  files: [],             // Array of File objects
+  projectId: null,
+  projectFiles: [],      // Response from /api/upload/folder
+  classificationOverrides: {},
 };
 
 // ─────────────────────────────────────────────
@@ -27,11 +33,42 @@ function switchView(view, btn) {
   const titles = {
     offer:    ['Angebot erstellen', 'Ausschreibung hochladen und KI-Analyse starten'],
     products: ['Produktkatalog', 'FTAG-Produktmatrix durchsuchen'],
+    history:  ['Analyse-Historie', 'Vergangene Analysen einsehen und vergleichen'],
   };
   document.getElementById('topbar-title').textContent = titles[view][0];
   document.getElementById('topbar-sub').textContent   = titles[view][1];
 
   if (view === 'products') loadProducts();
+  if (view === 'history') loadHistory();
+}
+
+// ─────────────────────────────────────────────
+// UPLOAD MODE TOGGLE
+// ─────────────────────────────────────────────
+
+function setUploadMode(mode) {
+  state.uploadMode = mode;
+  document.getElementById('toggle-folder').classList.toggle('active', mode === 'folder');
+  document.getElementById('toggle-files').classList.toggle('active', mode === 'files');
+
+  const mainText = document.getElementById('drop-main-text');
+  const hintText = document.getElementById('drop-hint-text');
+
+  if (mode === 'folder') {
+    mainText.textContent = 'Ordner hier ablegen';
+    hintText.innerHTML = 'oder <span class="drop-link" onclick="triggerFileInput(); event.stopPropagation()">auswählen</span> · PDF, XLSX, DOCX und mehr · max. 500 MB';
+  } else {
+    mainText.textContent = 'Dateien hier ablegen';
+    hintText.innerHTML = 'oder <span class="drop-link" onclick="triggerFileInput(); event.stopPropagation()">auswählen</span> · Mehrere Dateien möglich · max. 500 MB';
+  }
+}
+
+function triggerFileInput() {
+  if (state.uploadMode === 'folder') {
+    document.getElementById('folder-input').click();
+  } else {
+    document.getElementById('files-input').click();
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -45,34 +82,154 @@ function handleDragOver(e) {
 function handleDragLeave() {
   document.getElementById('drop-zone').classList.remove('drag-over');
 }
+
 function handleDrop(e) {
   e.preventDefault();
   document.getElementById('drop-zone').classList.remove('drag-over');
-  if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+
+  // Check for folder drop via webkitGetAsEntry
+  const items = e.dataTransfer.items;
+  if (items && items.length > 0 && items[0].webkitGetAsEntry) {
+    const entry = items[0].webkitGetAsEntry();
+    if (entry && entry.isDirectory) {
+      collectFolderFiles(entry).then(files => {
+        if (files.length > 0) setFiles(files);
+      });
+      return;
+    }
+  }
+
+  // Multi-file drop
+  const files = Array.from(e.dataTransfer.files);
+  if (files.length > 1) {
+    setFiles(files);
+  } else if (files.length === 1) {
+    setFiles(files);
+  }
 }
-function handleFileSelect(e) {
-  if (e.target.files[0]) setFile(e.target.files[0]);
+
+function handleFolderSelect(e) {
+  const files = Array.from(e.target.files);
+  if (files.length > 0) setFiles(files);
 }
 
-function setFile(file) {
-  const allowed = ['.pdf','.xlsx','.xls','.docx','.doc','.txt'];
-  const ext = '.' + file.name.split('.').pop().toLowerCase();
-  if (!allowed.includes(ext)) { showError(`Dateityp "${ext}" nicht unterstützt.`); return; }
+function handleFilesSelect(e) {
+  const files = Array.from(e.target.files);
+  if (files.length > 0) setFiles(files);
+}
 
-  state.file = file;
+async function collectFolderFiles(entry) {
+  const files = [];
 
-  const icons = { '.pdf': '📕', '.xlsx': '📗', '.xls': '📗', '.docx': '📘', '.doc': '📘', '.txt': '📄' };
-  document.getElementById('file-type-icon').textContent = icons[ext] || '📄';
-  document.getElementById('file-name').textContent = file.name;
-  document.getElementById('file-size').textContent = fmtSize(file.size);
-  document.getElementById('file-preview').classList.remove('hidden');
+  async function readEntry(dirEntry) {
+    return new Promise((resolve) => {
+      if (dirEntry.isFile) {
+        dirEntry.file(f => { files.push(f); resolve(); });
+      } else if (dirEntry.isDirectory) {
+        const reader = dirEntry.createReader();
+        reader.readEntries(async (entries) => {
+          for (const e of entries) {
+            await readEntry(e);
+          }
+          resolve();
+        });
+      } else {
+        resolve();
+      }
+    });
+  }
+
+  await readEntry(entry);
+  return files;
+}
+
+function setFiles(fileList) {
+  state.files = fileList;
+  state.file = null;
+  renderFilesPreview();
   document.getElementById('btn-upload').disabled = false;
+}
+
+function renderFilesPreview() {
+  const container = document.getElementById('files-preview');
+  const listEl = document.getElementById('files-list');
+  const countEl = document.getElementById('files-count');
+  const sizeEl = document.getElementById('files-total-size');
+
+  if (!state.files.length) {
+    container.classList.add('hidden');
+    return;
+  }
+
+  container.classList.remove('hidden');
+  document.getElementById('file-preview').classList.add('hidden');
+
+  const totalSize = state.files.reduce((sum, f) => sum + f.size, 0);
+  countEl.textContent = `${state.files.length} Dateien`;
+  sizeEl.textContent = fmtSize(totalSize);
+
+  const FILE_ICONS = {
+    '.pdf': '📕', '.xlsx': '📗', '.xls': '📗', '.xlsm': '📗',
+    '.docx': '📘', '.doc': '📘', '.docm': '📘', '.txt': '📄',
+    '.jpg': '🖼️', '.jpeg': '🖼️', '.png': '🖼️',
+    '.dwg': '📐', '.crbx': '📦',
+  };
+
+  listEl.innerHTML = state.files.map((f, i) => {
+    const ext = '.' + f.name.split('.').pop().toLowerCase();
+    const icon = FILE_ICONS[ext] || '📄';
+    const category = guessCategory(f.name);
+    return `
+      <div class="file-item">
+        <span class="file-item-icon">${icon}</span>
+        <span class="file-item-name">${esc(f.name)}</span>
+        <span class="file-item-size">${fmtSize(f.size)}</span>
+        <span class="category-badge ${category}">${categoryLabel(category)}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function guessCategory(filename) {
+  const name = filename.toLowerCase();
+  const ext = '.' + name.split('.').pop();
+  if (['.dwg', '.dxf'].includes(ext)) return 'plan';
+  if (['.jpg', '.jpeg', '.png', '.bmp', '.tif'].includes(ext)) return 'foto';
+  if (ext === '.crbx') return 'sonstig';
+  if (/t[üu]rliste|t[üu]rmatrix|tuerliste|tuermatrix/.test(name) && ['.xlsx', '.xls', '.xlsm'].includes(ext)) return 'tuerliste';
+  if (/grundriss|situationsplan|lageplan/.test(name)) return 'plan';
+  if (/leistungsverzeichnis|lv[_.\s-]|t[üu]rbuch|typicals|spezifikation|bedingung/.test(name)) return 'spezifikation';
+  if (['.xlsx', '.xls', '.xlsm'].includes(ext)) return 'tuerliste';
+  if (ext === '.pdf') return 'spezifikation';
+  if (['.docx', '.doc', '.docm'].includes(ext)) return 'spezifikation';
+  return 'sonstig';
+}
+
+function categoryLabel(cat) {
+  const labels = {
+    tuerliste: 'Türliste',
+    spezifikation: 'Spezifikation',
+    plan: 'Plan',
+    foto: 'Foto',
+    sonstig: 'Sonstig',
+  };
+  return labels[cat] || cat;
+}
+
+function clearFiles() {
+  state.files = [];
+  state.projectId = null;
+  state.projectFiles = [];
+  state.classificationOverrides = {};
+  document.getElementById('files-preview').classList.add('hidden');
+  document.getElementById('folder-input').value = '';
+  document.getElementById('files-input').value = '';
+  document.getElementById('btn-upload').disabled = true;
 }
 
 function clearFile() {
   state.file = null;
   document.getElementById('file-preview').classList.add('hidden');
-  document.getElementById('file-input').value = '';
   document.getElementById('btn-upload').disabled = true;
 }
 
@@ -85,6 +242,168 @@ function fmtSize(b) {
 // ─────────────────────────────────────────────
 // MAIN WORKFLOW
 // ─────────────────────────────────────────────
+
+function startUpload() {
+  if (state.files.length > 0) {
+    runProjectWorkflow();
+  } else if (state.file) {
+    runFullWorkflow();
+  }
+}
+
+async function runProjectWorkflow() {
+  if (!state.files.length) return;
+
+  showPanel('processing');
+  setPill(1);
+  setStep('upload', 'running', `${state.files.length} Dateien werden hochgeladen...`);
+  document.getElementById('processing-subtitle').textContent = 'Dateien werden hochgeladen...';
+
+  try {
+    // 1. Upload all files
+    const form = new FormData();
+    state.files.forEach(f => form.append('files', f));
+
+    const up = await api('/upload/folder', { method: 'POST', body: form });
+    state.projectId = up.project_id;
+    state.projectFiles = up.files;
+
+    const tl = up.summary.tuerliste_count;
+    const sp = up.summary.spezifikation_count;
+    setStep('upload', 'done',
+      `${up.total_files} Dateien: ${tl} Türliste${tl !== 1 ? 'n' : ''}, ${sp} Spezifikation${sp !== 1 ? 'en' : ''}`
+    );
+
+    // 2. Show classification review
+    setPill(2);
+    renderClassification(up.files, up.summary);
+    showPanel('classify');
+
+  } catch (err) {
+    console.error('[Workflow] Upload/classify failed:', err);
+    showError(err.message);
+    setPill(1);
+  }
+}
+
+function renderClassification(files, summary) {
+  const grid = document.getElementById('classification-grid');
+  const subtitle = document.getElementById('classify-subtitle');
+  const summaryEl = document.getElementById('classify-summary');
+
+  subtitle.textContent = `${files.length} Dateien automatisch klassifiziert`;
+
+  summaryEl.innerHTML = `
+    <div class="classify-summary-badges">
+      ${summary.tuerliste_count ? `<span class="category-badge tuerliste">${summary.tuerliste_count} Türliste${summary.tuerliste_count !== 1 ? 'n' : ''}</span>` : ''}
+      ${summary.spezifikation_count ? `<span class="category-badge spezifikation">${summary.spezifikation_count} Spezifikation${summary.spezifikation_count !== 1 ? 'en' : ''}</span>` : ''}
+      ${summary.plan_count ? `<span class="category-badge plan">${summary.plan_count} Pläne</span>` : ''}
+      ${summary.foto_count ? `<span class="category-badge foto">${summary.foto_count} Fotos</span>` : ''}
+      ${summary.sonstig_count ? `<span class="category-badge sonstig">${summary.sonstig_count} Sonstige</span>` : ''}
+    </div>
+  `;
+
+  // Sort: tuerliste first, then spezifikation, then rest
+  const order = { tuerliste: 0, spezifikation: 1, plan: 2, foto: 3, sonstig: 4 };
+  const sorted = [...files].sort((a, b) => (order[a.category] || 9) - (order[b.category] || 9));
+
+  const FILE_ICONS = {
+    '.pdf': '📕', '.xlsx': '📗', '.xls': '📗', '.xlsm': '📗',
+    '.docx': '📘', '.doc': '📘', '.docm': '📘', '.txt': '📄',
+    '.jpg': '🖼️', '.jpeg': '🖼️', '.png': '🖼️',
+    '.dwg': '📐', '.crbx': '📦',
+  };
+
+  grid.innerHTML = sorted.map(f => {
+    const ext = '.' + f.filename.split('.').pop().toLowerCase();
+    const icon = FILE_ICONS[ext] || '📄';
+    const skipped = ['plan', 'foto', 'sonstig'].includes(f.category);
+
+    return `
+      <div class="classify-card ${skipped ? 'skipped' : ''}" data-file-id="${esc(f.file_id)}">
+        <div class="classify-card-header">
+          <span class="classify-card-icon">${icon}</span>
+          <div class="classify-card-info">
+            <span class="classify-card-name">${esc(f.filename)}</span>
+            <span class="classify-card-meta">${fmtSize(f.size)} · ${esc(f.reason)}</span>
+          </div>
+        </div>
+        <select class="classify-dropdown" onchange="updateClassification('${esc(f.file_id)}', this.value)">
+          <option value="tuerliste" ${f.category === 'tuerliste' ? 'selected' : ''}>Türliste</option>
+          <option value="spezifikation" ${f.category === 'spezifikation' ? 'selected' : ''}>Spezifikation</option>
+          <option value="plan" ${f.category === 'plan' ? 'selected' : ''}>Plan (ignorieren)</option>
+          <option value="foto" ${f.category === 'foto' ? 'selected' : ''}>Foto (ignorieren)</option>
+          <option value="sonstig" ${f.category === 'sonstig' ? 'selected' : ''}>Sonstig (ignorieren)</option>
+        </select>
+      </div>
+    `;
+  }).join('');
+}
+
+function updateClassification(fileId, newCategory) {
+  state.classificationOverrides[fileId] = newCategory;
+
+  // Update visual
+  const card = document.querySelector(`.classify-card[data-file-id="${fileId}"]`);
+  if (card) {
+    card.classList.toggle('skipped', ['plan', 'foto', 'sonstig'].includes(newCategory));
+  }
+}
+
+async function startProjectAnalysis() {
+  if (!state.projectId) return;
+
+  showPanel('processing');
+  setPill(3);
+  setStep('upload', 'done', 'Dateien hochgeladen');
+  setStep('ai', 'running', 'Excel wird geparst & KI normalisiert...');
+  document.getElementById('processing-subtitle').textContent = 'Türliste wird analysiert...';
+
+  try {
+    // Analyze project
+    const analysis = await api('/analyze/project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_id: state.projectId,
+        file_overrides: state.classificationOverrides,
+      }),
+    });
+    state.analysis = analysis;
+
+    const pos = analysis.requirements?.positionen?.length || 0;
+    setStep('ai', 'done', `${pos} Türposition${pos !== 1 ? 'en' : ''} erkannt`);
+
+    // Matching results
+    const s = analysis.matching?.summary || {};
+    setStep('match', 'done',
+      `${s.matched_count || 0} erfüllbar · ${s.partial_count || 0} teilweise · ${s.unmatched_count || 0} nicht erfüllbar`
+    );
+    document.getElementById('processing-subtitle').textContent = 'Angebot & Gap-Report werden erstellt...';
+
+    // Generate offer
+    setStep('gen', 'running', 'Dokumente werden generiert...');
+    const offer = await api('/offer/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requirements: analysis.requirements,
+        matching: analysis.matching,
+      }),
+    });
+    state.offer = offer;
+    setStep('gen', 'done', offer.message);
+
+    // Show results
+    setPill(4);
+    showResults(analysis, offer);
+
+  } catch (err) {
+    console.error('[Workflow] Project analysis failed:', err);
+    showError(err.message);
+    setPill(1);
+  }
+}
 
 async function runFullWorkflow() {
   if (!state.file) return;
@@ -137,10 +456,11 @@ async function runFullWorkflow() {
     setStep('gen', 'done', offer.message);
 
     // Show results
-    setPill(3);
+    setPill(4);
     showResults(analysis, offer);
 
   } catch (err) {
+    console.error('[Workflow] Full workflow failed:', err);
     showError(err.message);
     setPill(1);
   }
@@ -246,8 +566,22 @@ function showResults(analysis, offer) {
           <td>${esc(pos.tuertyp || '—')}</td>
           <td>${pos.brandschutz ? `<span class="tag tag-red">${esc(pos.brandschutz)}</span>` : '<span style="color:var(--gray-300)">—</span>'}</td>
           <td>${pos.einbruchschutz ? `<span class="tag tag-blue">${esc(pos.einbruchschutz)}</span>` : '<span style="color:var(--gray-300)">—</span>'}</td>
-          <td style="font-size:.75rem;color:var(--gray-500);max-width:200px;">${esc(item.reason || '')}</td>
-          <td>
+          <td style="font-size:.75rem;max-width:260px;">
+            ${item.review_needed ? `<span class="review-badge" title="Confidence ${(item.confidence * 100).toFixed(0)}% – Status automatisch von '${esc(item.original_status || '')}' angepasst">Prüfen</span> ` : ''}
+            ${renderMatchCriteria(item.match_criteria)}
+            ${item.reason && (!item.match_criteria || !item.match_criteria.length)
+              ? `<span style="color:var(--gray-500);">${esc(item.reason)}</span>` : ''}
+          </td>
+          <td class="action-cell">
+            <button class="confirm-btn"
+              data-position="${esc(item.position || pos.position || '')}"
+              data-beschreibung="${esc(item.beschreibung || pos.beschreibung || '')}"
+              data-tuertyp="${esc(pos.tuertyp || '')}"
+              data-brandschutz="${esc(pos.brandschutz || '')}"
+              data-einbruchschutz="${esc(pos.einbruchschutz || '')}"
+              data-matched-product="${matchedJson}"
+              data-status="${esc(item.status || cls)}"
+              onclick="confirmMatch(this)" title="Match bestätigen">&#10003;</button>
             <button class="correction-btn"
               data-position="${esc(item.position || pos.position || '')}"
               data-beschreibung="${esc(item.beschreibung || pos.beschreibung || '')}"
@@ -288,8 +622,14 @@ function showResults(analysis, offer) {
 // ─────────────────────────────────────────────
 
 function resetAll() {
-  state = { file: null, fileId: null, analysis: null, offer: null };
+  state = {
+    file: null, fileId: null, analysis: null, offer: null,
+    uploadMode: state.uploadMode || 'folder',
+    files: [], projectId: null, projectFiles: [],
+    classificationOverrides: {},
+  };
 
+  clearFiles();
   clearFile();
   ['upload','ai','match','gen'].forEach(s => setStep(s, 'pending', 'Warte...'));
 
@@ -297,6 +637,8 @@ function resetAll() {
   document.getElementById('download-grid').innerHTML = '';
   document.getElementById('positions-container').innerHTML = '';
   document.getElementById('match-bar').style.width = '0%';
+  document.getElementById('classification-grid').innerHTML = '';
+  document.getElementById('classify-summary').innerHTML = '';
 
   showPanel('upload');
   setPill(1);
@@ -317,8 +659,9 @@ function showError(msg) {
 }
 
 function setPill(n) {
-  for (let i = 1; i <= 3; i++) {
+  for (let i = 1; i <= 4; i++) {
     const el = document.getElementById(`pill-${i}`);
+    if (!el) continue;
     el.classList.remove('active','done');
     if (i < n) el.classList.add('done');
     if (i === n) el.classList.add('active');
@@ -401,15 +744,184 @@ function renderProducts(products) {
 }
 
 // ─────────────────────────────────────────────
+// HISTORY
+// ─────────────────────────────────────────────
+
+async function loadHistory() {
+  const loading = document.getElementById('history-loading');
+  const errEl = document.getElementById('history-error');
+  const emptyEl = document.getElementById('history-empty');
+  const tableW = document.getElementById('history-table-wrap');
+
+  loading.classList.remove('hidden');
+  errEl.classList.add('hidden');
+  emptyEl.classList.add('hidden');
+  tableW.classList.add('hidden');
+  document.getElementById('history-detail').classList.add('hidden');
+
+  try {
+    const data = await api('/history');
+    loading.classList.add('hidden');
+
+    if (!data.analyses || data.analyses.length === 0) {
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+    renderHistoryTable(data.analyses);
+  } catch (err) {
+    loading.classList.add('hidden');
+    errEl.classList.remove('hidden');
+    errEl.textContent = `Fehler: ${err.message}`;
+  }
+}
+
+function renderHistoryTable(analyses) {
+  const tableW = document.getElementById('history-table-wrap');
+  const tbody = document.getElementById('history-tbody');
+
+  tbody.innerHTML = analyses.map(a => {
+    const date = new Date(a.timestamp).toLocaleDateString('de-CH', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    const rateColor = a.match_rate >= 70 ? 'green' : a.match_rate >= 40 ? 'orange' : 'red';
+    return `
+      <tr>
+        <td style="white-space:nowrap;">${esc(date)}</td>
+        <td>${esc(a.filename || a.id)}</td>
+        <td>${esc(a.projekt || '—')}</td>
+        <td>
+          <span class="tag tag-green">${a.matched_count || 0}</span>
+          <span class="tag tag-orange">${a.partial_count || 0}</span>
+          <span class="tag tag-red">${a.unmatched_count || 0}</span>
+        </td>
+        <td><span class="tag tag-${rateColor}">${a.match_rate || 0}%</span></td>
+        <td class="action-cell">
+          <button class="correction-btn" onclick="showHistoryDetail('${esc(a.id)}')">Details</button>
+          <button class="correction-btn" onclick="rematchHistory('${esc(a.id)}')" title="Mit aktuellen Daten neu matchen">Neu matchen</button>
+          <button class="confirm-btn" onclick="deleteHistory('${esc(a.id)}')" style="color:var(--red-600);background:var(--red-50);border-color:var(--red-100);">&times;</button>
+        </td>
+      </tr>`;
+  }).join('');
+
+  tableW.classList.remove('hidden');
+}
+
+async function showHistoryDetail(historyId) {
+  try {
+    const data = await api(`/history/${historyId}`);
+    const detailPanel = document.getElementById('history-detail');
+    detailPanel.classList.remove('hidden');
+
+    document.getElementById('history-detail-title').textContent =
+      `Analyse: ${data.projekt || data.filename || historyId}`;
+    document.getElementById('history-detail-sub').textContent =
+      `${new Date(data.timestamp).toLocaleDateString('de-CH')} · ${data.auftraggeber || ''}`;
+
+    const summary = data.matching?.summary || {};
+    const statsEl = document.getElementById('history-detail-stats');
+    statsEl.innerHTML = [
+      { num: summary.total_positions || 0, label: 'Positionen', cls: 'blue' },
+      { num: summary.matched_count || 0, label: 'Erfüllbar', cls: 'green' },
+      { num: summary.partial_count || 0, label: 'Teilweise', cls: 'orange' },
+      { num: summary.unmatched_count || 0, label: 'Nicht erfüllbar', cls: 'red' },
+    ].map(s => `
+      <div class="stat-card ${s.cls}">
+        <div class="stat-num">${s.num}</div>
+        <div class="stat-label">${s.label}</div>
+      </div>
+    `).join('');
+
+    const container = document.getElementById('history-detail-positions');
+    container.innerHTML = '';
+    const match = data.matching || {};
+    const sections = [
+      { items: match.matched || [], label: 'Erfüllbar', cls: 'green', icon: '&#10003;' },
+      { items: match.partial || [], label: 'Teilweise', cls: 'orange', icon: '~' },
+      { items: match.unmatched || [], label: 'Nicht erfüllbar', cls: 'red', icon: '&#10007;' },
+    ];
+    sections.forEach(({ items, label, cls, icon }) => {
+      if (!items.length) return;
+      const rows = items.map(item => {
+        const pos = item.original_position || item;
+        return `<tr>
+          <td><strong>${esc(item.position || pos.position || '—')}</strong></td>
+          <td>${esc(item.beschreibung || pos.beschreibung || '—')}</td>
+          <td>${esc(String(pos.menge || item.menge || 1))} ${esc(pos.einheit || 'Stk')}</td>
+          <td>${esc(pos.tuertyp || '—')}</td>
+          <td style="font-size:.75rem;">${renderMatchCriteria(item.match_criteria)}${
+            item.reason && (!item.match_criteria || !item.match_criteria.length)
+            ? `<span style="color:var(--gray-500);">${esc(item.reason)}</span>` : ''
+          }</td>
+        </tr>`;
+      }).join('');
+      container.innerHTML += `
+        <div class="positions-section">
+          <div class="section-header ${cls}">
+            <span>${icon}</span><span>${label}</span>
+            <span class="section-badge">${items.length}</span>
+          </div>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Pos.</th><th>Beschreibung</th><th>Menge</th><th>Türtyp</th><th>Kriterien</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table></div>
+        </div>`;
+    });
+
+    detailPanel.scrollIntoView({ behavior: 'smooth' });
+  } catch (err) {
+    showToast(`Fehler: ${err.message}`);
+  }
+}
+
+function closeHistoryDetail() {
+  document.getElementById('history-detail').classList.add('hidden');
+}
+
+async function rematchHistory(historyId) {
+  if (!confirm('Analyse mit aktuellen Feedback-Daten und Synonymen neu matchen?')) return;
+  showToast('Rematch wird durchgeführt...');
+  try {
+    const result = await api(`/history/${historyId}/rematch`, { method: 'POST' });
+    showToast(result.message);
+    loadHistory();
+  } catch (err) {
+    showToast(`Fehler: ${err.message}`);
+  }
+}
+
+async function deleteHistory(historyId) {
+  if (!confirm('Diese Analyse wirklich löschen?')) return;
+  try {
+    await api(`/history/${historyId}`, { method: 'DELETE' });
+    showToast('Analyse gelöscht.');
+    loadHistory();
+  } catch (err) {
+    showToast(`Fehler: ${err.message}`);
+  }
+}
+
+// ─────────────────────────────────────────────
 // API HELPER
 // ─────────────────────────────────────────────
 
 async function api(path, opts = {}) {
   const url = path.startsWith('http') ? path : `${API}${path}`;
-  const res  = await fetch(url, opts);
+  let res;
+  try {
+    res = await fetch(url, opts);
+  } catch (networkErr) {
+    console.error(`[API] Network error for ${path}:`, networkErr);
+    throw new Error('Server nicht erreichbar. Ist der Server gestartet?');
+  }
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
-    try { msg = (await res.json()).detail || msg; } catch {}
+    let detail = null;
+    try {
+      const body = await res.json();
+      detail = body.detail;
+      msg = detail || msg;
+    } catch {}
+    console.error(`[API] Error ${res.status} for ${path}:`, detail || msg);
     throw new Error(msg);
   }
   return res.json();
@@ -562,6 +1074,66 @@ async function saveCorrection() {
   }
 }
 
+// ─────────────────────────────────────────────
+// MATCH CRITERIA RENDERING
+// ─────────────────────────────────────────────
+
+function renderMatchCriteria(criteria) {
+  if (!criteria || !criteria.length) return '';
+  return criteria.map(c => {
+    const statusCls = c.status === 'ok' ? 'criteria-ok'
+      : c.status === 'fehlt' ? 'criteria-fehlt'
+      : 'criteria-teilweise';
+    const icon = c.status === 'ok' ? '&#10003;' : c.status === 'fehlt' ? '&#10007;' : '~';
+    return `<span class="criteria-tag ${statusCls}" title="${esc(c.detail || '')}">${icon} ${esc(c.kriterium || '')}</span>`;
+  }).join(' ');
+}
+
+// ─────────────────────────────────────────────
+// POSITIVE FEEDBACK (Bestätigen)
+// ─────────────────────────────────────────────
+
+async function confirmMatch(btn) {
+  const d = btn.dataset;
+  let products = [];
+  try { products = JSON.parse(d.matchedProduct || '[]'); } catch {}
+  if (!products.length) {
+    showToast('Kein Produkt zum Bestätigen vorhanden.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '...';
+
+  try {
+    await api('/feedback/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requirement_text: [d.beschreibung, d.tuertyp, d.brandschutz, d.einbruchschutz]
+          .filter(Boolean).join(' | '),
+        requirement_fields: {
+          tuertyp: d.tuertyp || null,
+          brandschutz: d.brandschutz || null,
+          einbruchschutz: d.einbruchschutz || null,
+        },
+        confirmed_product: {
+          product_summary: Object.values(products[0]).join(' | '),
+        },
+        position_id: d.position || '?',
+        match_status_was: d.status || 'unknown',
+      }),
+    });
+    btn.textContent = '&#10003;';
+    btn.classList.add('confirmed');
+    showToast('Match bestätigt – wird beim nächsten Matching berücksichtigt.');
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = '&#10003;';
+    showToast(`Fehler: ${err.message}`);
+  }
+}
+
 function showToast(message) {
   const existing = document.querySelector('.toast');
   if (existing) existing.remove();
@@ -571,3 +1143,45 @@ function showToast(message) {
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
 }
+
+// ─────────────────────────────────────────────
+// HEALTH CHECK
+// ─────────────────────────────────────────────
+
+async function checkServerHealth() {
+  const chip = document.getElementById('server-status');
+  const dot = chip.querySelector('.status-dot');
+  const label = chip.querySelector('span');
+
+  try {
+    const res = await fetch(`${API.replace('/api', '')}/health`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (!data.api_key_set) {
+      chip.style.background = '#ffedd5';
+      chip.style.color = '#ea580c';
+      chip.style.borderColor = '#fed7aa';
+      dot.style.background = '#ea580c';
+      label.textContent = 'API-Key fehlt!';
+      showToast('ANTHROPIC_API_KEY ist nicht gesetzt. Analyse wird fehlschlagen.');
+    } else {
+      chip.style.background = '';
+      chip.style.color = '';
+      chip.style.borderColor = '';
+      dot.style.background = '';
+      label.textContent = 'Server verbunden';
+    }
+  } catch (err) {
+    chip.style.background = '#fee2e2';
+    chip.style.color = '#dc2626';
+    chip.style.borderColor = '#fca5a5';
+    dot.style.background = '#dc2626';
+    dot.style.animation = 'none';
+    label.textContent = 'Server nicht erreichbar';
+    console.error('Health check failed:', err);
+  }
+}
+
+// Run health check on load
+checkServerHealth();

@@ -111,6 +111,21 @@ def _parse_text(file_path: str) -> str:
         raise RuntimeError(f"Text file reading failed: {e}")
 
 
+def parse_pdf_specs(file_path: str, max_chars: int = 8000) -> str:
+    """
+    Parse a specification PDF for supplementary context.
+    Focuses on text-based specs (LV, Türtypicals, Türbuch).
+    Truncates at max_chars to stay within token budget.
+    """
+    try:
+        text = _parse_pdf(file_path)
+        if len(text) > max_chars:
+            text = text[:max_chars] + "\n... [gekürzt]"
+        return text
+    except Exception as e:
+        return f"[PDF konnte nicht gelesen werden: {e}]"
+
+
 def _table_to_text(table: list) -> str:
     """Convert a table (list of lists) to formatted text."""
     if not table:
