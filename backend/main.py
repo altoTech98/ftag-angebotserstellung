@@ -11,7 +11,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -43,14 +43,25 @@ app.include_router(offer.router, prefix="/api")
 app.include_router(feedback.router, prefix="/api")
 app.include_router(history.router, prefix="/api")
 
-# Serve frontend static files
+# Serve frontend static files (with no-cache headers to prevent stale JS/CSS)
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
 if os.path.exists(frontend_path):
     app.mount("/static", StaticFiles(directory=frontend_path), name="static")
 
     @app.get("/")
     async def serve_frontend():
-        return FileResponse(os.path.join(frontend_path, "index.html"))
+        return FileResponse(
+            os.path.join(frontend_path, "index.html"),
+            headers={"Cache-Control": "no-cache, must-revalidate"},
+        )
+
+
+@app.middleware("http")
+async def add_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 @app.on_event("startup")
