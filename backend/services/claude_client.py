@@ -299,39 +299,16 @@ def normalize_door_positions(
         f"(saving {len(doors) - len(unique_doors)} duplicate normalizations)"
     )
 
-    # For large files: skip Claude normalization, use fast fallback
-    # The Excel parser already provides structured data; Claude just cleans field names
-    MAX_UNIQUE_FOR_AI = 60
-    if len(unique_doors) > MAX_UNIQUE_FOR_AI:
-        logger.info(
-            f"Large file ({len(unique_doors)} unique types > {MAX_UNIQUE_FOR_AI}): "
-            f"using fast fallback normalization instead of Claude"
-        )
-        if on_progress:
-            on_progress(f"Schnelle Normalisierung ({len(unique_doors)} Typen)...")
-        all_fallback = _fallback_normalize(unique_doors)
-        normalized_by_sig = {}
-        for orig_door, fb in zip(unique_doors, all_fallback):
-            sig = _door_signature(orig_door)
-            normalized_by_sig[sig] = fb
-    else:
-        # Normalize unique door types via Claude AI
-        BATCH_SIZE = 100
-        normalized_by_sig = {}
-        total_batches = (len(unique_doors) + BATCH_SIZE - 1) // BATCH_SIZE
-
-        for batch_idx, batch_start in enumerate(range(0, len(unique_doors), BATCH_SIZE)):
-            batch = unique_doors[batch_start:batch_start + BATCH_SIZE]
-
-            if on_progress:
-                on_progress(f"KI normalisiert Batch {batch_idx + 1}/{total_batches} ({len(batch)} Typen)...")
-
-            batch_positions = _normalize_batch(client, batch, supplementary_context, unmapped_columns_sample)
-
-            # Map normalized results back by signature
-            for orig_door, normalized in zip(batch, batch_positions):
-                sig = _door_signature(orig_door)
-                normalized_by_sig[sig] = normalized
+    # Fast fallback normalization for structured Excel data (no Claude needed)
+    # The Excel parser already provides structured fields; AI normalization is
+    # only marginally better but adds minutes of processing time.
+    if on_progress:
+        on_progress(f"Normalisierung ({len(unique_doors)} Typen)...")
+    all_fallback = _fallback_normalize(unique_doors)
+    normalized_by_sig = {}
+    for orig_door, fb in zip(unique_doors, all_fallback):
+        sig = _door_signature(orig_door)
+        normalized_by_sig[sig] = fb
 
     # Expand back to all doors, preserving original tuer_nr and menge
     all_positions = []

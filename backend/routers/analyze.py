@@ -267,29 +267,16 @@ def _run_project_analysis(job_id: str, project_id: str, cached_files: dict) -> d
             "hinweise": "Fallback-Normalisierung (ohne KI)",
         }
 
-    # Step 5: Product matching
+    # Step 5: Product matching (always keyword for project analysis – fast & reliable)
     pos_count = len(requirements.get("positionen", []))
     update_job(job_id, progress=f"Produkt-Matching für {pos_count} Positionen...")
-
-    # For large files, use fast keyword matching instead of slow AI matching
-    def _pos_sig(p):
-        return "|".join(str(p.get(k) or "") for k in
-                        ("tuertyp","brandschutz","schallschutz","einbruchschutz","breite","hoehe")).lower()
-    unique_pos_count = len(set(_pos_sig(p) for p in requirements.get("positionen", [])))
-    use_ai = unique_pos_count <= 30  # AI only for small files
-
     try:
-        if use_ai:
-            logger.info(f"Using AI matching ({unique_pos_count} unique positions)")
-            match_result = match_requirements_ai(requirements)
-        else:
-            logger.info(f"Using keyword matching ({unique_pos_count} unique positions, too many for AI)")
-            match_result = match_requirements(requirements)
+        match_result = match_requirements(requirements)
     except FileNotFoundError:
         raise
     except Exception as e:
-        logger.warning(f"Matching failed, falling back to keyword: {e}")
-        match_result = match_requirements(requirements)
+        logger.error(f"Keyword matching failed: {e}", exc_info=True)
+        raise
 
     # Step 6: Save to history
     update_job(job_id, progress="Ergebnisse werden gespeichert...")
