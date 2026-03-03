@@ -1,7 +1,8 @@
 """
 Analyze Router – Document analysis with Claude AI and product listing.
-POST /api/analyze          – Single-file analysis
-POST /api/analyze/project  – Multi-file project analysis
+POST /api/analyze          – Single-file analysis (background job)
+POST /api/analyze/project  – Multi-file project analysis (background job)
+GET  /api/analyze/status/{job_id} – Poll job status
 GET  /api/products
 """
 
@@ -22,11 +23,29 @@ from services.product_matcher import (
 )
 from services.history_store import save_analysis
 from services.memory_cache import text_cache, project_cache
+from services.job_store import create_job, get_job, update_job, run_in_background
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+# ─────────────────────────────────────────────
+# JOB STATUS ENDPOINT
+# ─────────────────────────────────────────────
+
+@router.get("/analyze/status/{job_id}")
+async def get_analyze_status(job_id: str):
+    """Poll the status of a background analysis job."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job nicht gefunden")
+    return job.to_dict()
+
+
+# ─────────────────────────────────────────────
+# SINGLE FILE ANALYSIS
+# ─────────────────────────────────────────────
 
 class AnalyzeRequest(BaseModel):
     file_id: str
@@ -34,157 +53,130 @@ class AnalyzeRequest(BaseModel):
 
 @router.post("/analyze")
 async def analyze_document(request: AnalyzeRequest):
-    """
-    Analyze an uploaded document with Claude AI.
-    Reads extracted text from memory cache (no disk access).
-    """
-    # Read text from cache
+    """Start single-file analysis as background job. Returns job_id immediately."""
     text = text_cache.get(request.file_id)
     if text is None:
         raise HTTPException(
             status_code=410,
             detail="Datei abgelaufen oder nicht gefunden. Bitte erneut hochladen.",
         )
-
     if not text.strip():
         raise HTTPException(
             status_code=422,
             detail="Dokument ist leer oder konnte nicht geparst werden",
         )
 
-    # Extract requirements with Claude
-    try:
-        requirements = extract_requirements_from_text(text)
-    except ValueError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"KI-Analyse fehlgeschlagen: {str(e)}",
-        )
+    job = create_job()
+    run_in_background(job, _run_single_analysis, request.file_id, text)
 
-    # Match against product catalog (AI-powered with keyword fallback)
+    return {"job_id": job.id, "status": "started"}
+
+
+def _run_single_analysis(file_id: str, text: str) -> dict:
+    """Run single-file analysis (called in background thread)."""
+    update_job_by_file = lambda prog: None  # placeholder
+
+    # Find the job for progress updates
+    # We get job_id from the thread context via the job store
+    import threading
+    # Progress is updated via update_job in the calling wrapper
+
+    # Extract requirements with Claude
+    requirements = extract_requirements_from_text(text)
+
+    # Match against product catalog
     try:
         match_result = match_requirements_ai(requirements)
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
-        logger.warning(f"AI matching failed, falling back to keyword matching: {e}")
-        try:
-            match_result = match_requirements(requirements)
-        except Exception as e2:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Produkt-Matching fehlgeschlagen: {str(e2)}",
-            )
+        logger.warning(f"AI matching failed, falling back to keyword: {e}")
+        match_result = match_requirements(requirements)
 
-    # Auto-save to history
+    # Save to history
     try:
-        save_analysis(
-            file_id=request.file_id,
-            filename=request.file_id,
-            requirements=requirements,
-            matching=match_result,
-        )
+        save_analysis(file_id=file_id, filename=file_id, requirements=requirements, matching=match_result)
     except Exception as e:
         logger.warning(f"Failed to save analysis to history: {e}")
 
     return {
-        "file_id": request.file_id,
+        "file_id": file_id,
         "requirements": requirements,
         "matching": match_result,
         "status": "analyzed",
         "message": (
-            f"Analyse abgeschlossen: {match_result['summary']['total_positions']} Positionen gefunden, "
+            f"Analyse abgeschlossen: {match_result['summary']['total_positions']} Positionen, "
             f"{match_result['summary']['matched_count']} erfüllbar, "
             f"{match_result['summary']['unmatched_count']} nicht erfüllbar"
         ),
     }
 
 
+# ─────────────────────────────────────────────
+# PROJECT ANALYSIS
+# ─────────────────────────────────────────────
+
 class AnalyzeProjectRequest(BaseModel):
     project_id: str
-    file_overrides: dict = {}  # {file_id: "new_category"} for user corrections
+    file_overrides: dict = {}
 
 
 @router.post("/analyze/project")
 async def analyze_project(request: AnalyzeProjectRequest):
-    """
-    Analyze an entire project (folder upload) with structured Excel parsing.
-    Reads file bytes from memory cache (no disk access).
+    """Start project analysis as background job. Returns job_id immediately."""
+    logger.info(f"Starting project analysis for {request.project_id}")
 
-    Pipeline:
-    1. Load project, apply classification overrides
-    2. Parse Excel Türliste(n) from cached bytes
-    3. Merge if multiple Türlisten
-    4. Parse PDF specs from cached bytes
-    5. Claude normalization
-    6. Product matching
-    7. Save to history
-    """
-    logger.info(f"Starting project analysis for {request.project_id} with overrides: {request.file_overrides}")
-
-    # 1. Load project
     project = get_project(request.project_id)
     if not project:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Projekt '{request.project_id}' nicht gefunden",
-        )
+        raise HTTPException(status_code=404, detail=f"Projekt '{request.project_id}' nicht gefunden")
 
-    # Get cached file bytes
     cached_files = project_cache.get(f"project_{request.project_id}")
     if cached_files is None:
-        raise HTTPException(
-            status_code=410,
-            detail="Projektdateien abgelaufen. Bitte erneut hochladen.",
-        )
+        raise HTTPException(status_code=410, detail="Projektdateien abgelaufen. Bitte erneut hochladen.")
 
-    # Apply user classification overrides
+    # Apply overrides before starting background job
     for file_id, new_category in request.file_overrides.items():
         try:
             update_file_classification(request.project_id, file_id, new_category)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
-    # Reload project after overrides
-    project = get_project(request.project_id)
-    files = project["files"]
+    job = create_job()
+    run_in_background(job, _run_project_analysis, job.id, request.project_id, cached_files)
 
-    # Update project status
-    update_project(request.project_id, {"status": "analyzing"})
+    return {"job_id": job.id, "status": "started"}
+
+
+def _run_project_analysis(job_id: str, project_id: str, cached_files: dict) -> dict:
+    """Run full project analysis pipeline (called in background thread)."""
+
+    project = get_project(project_id)
+    files = project["files"]
+    update_project(project_id, {"status": "analyzing"})
 
     parsed_files_info = []
 
-    # 2. Parse Excel Türlisten from cached bytes
+    # Step 1: Parse Excel Türlisten
+    update_job(job_id, progress="Excel-Türlisten werden geparst...")
     tuerlisten_files = [f for f in files if f["category"] == "tuerliste"]
     logger.info(f"Found {len(tuerlisten_files)} Türlisten, {len(files)} total files")
+
     if not tuerlisten_files:
-        update_project(request.project_id, {"status": "error"})
-        raise HTTPException(
-            status_code=422,
-            detail="Keine Türliste gefunden. Bitte mindestens eine Excel-Datei als 'Türliste' klassifizieren.",
-        )
+        update_project(project_id, {"status": "error"})
+        raise ValueError("Keine Türliste gefunden. Bitte mindestens eine Excel-Datei als 'Türliste' klassifizieren.")
 
     parsed_tuerlisten = []
     for tf in tuerlisten_files:
         file_bytes = cached_files.get(tf["file_id"])
         if not file_bytes:
             parsed_files_info.append({
-                "filename": tf["filename"],
-                "category": "tuerliste",
-                "status": "error",
-                "error": "Datei nicht im Cache gefunden",
-                "doors_found": 0,
+                "filename": tf["filename"], "category": "tuerliste",
+                "status": "error", "error": "Datei nicht im Cache", "doors_found": 0,
             })
             continue
         try:
             parsed = parse_tuerliste_bytes(file_bytes)
             parsed_tuerlisten.append(parsed)
             parsed_files_info.append({
-                "filename": tf["filename"],
-                "category": "tuerliste",
-                "status": "ok",
+                "filename": tf["filename"], "category": "tuerliste", "status": "ok",
                 "doors_found": parsed["total_rows"],
                 "columns_mapped": len(parsed["column_mapping"]),
                 "sheet_name": parsed["sheet_name"],
@@ -192,42 +184,29 @@ async def analyze_project(request: AnalyzeProjectRequest):
         except Exception as e:
             logger.warning(f"Failed to parse Tuerliste {tf['filename']}: {e}")
             parsed_files_info.append({
-                "filename": tf["filename"],
-                "category": "tuerliste",
-                "status": "error",
-                "error": str(e),
-                "doors_found": 0,
+                "filename": tf["filename"], "category": "tuerliste",
+                "status": "error", "error": str(e), "doors_found": 0,
             })
 
     if not parsed_tuerlisten:
-        update_project(request.project_id, {"status": "error"})
-        raise HTTPException(
-            status_code=422,
-            detail="Keine Türliste konnte gelesen werden. Bitte Dateien prüfen.",
-        )
+        update_project(project_id, {"status": "error"})
+        raise ValueError("Keine Türliste konnte gelesen werden. Bitte Dateien prüfen.")
 
-    # 3. Merge if multiple Türlisten
-    if len(parsed_tuerlisten) > 1:
-        merged = merge_tuerlisten(parsed_tuerlisten)
-    else:
-        merged = parsed_tuerlisten[0]
-
+    # Step 2: Merge
+    merged = merge_tuerlisten(parsed_tuerlisten) if len(parsed_tuerlisten) > 1 else parsed_tuerlisten[0]
     doors = merged["doors"]
     column_mapping = merged["column_mapping"]
-
-    logger.info(f"Parsed {len(doors)} doors from {len(parsed_tuerlisten)} Türliste(n), mapping: {column_mapping}")
+    logger.info(f"Parsed {len(doors)} doors, mapping: {column_mapping}")
 
     if not doors:
-        update_project(request.project_id, {"status": "error"})
-        raise HTTPException(
-            status_code=422,
-            detail="Keine Türpositionen in der Türliste gefunden.",
-        )
+        update_project(project_id, {"status": "error"})
+        raise ValueError("Keine Türpositionen in der Türliste gefunden.")
 
-    # 4. Parse PDF specs from cached bytes
+    # Step 3: Parse PDF specs
+    update_job(job_id, progress="PDF-Spezifikationen werden gelesen...")
     spec_files = [f for f in files if f["category"] == "spezifikation" and f["parseable"]]
     supplementary_context = ""
-    for sf in spec_files[:3]:  # Max 3 spec files
+    for sf in spec_files[:3]:
         file_bytes = cached_files.get(sf["file_id"])
         if not file_bytes:
             continue
@@ -242,42 +221,28 @@ async def analyze_project(request: AnalyzeProjectRequest):
             if text.strip():
                 supplementary_context += f"\n--- {sf['filename']} ---\n{text}\n"
                 parsed_files_info.append({
-                    "filename": sf["filename"],
-                    "category": "spezifikation",
-                    "status": "ok",
-                    "text_length": len(text),
+                    "filename": sf["filename"], "category": "spezifikation",
+                    "status": "ok", "text_length": len(text),
                 })
         except Exception as e:
-            logger.warning(f"Failed to parse spec file {sf['filename']}: {e}")
+            logger.warning(f"Failed to parse spec {sf['filename']}: {e}")
             parsed_files_info.append({
-                "filename": sf["filename"],
-                "category": "spezifikation",
-                "status": "error",
-                "error": str(e),
+                "filename": sf["filename"], "category": "spezifikation",
+                "status": "error", "error": str(e),
             })
 
-    # Track skipped files
     for f in files:
         if f["category"] in ("plan", "foto", "sonstig"):
-            parsed_files_info.append({
-                "filename": f["filename"],
-                "category": f["category"],
-                "status": "skipped",
-            })
+            parsed_files_info.append({"filename": f["filename"], "category": f["category"], "status": "skipped"})
 
-    logger.info(f"Supplementary context: {len(supplementary_context)} chars from {len(spec_files)} spec files")
-
-    # 5. Claude normalization
+    # Step 4: Claude normalization
+    update_job(job_id, progress=f"KI normalisiert {len(doors)} Türpositionen...")
     try:
         unmapped_sample = None
         if merged.get("unmapped_columns") and doors:
             unmapped_sample = {}
             for col in merged["unmapped_columns"][:10]:
-                values = []
-                for d in doors[:5]:
-                    raw = d.get("_raw_row", {})
-                    if col in raw and raw[col]:
-                        values.append(raw[col])
+                values = [d.get("_raw_row", {}).get(col) for d in doors[:5] if d.get("_raw_row", {}).get(col)]
                 if values:
                     unmapped_sample[col] = values
 
@@ -287,52 +252,40 @@ async def analyze_project(request: AnalyzeProjectRequest):
             unmapped_columns_sample=unmapped_sample,
         )
     except ValueError as e:
-        logger.error(f"Claude client error (likely missing API key): {e}")
-        raise HTTPException(status_code=503, detail=str(e))
+        raise
     except Exception as e:
         logger.error(f"Claude normalization failed, using fallback: {e}", exc_info=True)
         from services.claude_client import _fallback_normalize
         positions = _fallback_normalize(doors)
         requirements = {
-            "projekt": "",
-            "auftraggeber": "",
-            "positionen": positions,
+            "projekt": "", "auftraggeber": "", "positionen": positions,
             "gesamtanzahl_tueren": sum(p.get("menge", 1) for p in positions),
             "hinweise": "Fallback-Normalisierung (ohne KI)",
         }
 
-    # 6. Product matching
+    # Step 5: Product matching
+    pos_count = len(requirements.get("positionen", []))
+    update_job(job_id, progress=f"Produkt-Matching für {pos_count} Positionen...")
     try:
         match_result = match_requirements_ai(requirements)
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    except FileNotFoundError:
+        raise
     except Exception as e:
-        logger.warning(f"AI matching failed, falling back to keyword matching: {e}")
-        try:
-            match_result = match_requirements(requirements)
-        except Exception as e2:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Produkt-Matching fehlgeschlagen: {str(e2)}",
-            )
+        logger.warning(f"AI matching failed, falling back to keyword: {e}")
+        match_result = match_requirements(requirements)
 
-    # 7. Save to history
+    # Step 6: Save to history
+    update_job(job_id, progress="Ergebnisse werden gespeichert...")
     try:
         filenames = ", ".join(tf["filename"] for tf in tuerlisten_files)
-        save_analysis(
-            file_id=request.project_id,
-            filename=filenames,
-            requirements=requirements,
-            matching=match_result,
-        )
+        save_analysis(file_id=project_id, filename=filenames, requirements=requirements, matching=match_result)
     except Exception as e:
         logger.warning(f"Failed to save project analysis to history: {e}")
 
-    # Update project status
-    update_project(request.project_id, {"status": "analyzed"})
+    update_project(project_id, {"status": "analyzed"})
 
     return {
-        "project_id": request.project_id,
+        "project_id": project_id,
         "requirements": requirements,
         "matching": match_result,
         "parsed_files": parsed_files_info,
@@ -347,28 +300,23 @@ async def analyze_project(request: AnalyzeProjectRequest):
     }
 
 
+# ─────────────────────────────────────────────
+# PRODUCTS
+# ─────────────────────────────────────────────
+
 @router.get("/products")
 async def get_products(limit: int = 100, search: str = ""):
-    """
-    Return the FTAG product catalog (summary).
-    Optional: filter by search term.
-    """
+    """Return the FTAG product catalog (summary)."""
     try:
         products = get_products_summary()
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Produktliste konnte nicht geladen werden: {str(e)}",
-        )
+        raise HTTPException(status_code=500, detail=f"Produktliste konnte nicht geladen werden: {str(e)}")
 
     if search:
         search_lower = search.lower()
-        products = [
-            p for p in products
-            if any(search_lower in str(v).lower() for v in p.values())
-        ]
+        products = [p for p in products if any(search_lower in str(v).lower() for v in p.values())]
 
     try:
         df = load_product_catalog()
@@ -376,8 +324,4 @@ async def get_products(limit: int = 100, search: str = ""):
     except Exception:
         total_count = len(products)
 
-    return {
-        "total": total_count,
-        "returned": len(products[:limit]),
-        "products": products[:limit],
-    }
+    return {"total": total_count, "returned": len(products[:limit]), "products": products[:limit]}

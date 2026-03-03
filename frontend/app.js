@@ -360,8 +360,8 @@ async function startProjectAnalysis() {
   document.getElementById('processing-subtitle').textContent = 'Türliste wird analysiert...';
 
   try {
-    // Analyze project
-    const analysis = await api('/analyze/project', {
+    // Start background job
+    const { job_id } = await api('/analyze/project', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -369,12 +369,16 @@ async function startProjectAnalysis() {
         file_overrides: state.classificationOverrides,
       }),
     });
+
+    // Poll for results
+    const analysis = await pollJob(job_id, (progress) => {
+      document.getElementById('processing-subtitle').textContent = progress || 'KI analysiert...';
+    });
     state.analysis = analysis;
 
     const pos = analysis.requirements?.positionen?.length || 0;
     setStep('ai', 'done', `${pos} Türposition${pos !== 1 ? 'en' : ''} erkannt`);
 
-    // Matching results
     const s = analysis.matching?.summary || {};
     setStep('match', 'done',
       `${s.matched_count || 0} erfüllbar · ${s.partial_count || 0} teilweise · ${s.unmatched_count || 0} nicht erfüllbar`
@@ -394,7 +398,6 @@ async function startProjectAnalysis() {
     state.offer = offer;
     setStep('gen', 'done', offer.message);
 
-    // Show results
     setPill(4);
     showResults(analysis, offer);
 
@@ -421,21 +424,26 @@ async function runFullWorkflow() {
     state.fileId = up.file_id;
     setStep('upload', 'done', `${up.text_length.toLocaleString('de-CH')} Zeichen extrahiert`);
 
-    // 2. AI Analyse
+    // 2. Start AI analysis as background job
     setStep('ai', 'running', 'Claude analysiert die Ausschreibung...');
     document.getElementById('processing-subtitle').textContent = 'Claude KI analysiert...';
 
-    const analysis = await api('/analyze', {
+    const { job_id } = await api('/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ file_id: state.fileId }),
+    });
+
+    // Poll for results
+    const analysis = await pollJob(job_id, (progress) => {
+      document.getElementById('processing-subtitle').textContent = progress || 'Claude KI analysiert...';
     });
     state.analysis = analysis;
 
     const pos = analysis.requirements?.positionen?.length || 0;
     setStep('ai', 'done', `${pos} Türposition${pos !== 1 ? 'en' : ''} erkannt`);
 
-    // 3. Matching
+    // 3. Matching results (already included in analysis)
     const s = analysis.matching?.summary || {};
     setStep('match', 'done',
       `${s.matched_count || 0} erfüllbar · ${s.partial_count || 0} teilweise · ${s.unmatched_count || 0} nicht erfüllbar`
@@ -455,7 +463,6 @@ async function runFullWorkflow() {
     state.offer = offer;
     setStep('gen', 'done', offer.message);
 
-    // Show results
     setPill(4);
     showResults(analysis, offer);
 
@@ -464,6 +471,31 @@ async function runFullWorkflow() {
     showError(err.message);
     setPill(1);
   }
+}
+
+// ─────────────────────────────────────────────
+// JOB POLLING
+// ─────────────────────────────────────────────
+
+async function pollJob(jobId, onProgress) {
+  const POLL_INTERVAL = 2000; // 2 seconds
+  const MAX_POLLS = 150;      // 5 minutes max
+
+  for (let i = 0; i < MAX_POLLS; i++) {
+    await new Promise(r => setTimeout(r, POLL_INTERVAL));
+
+    const job = await api(`/analyze/status/${jobId}`);
+
+    if (job.progress && onProgress) onProgress(job.progress);
+
+    if (job.status === 'completed') {
+      return job.result;
+    }
+    if (job.status === 'failed') {
+      throw new Error(job.error || 'Analyse fehlgeschlagen');
+    }
+  }
+  throw new Error('Analyse-Timeout: Bitte erneut versuchen.');
 }
 
 // ─────────────────────────────────────────────
