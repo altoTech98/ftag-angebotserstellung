@@ -1,11 +1,13 @@
 """
 Offer Router – Offer generation and download endpoints (in-memory, no disk writes).
-POST /api/offer/generate
+POST /api/offer/generate       – Start offer generation (background job)
+GET  /api/offer/status/{job_id} – Poll job status
 GET  /api/offer/{id}/download
 GET  /api/report/{id}/download
 """
 
 import uuid
+import logging
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -16,6 +18,9 @@ from services.offer_generator import (
     generate_offer_word, generate_gap_report_word,
 )
 from services.memory_cache import offer_cache
+from services.job_store import create_job, get_job, update_job, run_in_background
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -27,13 +32,26 @@ class GenerateOfferRequest(BaseModel):
 
 @router.post("/offer/generate")
 async def generate_offer(request: GenerateOfferRequest):
-    """
-    Generate an offer and/or gap report based on analysis results.
-    Stores generated documents in memory cache for download.
-    """
-    requirements = request.requirements
-    matching = request.matching
+    """Start offer generation as background job. Returns job_id immediately."""
+    job = create_job()
+    run_in_background(
+        job, _run_offer_generation,
+        request.requirements, request.matching,
+    )
+    return {"job_id": job.id, "status": "started"}
 
+
+@router.get("/offer/status/{job_id}")
+async def get_offer_status(job_id: str):
+    """Poll the status of an offer generation job."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job nicht gefunden")
+    return job.to_dict()
+
+
+def _run_offer_generation(requirements: dict, matching: dict) -> dict:
+    """Run offer + gap report generation in background thread."""
     matched = matching.get("matched", [])
     partial = matching.get("partial", [])
     unmatched = matching.get("unmatched", [])
@@ -58,17 +76,8 @@ async def generate_offer(request: GenerateOfferRequest):
     # Generate offer if there are matched/partial positions
     offer_positions = matched + partial
     if offer_positions:
-        try:
-            offer_text = generate_offer_text(requirements, offer_positions, project_info)
-        except ValueError as e:
-            raise HTTPException(status_code=503, detail=str(e))
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Angebotserstellung fehlgeschlagen: {str(e)}",
-            )
+        offer_text = generate_offer_text(requirements, offer_positions, project_info)
 
-        # Generate both formats in memory and cache them
         xlsx_bytes = generate_offer_excel(offer_text, offer_positions, requirements, offer_id)
         docx_bytes = generate_offer_word(offer_text, offer_positions, requirements, offer_id)
 
@@ -82,15 +91,7 @@ async def generate_offer(request: GenerateOfferRequest):
     # Generate gap report if there are unmatched/partial positions
     gap_positions = unmatched + partial
     if gap_positions:
-        try:
-            gap_text = generate_gap_report_text(requirements, unmatched, project_info)
-        except ValueError as e:
-            raise HTTPException(status_code=503, detail=str(e))
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Gap-Report Erstellung fehlgeschlagen: {str(e)}",
-            )
+        gap_text = generate_gap_report_text(requirements, unmatched, project_info)
 
         xlsx_bytes = generate_gap_report_excel(gap_text, unmatched, partial, requirements, report_id)
         docx_bytes = generate_gap_report_word(gap_text, unmatched, partial, requirements, report_id)

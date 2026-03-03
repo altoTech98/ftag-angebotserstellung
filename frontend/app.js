@@ -385,9 +385,9 @@ async function startProjectAnalysis() {
     );
     document.getElementById('processing-subtitle').textContent = 'Angebot & Gap-Report werden erstellt...';
 
-    // Generate offer
+    // Generate offer (background job)
     setStep('gen', 'running', 'Dokumente werden generiert...');
-    const offer = await api('/offer/generate', {
+    const { job_id: offerJobId } = await api('/offer/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -395,6 +395,9 @@ async function startProjectAnalysis() {
         matching: analysis.matching,
       }),
     });
+    const offer = await pollJob(offerJobId, (progress) => {
+      document.getElementById('processing-subtitle').textContent = progress || 'Angebot wird erstellt...';
+    }, '/offer/status/');
     state.offer = offer;
     setStep('gen', 'done', offer.message);
 
@@ -450,9 +453,9 @@ async function runFullWorkflow() {
     );
     document.getElementById('processing-subtitle').textContent = 'Angebot & Gap-Report werden erstellt...';
 
-    // 4. Generate
+    // 4. Generate (background job)
     setStep('gen', 'running', 'Dokumente werden generiert...');
-    const offer = await api('/offer/generate', {
+    const { job_id: offerJobId2 } = await api('/offer/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -460,6 +463,9 @@ async function runFullWorkflow() {
         matching: analysis.matching,
       }),
     });
+    const offer = await pollJob(offerJobId2, (progress) => {
+      document.getElementById('processing-subtitle').textContent = progress || 'Angebot wird erstellt...';
+    }, '/offer/status/');
     state.offer = offer;
     setStep('gen', 'done', offer.message);
 
@@ -477,14 +483,14 @@ async function runFullWorkflow() {
 // JOB POLLING
 // ─────────────────────────────────────────────
 
-async function pollJob(jobId, onProgress) {
+async function pollJob(jobId, onProgress, statusPath = '/analyze/status/') {
   const POLL_INTERVAL = 2000; // 2 seconds
   const MAX_POLLS = 150;      // 5 minutes max
 
   for (let i = 0; i < MAX_POLLS; i++) {
     await new Promise(r => setTimeout(r, POLL_INTERVAL));
 
-    const job = await api(`/analyze/status/${jobId}`);
+    const job = await api(`${statusPath}${jobId}`);
 
     if (job.progress && onProgress) onProgress(job.progress);
 
@@ -492,10 +498,10 @@ async function pollJob(jobId, onProgress) {
       return job.result;
     }
     if (job.status === 'failed') {
-      throw new Error(job.error || 'Analyse fehlgeschlagen');
+      throw new Error(job.error || 'Verarbeitung fehlgeschlagen');
     }
   }
-  throw new Error('Analyse-Timeout: Bitte erneut versuchen.');
+  throw new Error('Timeout: Bitte erneut versuchen.');
 }
 
 // ─────────────────────────────────────────────
