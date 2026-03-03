@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/style.css?v=6" />
+  <link rel="stylesheet" href="/static/style.css?v=8" />
 </head>
 <body>
 
@@ -20,6 +20,10 @@
       <button class="nav-item" id="nav-history" onclick="switchView('history', this)">Historie</button>
     </nav>
     <div class="header-status">
+      <div id="ollama-status" class="status-badge" title="Ollama Status">
+        <span class="status-dot" id="ollama-dot"></span>
+        <span class="status-text" id="ollama-text">Ollama</span>
+      </div>
       <div id="server-status"></div>
     </div>
   </header>
@@ -63,8 +67,7 @@
             <div class="drop-zone" id="drop-zone"
               ondragover="handleDragOver(event)"
               ondragleave="handleDragLeave(event)"
-              ondrop="handleDrop(event)"
-              onclick="document.getElementById('file-input').click()">
+              ondrop="handleDrop(event)">
               <div class="drop-visual">
                 <div class="drop-circle">
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -74,12 +77,23 @@
                   </svg>
                 </div>
                 <p class="drop-main">Dateien oder Ordner hier ablegen</p>
-                <p class="drop-hint">
-                  oder
-                  <span class="drop-link" onclick="event.stopPropagation(); document.getElementById('file-input').click();">Dateien</span> /
-                  <span class="drop-link" onclick="event.stopPropagation(); document.getElementById('folder-input').click();">Ordner auswaehlen</span>
-                  &middot; Excel, PDF, Word &middot; max. 100 MB
-                </p>
+                <p class="drop-hint">Excel, PDF, Word &middot; max. 500 MB</p>
+                <div class="upload-buttons">
+                  <button type="button" class="upload-btn upload-btn-folder" onclick="event.stopPropagation(); document.getElementById('folder-input').click();">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    Ordner auswaehlen
+                  </button>
+                  <button type="button" class="upload-btn upload-btn-file" onclick="event.stopPropagation(); document.getElementById('file-input').click();">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    Dateien auswaehlen
+                  </button>
+                </div>
+                <p class="drop-folder-hint">Ordner: In den Ordner navigieren, dann unten "Ordner auswaehlen" klicken</p>
               </div>
               <input type="file" id="file-input"
                 accept=".xlsx,.xls,.xlsm,.pdf,.docx,.doc,.txt,.jpg,.jpeg,.png,.bmp,.tif,.tiff,.dwg,.dxf"
@@ -182,6 +196,8 @@
         </div>
 
         <div class="stat-grid" id="stat-grid"></div>
+
+        <div id="metadata-card" class="metadata-card hidden"></div>
 
         <div class="match-rate-card" id="match-rate-card">
           <div class="match-rate-header">
@@ -385,6 +401,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=6"></script>
+  <script src="/static/app.js?v=8"></script>
 </body>
 </html>

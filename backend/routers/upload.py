@@ -25,8 +25,8 @@ FOLDER_ALLOWED_EXTENSIONS = {
     ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff",
     ".dwg", ".dxf", ".crbx",
 }
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
-MAX_TOTAL_SIZE = 100 * 1024 * 1024  # 100 MB for folder uploads (Railway-safe)
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB per file
+MAX_TOTAL_SIZE = 500 * 1024 * 1024  # 500 MB for folder uploads
 
 
 @router.post("/upload")

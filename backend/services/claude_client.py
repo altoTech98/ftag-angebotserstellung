@@ -1,20 +1,33 @@
 """
 Claude API Client – Wraps Anthropic SDK for document analysis and offer generation.
+
+NOTE: This module is no longer actively used. All AI functions have been moved to
+local_llm.py (Ollama-based). This file is kept for optional backward compatibility.
+The anthropic SDK is no longer a required dependency.
 """
 
 import os
 import re
 import json
 import logging
-import anthropic
+
+try:
+    import anthropic
+except ImportError:
+    anthropic = None
 
 logger = logging.getLogger(__name__)
 
 _client = None
 
 
-def get_client() -> anthropic.Anthropic:
+def get_client():
     global _client
+    if anthropic is None:
+        raise ImportError(
+            "anthropic SDK is not installed. Install it with: pip install anthropic\n"
+            "Note: The application now uses Ollama (local_llm.py) by default."
+        )
     if _client is None:
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:

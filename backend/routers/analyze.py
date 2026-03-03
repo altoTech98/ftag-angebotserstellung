@@ -1,5 +1,5 @@
 """
-Analyze Router – Document analysis with Claude AI and product listing.
+Analyze Router – Document analysis with Ollama AI and product listing.
 POST /api/analyze          – Single-file analysis (background job)
 POST /api/analyze/project  – Multi-file project analysis (background job)
 GET  /api/analyze/status/{job_id} – Poll job status
@@ -12,7 +12,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from services.document_parser import parse_document_bytes, parse_pdf_specs_bytes
-from services.claude_client import extract_requirements_from_text
+from services.local_llm import extract_requirements_from_text, extract_project_metadata
+from services.document_scanner import scan_and_enrich
 from services.excel_parser import parse_tuerliste_bytes, merge_tuerlisten
 from services.project_store import get_project, update_project, update_file_classification
 from services.product_matcher import get_products_summary
@@ -92,7 +93,7 @@ def _run_excel_analysis(file_id: str, excel_bytes: bytes) -> dict:
         positions.append(pos)
 
     requirements = {
-        "projekt": file_id,
+        "projekt": "",
         "auftraggeber": "",
         "positionen": positions,
         "gesamtanzahl_tueren": sum(d.get("menge", 1) for d in positions),
@@ -122,6 +123,16 @@ def _run_excel_analysis(file_id: str, excel_bytes: bytes) -> dict:
 def _run_text_analysis(file_id: str, text: str) -> dict:
     """Run text-based analysis for PDF/Word files (Claude extraction + matching)."""
     requirements = extract_requirements_from_text(text)
+
+    # Extract project metadata from the document text
+    try:
+        metadata = extract_project_metadata(text)
+        requirements["metadata"] = metadata
+        logger.info(f"Metadata extracted (source={metadata.get('source', 'none')}): "
+                     f"bauherr={metadata.get('bauherr')}, bauort={metadata.get('bauort')}")
+    except Exception as e:
+        logger.warning(f"Metadata extraction failed: {e}")
+        requirements["metadata"] = {"source": "none"}
 
     match_result = fast_match_all(requirements.get("positionen", []))
 
@@ -268,6 +279,27 @@ def _run_project_analysis(job_id: str, project_id: str, cached_files: dict) -> d
         if f["category"] in ("plan", "foto", "sonstig"):
             parsed_files_info.append({"filename": f["filename"], "category": f["category"], "status": "skipped"})
 
+    # Step 3.5: Extract project metadata from spec documents
+    update_job(job_id, progress="Projektmetadaten werden extrahiert...")
+    metadata = {"source": "none"}
+    if supplementary_context.strip():
+        try:
+            metadata = extract_project_metadata(supplementary_context)
+            logger.info(f"Metadata extracted (source={metadata.get('source', 'none')}): "
+                         f"bauherr={metadata.get('bauherr')}, bauort={metadata.get('bauort')}")
+        except Exception as e:
+            logger.warning(f"Metadata extraction failed: {e}")
+
+    # Step 3.6: Scan documents for additional door data and enrich Tuerliste
+    update_job(job_id, progress="Dokumente werden auf Tuerdaten gescannt...")
+    try:
+        def on_scan_progress(msg):
+            update_job(job_id, progress=msg)
+        scan_and_enrich(doors, spec_files, cached_files, on_progress=on_scan_progress)
+        logger.info("Document scanning and enrichment complete")
+    except Exception as e:
+        logger.warning(f"Document scanning failed (continuing without enrichment): {e}")
+
     # Step 4: Prepare positions for matching
     # Use raw structured doors directly for AI matching (richer data than
     # Claude normalization which can lose fields like schloss_typ, zargentyp).
@@ -278,11 +310,12 @@ def _run_project_analysis(job_id: str, project_id: str, cached_files: dict) -> d
         positions.append(pos)
 
     requirements = {
-        "projekt": project.get("name", project_id),
+        "projekt": "",
         "auftraggeber": "",
         "positionen": positions,
         "gesamtanzahl_tueren": sum(d.get("menge", 1) for d in positions),
         "hinweise": supplementary_context[:2000] if supplementary_context else "",
+        "metadata": {},
     }
 
     # Step 5: AI product matching (category-aware, batched)

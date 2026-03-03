@@ -101,6 +101,82 @@ class CatalogIndex:
                 result[str(col)] = str(val).strip()
         return result
 
+    def get_product_extended(self, row_index: int) -> dict:
+        """Get extended product details including compatible accessories.
+
+        Returns dict with basic fields plus:
+        - tuerschliesser: list of compatible door closers
+        - baender: list of compatible hinges
+        - schloesser: list of compatible locks
+        - bodenabschluss: list of compatible bottom seals
+        """
+        if row_index < 0 or row_index >= len(self.df):
+            return {}
+        row = self.df.iloc[row_index]
+        ncols = len(self.df.columns)
+
+        def _val(idx):
+            if idx >= ncols:
+                return ""
+            v = row.iloc[idx]
+            if pd.isna(v):
+                return ""
+            s = str(v).strip()
+            return "" if s in ("-", "nan", "NaN", ".") else s
+
+        def _ja_cols(start, end):
+            """Collect column names where value is 'ja'."""
+            result = []
+            for i in range(start, min(end, ncols)):
+                v = row.iloc[i]
+                if pd.notna(v) and str(v).strip().lower() == "ja":
+                    result.append(str(self.df.columns[i]).strip())
+            return result
+
+        # Zargen compatibility
+        zargen_types = []
+        for idx, label in [(53, "MBW"), (54, "LBW"), (55, "Steckzargen"), (56, "OS-Zarge")]:
+            if idx < ncols:
+                v = row.iloc[idx]
+                if pd.notna(v) and str(v).strip().lower() == "ja":
+                    zargen_types.append(label)
+
+        # Oberfläche: split into Umfassung (frame) and Türblatt (leaf)
+        giessharz = _val(22)  # Giessharzbeschichtung Orsopal
+        senosan = _val(23)    # Oberflächenfolie Senosan
+        umf_material = _val(16)  # Umfassung Materialisierung
+
+        # Türblatt surface: KH (Kunstharz) or Folie
+        oberfl_tuerblatt = ""
+        if giessharz.lower() == "ja":
+            oberfl_tuerblatt = "KH"
+        elif senosan.lower() == "ja":
+            oberfl_tuerblatt = "Folie"
+
+        # Umfassung surface: from material column (e.g. "grundiert"), or same as Türblatt
+        oberfl_umfassung = umf_material if umf_material else oberfl_tuerblatt
+
+        ext = {
+            "kostentraeger": _val(COL_COST_CENTER),
+            "tuerblatt": _val(COL_DOOR_TYPE),
+            "tuerblattausfuehrung": _val(COL_DOOR_VARIANT),
+            "anzahl_fluegel": _val(COL_LEAVES),
+            "brandschutzklasse": _val(COL_FIRE_CLASS),
+            "lichtmass_max": _val(COL_LIGHT_OPENING),
+            "umfassung_material": umf_material,
+            "oberflaeche_umfassung": oberfl_umfassung,
+            "oberflaeche_tuerblatt": oberfl_tuerblatt,
+            "schallschutz_db": _val(COL_SOUND_DB),
+            "widerstandsklasse": _val(COL_RESISTANCE),
+            "glasausschnitt": _val(COL_GLASS_CUTOUT),
+            "zargen_types": zargen_types,
+            "tuerschliesser": _ja_cols(76, 90),
+            "baender": _ja_cols(210, 239),
+            "schloesser": _ja_cols(120, 140),
+            "bodenabschluss": _ja_cols(253, 259),
+        }
+        return ext
+
 
 def _safe_str(val, max_len: int = 80) -> str:
     """Convert a cell value to a clean string, or empty string."""

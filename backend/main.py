@@ -5,6 +5,7 @@ FastAPI Backend Entry Point
 
 import os
 import logging
+from contextlib import asynccontextmanager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,10 +22,45 @@ from routers import upload, analyze, offer, feedback, history, catalog
 # Base directory for data files
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: startup and shutdown."""
+    _logger = logging.getLogger(__name__)
+
+    # Startup: pre-load catalog
+    try:
+        from services.catalog_index import get_catalog_index
+        index = get_catalog_index()
+        _logger.info(
+            f"Catalog index pre-loaded: {len(index.main_products)} main products, "
+            f"{len(index.all_profiles)} total"
+        )
+    except Exception as e:
+        _logger.warning(f"Could not pre-load catalog index: {e}")
+
+    # Startup: start Telegram bot
+    try:
+        from services.telegram_bot import start_bot
+        await start_bot()
+    except Exception as e:
+        _logger.warning(f"Telegram bot start failed: {e}")
+
+    yield
+
+    # Shutdown: stop Telegram bot
+    try:
+        from services.telegram_bot import stop_bot
+        await stop_bot()
+    except Exception as e:
+        _logger.warning(f"Telegram bot shutdown error: {e}")
+
+
 app = FastAPI(
     title="Frank Türen AG – Angebotserstellung",
     description="KI-gestützte Ausschreibungsanalyse und Angebotserstellung",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS for frontend
@@ -65,28 +101,15 @@ async def add_cache_headers(request: Request, call_next):
     return response
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Pre-load catalog index at startup."""
-    try:
-        from services.catalog_index import get_catalog_index
-        index = get_catalog_index()
-        logging.getLogger(__name__).info(
-            f"Catalog index pre-loaded: {len(index.main_products)} main products, "
-            f"{len(index.all_profiles)} total"
-        )
-    except Exception as e:
-        logging.getLogger(__name__).warning(f"Could not pre-load catalog index: {e}")
-
-
 @app.get("/health")
 async def health_check():
-    api_key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    from services.local_llm import check_ollama_status
     from services.memory_cache import text_cache, offer_cache, project_cache
+    ollama = check_ollama_status()
     return {
         "status": "ok",
         "service": "Frank Türen AG Angebotserstellung",
-        "api_key_set": api_key_set,
+        "ollama": ollama,
         "cache": {
             "text": text_cache.stats(),
             "offer": offer_cache.stats(),

@@ -46,6 +46,21 @@ http://localhost:8000
 - Windows (setup.bat / start.bat)
 - ANTHROPIC_API_KEY (optional, nur fuer PDF/Word-Dokumente)
 
+### Ollama (optional – Metadaten-Extraktion)
+
+Ollama ermoeglicht die automatische Extraktion von Projektmetadaten
+(Bauherr, Baustelle, Architekt, Datum) aus hochgeladenen Dokumenten.
+Ohne Ollama wird ein Regex-Fallback verwendet.
+
+```bash
+# 1. Ollama installieren: https://ollama.com
+# 2. Modell herunterladen
+ollama pull llama3.2
+
+# 3. Ollama-Server starten (laeuft im Hintergrund)
+ollama serve
+```
+
 ## Projektstruktur
 
 ```
@@ -68,6 +83,7 @@ ClaudeCodeTest/
 │       ├── result_generator.py    # Machbarkeitsanalyse Excel-Generator
 │       ├── offer_generator.py     # Angebots-Excel-Generator
 │       ├── claude_client.py       # Claude API (Text-Extraktion)
+│       ├── local_llm.py          # Ollama/Regex Metadaten-Extraktion
 │       ├── product_matcher.py     # KI-gestuetztes Matching (Legacy)
 │       ├── feedback_store.py      # Korrektur-Speicher (JSON)
 │       ├── history_store.py       # Analyse-Historie (JSON)

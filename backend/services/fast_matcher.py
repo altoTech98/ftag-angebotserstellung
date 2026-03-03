@@ -20,6 +20,10 @@ from services.catalog_index import get_catalog_index, ProductProfile
 
 logger = logging.getLogger(__name__)
 
+# ── Matching thresholds ──
+MATCH_THRESHOLD = 60   # Score >= 60 = machbar
+PARTIAL_THRESHOLD = 35  # Score 35-59 = teilweise machbar
+
 # ── Fire class hierarchy (higher fulfills lower) ──
 FIRE_CLASS_RANK = {
     "ohne": 0, "keine": 0, "": 0, "--": 0, "nicht definiert": 0,
@@ -148,10 +152,32 @@ def _detect_leaves(door: dict) -> Optional[str]:
 
 
 def _detect_category(door: dict) -> str:
-    """Detect product category from door fields using keywords."""
-    # Combine all text fields for matching
+    """Detect product category from door fields using keywords and frame type."""
+    # ── Step 1: Check explicit frame type fields (zargentyp, umfassungsart) ──
+    # These are the most reliable indicators for Rahmentüre vs Zargentüre
+    frame_type = str(door.get("zargentyp") or "").lower().strip()
+    wall_type = str(door.get("wandtyp") or "").lower().strip()
+
+    if frame_type:
+        # "Zarge LBW", "Zarge MW", "Umfassungszarge", "Stahl" → Zargentüre
+        if any(kw in frame_type for kw in ("zarge", "lbw", "mw", "stahl", "metall")):
+            return "Zargentüre"
+        # "Rahmen", "Blockrahmen", "Holzrahmen" → Rahmentüre
+        if any(kw in frame_type for kw in ("rahmen", "block", "holz", "futter")):
+            if "futter" in frame_type:
+                return "Futtertüre"
+            return "Rahmentüre"
+
+    # ── Step 2: Check wall type for zarge hints ──
+    if wall_type:
+        if any(kw in wall_type for kw in ("lbw", "leichtbau", "gips", "trockenbau")):
+            return "Zargentüre"
+        if any(kw in wall_type for kw in ("mw", "mauerwerk", "beton", "backstein")):
+            return "Zargentüre"
+
+    # ── Step 3: Keyword-based detection from text fields ──
     text_parts = []
-    for field in ("tuertyp", "beschreibung", "besonderheiten", "zargentyp"):
+    for field in ("tuertyp", "beschreibung", "besonderheiten"):
         val = door.get(field)
         if val:
             text_parts.append(str(val).lower())
@@ -163,7 +189,7 @@ def _detect_category(door: dict) -> str:
             if kw in text:
                 return category
 
-    # Fallback: if has fire class -> Rahmentüre (most common)
+    # ── Step 4: Fallback based on fire class ──
     if door.get("brandschutz"):
         bs = str(door["brandschutz"]).lower()
         if "ei" in bs or "t30" in bs or "t60" in bs:
@@ -171,6 +197,38 @@ def _detect_category(door: dict) -> str:
 
     # Default to Rahmentüre (largest category)
     return "Rahmentüre"
+
+
+def _product_preference(product: ProductProfile, door_fire: int) -> float:
+    """
+    Return a preference bonus/penalty for product selection.
+    Standard products get 0, premium/niche variants get penalties.
+    This ensures "Prestige 51" beats "Prestige Alu 51", etc.
+    """
+    name = (product.key_fields.get("door_type", "") or "").lower()
+    penalty = 0.0
+
+    # Penalize Alu variants (premium, not standard choice)
+    if " alu " in f" {name} " or name.endswith(" alu"):
+        penalty -= 8.0
+
+    # Penalize Light variants (lighter construction, less common)
+    if " light " in f" {name} " or name.endswith(" light"):
+        penalty -= 5.0
+
+    # Penalize exotic/niche products
+    if "bat" in name or "ftag bat" in name:
+        penalty -= 10.0
+    if "db-plus" in name or "dB-Plus" in name.lower():
+        # dB-Plus is OK for high sound requirements, small penalty
+        penalty -= 3.0
+
+    # Prefer standard families slightly (Confort, Prestige, Maxima, Nova, Fries)
+    standard_families = ("confort", "prestige", "maxima", "nova", "fries")
+    if any(fam in name for fam in standard_families):
+        penalty += 2.0
+
+    return penalty
 
 
 def _score_product(door: dict, product: ProductProfile) -> tuple[float, list[str]]:
@@ -192,18 +250,25 @@ def _score_product(door: dict, product: ProductProfile) -> tuple[float, list[str
         max_score += 30
         if prod_fire >= door_fire:
             score += 30  # Product fulfills or exceeds requirement
+            # Bonus for exact fire class match (prefer EI30 for EI30, not EI60)
+            if prod_fire == door_fire:
+                score += 5
+                max_score += 5
+            else:
+                max_score += 5  # Over-specified: works but not ideal
+                score += 2
         elif prod_fire > 0:
             score += 10  # Has fire protection, just not enough
             gaps.append(f"Brandschutz: braucht {door.get('brandschutz')}, Produkt hat {kf.get('fire_class', 'ohne')}")
         else:
             gaps.append(f"Brandschutz: braucht {door.get('brandschutz')}, Produkt hat keine")
     else:
-        # No fire requirement - any product is fine, but prefer "ohne"
+        # No fire requirement - prefer products WITHOUT fire class (cheaper)
         max_score += 10
         if prod_fire == 0:
-            score += 10
+            score += 10  # Perfect: no fire requirement, product has none
         else:
-            score += 8  # Higher fire class still works
+            score += 5  # Over-specified: works but costs more
 
     # ── 2. Sound class (20 points) ──
     door_db = _extract_db(str(door.get("schallschutz") or ""))
@@ -291,8 +356,16 @@ def _score_product(door: dict, product: ProductProfile) -> tuple[float, list[str
         max_score += 2
         score += 2
 
+    # ── 7. Product preference (tiebreaker) ──
+    # Penalize Alu/Light/BAT variants, prefer standard products
+    max_score += 10
+    score += 10  # Base: all products start equal
+    preference = _product_preference(product, door_fire)
+    score += preference  # Can go negative (penalty) or positive (bonus)
+
     # Normalize to 0-100
     final_score = (score / max(max_score, 1)) * 100
+    final_score = max(0.0, min(100.0, final_score))  # Clamp
     return round(final_score, 1), gaps
 
 
@@ -322,7 +395,7 @@ def match_all(
     unmatched = []
 
     # Deduplicate
-    sig_map = {}  # signature -> (best_product, score, gaps, category)
+    sig_map = {}  # signature -> (best_product, score, gaps, category, viable_products)
     sig_groups = {}  # signature -> [indices]
 
     for i, pos in enumerate(positions):
@@ -347,39 +420,57 @@ def match_all(
                     break
 
         if not cat_products:
-            sig_map[sig] = (None, 0, [f"Keine Produkte in Kategorie '{category}'"], category)
+            sig_map[sig] = (None, 0, [f"Keine Produkte in Kategorie '{category}'"], category, [])
             continue
 
-        # Score all products, pick best
+        # Score all products, collect all viable ones
         best_product = None
         best_score = -1
         best_gaps = []
+        viable_products = []
 
         for product in cat_products:
             score, gaps = _score_product(door, product)
+            if score >= MATCH_THRESHOLD:
+                viable_products.append((product, score, gaps))
             if score > best_score:
                 best_score = score
                 best_product = product
                 best_gaps = gaps
 
-        sig_map[sig] = (best_product, best_score, best_gaps, category)
+        # Sort viable products by score descending (best first)
+        viable_products.sort(key=lambda x: x[1], reverse=True)
+        sig_map[sig] = (best_product, best_score, best_gaps, category, viable_products)
 
     progress("Ergebnisse werden zusammengestellt...")
 
     # Build results
-    MATCH_THRESHOLD = 60  # Score >= 60 = machbar
-    PARTIAL_THRESHOLD = 35  # Score 35-59 = teilweise machbar
-
     for i, pos in enumerate(positions):
         sig = _door_signature(pos)
-        best_product, score, gaps, category = sig_map[sig]
+        best_product, score, gaps, category, viable_products = sig_map[sig]
 
-        # Get product detail
+        # Get product details for ALL viable products (deduplicated by name)
         matched_products = []
-        if best_product is not None:
+        if viable_products:
+            seen_names = set()
+            for prod, prod_score, prod_gaps in viable_products:
+                detail = catalog.get_product_detail(prod.row_index)
+                if detail:
+                    name = detail.get("Türblatt / Verglasungsart / Rollkasten", "")
+                    if not name:
+                        name = prod.key_fields.get("door_type", "")
+                    if name in seen_names:
+                        continue
+                    seen_names.add(name)
+                    detail["_compact"] = prod.compact_text
+                    detail["_row_index"] = prod.row_index
+                    matched_products.append(detail)
+        elif best_product is not None:
+            # Fallback: best product scored below threshold
             detail = catalog.get_product_detail(best_product.row_index)
             if detail:
                 detail["_compact"] = best_product.compact_text
+                detail["_row_index"] = best_product.row_index
                 matched_products = [detail]
 
         if score >= MATCH_THRESHOLD:
@@ -445,6 +536,7 @@ def _door_signature(door: dict) -> str:
         str(door.get("hoehe") or ""),
         str(door.get("verglasung") or ""),
         str(door.get("fluegel_anzahl") or ""),
+        str(door.get("zargentyp") or ""),  # Frame type affects category
     ]
     return "|".join(parts).lower()
 

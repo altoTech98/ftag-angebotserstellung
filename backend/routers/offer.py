@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from services.claude_client import generate_offer_text, generate_gap_report_text
+from services.local_llm import generate_offer_text, generate_gap_report_text
 from services.offer_generator import (
     generate_offer_excel, generate_gap_report_excel,
     generate_offer_word, generate_gap_report_word,

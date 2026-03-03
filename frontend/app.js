@@ -415,11 +415,16 @@ function showResults(analysis, offer) {
     </div>
   `).join('');
 
+  // Metadata card – only show verified data, otherwise "nicht bekannt"
+  const metaCard = document.getElementById('metadata-card');
+  metaCard.classList.add('hidden');
+  metaCard.innerHTML = '';
+
   // Match rate bar
   const rate = summary.match_rate || 0;
   document.getElementById('match-rate-pct').textContent = `${rate}%`;
   document.getElementById('match-rate-sub').textContent =
-    `Projekt: ${req.projekt || 'Tuerliste'} · ${summary.total_positions || 0} Positionen`;
+    `${summary.total_positions || 0} Positionen`;
   setTimeout(() => {
     document.getElementById('match-bar').style.width = `${rate}%`;
   }, 100);
@@ -475,10 +480,13 @@ function showResults(analysis, offer) {
       const products = item.matched_products || [];
       let ftag = '—';
       if (products.length > 0) {
-        const p = products[0];
-        ftag = p['Tuerblatt / Verglasungsart / Rollkasten']
-          || p[Object.keys(p).find(k => k.includes('blatt') || k.includes('Verglasungsart')) || '']
-          || Object.values(p)[1] || '—';
+        const names = products.map(p => {
+          return p['Türblatt / Verglasungsart / Rollkasten']
+            || p['Tuerblatt / Verglasungsart / Rollkasten']
+            || p[Object.keys(p).find(k => k.includes('blatt') || k.includes('Verglasungsart')) || '']
+            || '';
+        }).filter(n => n);
+        ftag = [...new Set(names)].join(' / ') || '—';
       }
 
       return `
@@ -487,7 +495,7 @@ function showResults(analysis, offer) {
           <td>${esc(item.beschreibung || pos.beschreibung || pos.tuertyp || '—')}</td>
           <td>${esc(String(pos.menge || item.menge || 1))}</td>
           <td>${esc(pos.brandschutz || '—')}</td>
-          <td style="font-size:.8rem;" title="${esc(ftag)}">${esc(ftag.substring(0, 35))}${ftag.length > 35 ? '...' : ''}</td>
+          <td style="font-size:.8rem;" title="${esc(ftag)}">${esc(ftag.substring(0, 60))}${ftag.length > 60 ? '...' : ''}</td>
           <td>${esc(item.category || '—')}</td>
           <td style="font-size:.75rem;">
             ${item.confidence ? `<span style="color:var(--text-faint);">${(item.confidence * 100).toFixed(0)}%</span> ` : ''}
@@ -561,17 +569,23 @@ function openDetailModal(index) {
     `<div class="detail-field"><span class="detail-field-label">${esc(label)}</span><span class="detail-field-value">${esc(String(value))}</span></div>`
   ).join('');
 
-  // FTAG product
+  // FTAG product(s)
   const products = item.matched_products || [];
   let productHtml = '<p style="color:var(--text-muted);">Kein passendes Produkt gefunden</p>';
   if (products.length > 0) {
-    const p = products[0];
-    const productFields = Object.entries(p)
-      .filter(([k, v]) => v != null && v !== '' && !k.startsWith('_'))
-      .slice(0, 10)
-      .map(([k, v]) => `<div class="detail-field"><span class="detail-field-label">${esc(k)}</span><span class="detail-field-value">${esc(String(v))}</span></div>`)
-      .join('');
-    productHtml = `<div class="detail-fields">${productFields}</div>`;
+    productHtml = products.map((p, i) => {
+      const productName = p['Türblatt / Verglasungsart / Rollkasten']
+        || p['Tuerblatt / Verglasungsart / Rollkasten'] || '';
+      const heading = products.length > 1
+        ? `<h5 style="font-size:.8rem;font-weight:600;margin:${i > 0 ? '1rem' : '0'} 0 .25rem;color:var(--text-muted);">Produkt ${i + 1}${productName ? ': ' + esc(productName) : ''}</h5>`
+        : '';
+      const productFields = Object.entries(p)
+        .filter(([k, v]) => v != null && v !== '' && !k.startsWith('_'))
+        .slice(0, 10)
+        .map(([k, v]) => `<div class="detail-field"><span class="detail-field-label">${esc(k)}</span><span class="detail-field-value">${esc(String(v))}</span></div>`)
+        .join('');
+      return `${heading}<div class="detail-fields">${productFields}</div>`;
+    }).join('');
   }
 
   // Match criteria / GAP
@@ -615,7 +629,7 @@ function openDetailModal(index) {
     <h4 style="font-size:.875rem;font-weight:600;margin-bottom:.5rem;">Kundenanforderung</h4>
     <div class="detail-fields">${fieldsHtml}</div>
 
-    <h4 style="font-size:.875rem;font-weight:600;margin:1rem 0 .5rem;">FTAG Produkt</h4>
+    <h4 style="font-size:.875rem;font-weight:600;margin:1rem 0 .5rem;">FTAG Produkt${products.length > 1 ? 'e (' + products.length + ')' : ''}</h4>
     ${productHtml}
 
     ${criteriaHtml}
@@ -881,7 +895,7 @@ function renderHistoryTable(analyses) {
       <tr>
         <td style="white-space:nowrap;">${esc(date)}</td>
         <td>${esc(a.filename || a.id)}</td>
-        <td>${esc(a.projekt || '—')}</td>
+        <td>${esc(a.filename || '—')}</td>
         <td>
           <span class="tag tag-green">${a.matched_count || 0}</span>
           <span class="tag tag-orange">${a.partial_count || 0}</span>
@@ -906,9 +920,9 @@ async function showHistoryDetail(historyId) {
     detailPanel.classList.remove('hidden');
 
     document.getElementById('history-detail-title').textContent =
-      `Analyse: ${data.projekt || data.filename || historyId}`;
+      `Analyse: ${data.filename || historyId}`;
     document.getElementById('history-detail-sub').textContent =
-      `${new Date(data.timestamp).toLocaleDateString('de-CH')} · ${data.auftraggeber || ''}`;
+      `${new Date(data.timestamp).toLocaleDateString('de-CH')}`;
 
     const summary = data.matching?.summary || {};
     const statsEl = document.getElementById('history-detail-stats');
@@ -1187,6 +1201,8 @@ async function api(path, opts = {}) {
 
 async function checkServerHealth() {
   const dot = document.getElementById('server-status');
+  const ollamaDot = document.getElementById('ollama-dot');
+  const ollamaText = document.getElementById('ollama-text');
   if (!dot) return;
 
   try {
@@ -1194,17 +1210,30 @@ async function checkServerHealth() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    if (!data.api_key_set) {
-      dot.style.background = '#d97706';
-      dot.title = 'API-Key fehlt (wird fuer Text-Analyse benoetigt)';
-    } else {
-      dot.style.background = '';
-      dot.title = 'Server verbunden';
+    dot.style.background = '';
+    dot.title = 'Server verbunden';
+
+    // Ollama status
+    if (ollamaDot && ollamaText) {
+      if (data.ollama && data.ollama.available) {
+        ollamaDot.style.background = '#16a34a';
+        const model = data.ollama.models && data.ollama.models[0] ? data.ollama.models[0].split(':')[0] : 'verbunden';
+        ollamaText.textContent = `Ollama (${model})`;
+        ollamaDot.title = 'Ollama verbunden';
+      } else {
+        ollamaDot.style.background = '#d97706';
+        ollamaText.textContent = 'Ollama (offline)';
+        ollamaDot.title = 'Ollama nicht erreichbar - Fallback aktiv';
+      }
     }
   } catch (err) {
     dot.style.background = '#dc2626';
     dot.classList.add('offline');
     dot.title = 'Server nicht erreichbar';
+    if (ollamaDot) {
+      ollamaDot.style.background = '#6b7280';
+      if (ollamaText) ollamaText.textContent = 'Ollama (?)';
+    }
     console.error('Health check failed:', err);
   }
 }

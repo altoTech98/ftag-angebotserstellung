@@ -12,13 +12,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Check for ANTHROPIC_API_KEY
-if "%ANTHROPIC_API_KEY%"=="" (
-    echo WARNUNG: ANTHROPIC_API_KEY ist nicht gesetzt!
-    echo Bitte setzen Sie den API-Key:
-    echo   set ANTHROPIC_API_KEY=sk-ant-...
+REM Check Ollama
+curl -s http://localhost:11434 >nul 2>&1
+if errorlevel 1 (
+    echo WARNUNG: Ollama laeuft nicht! Bitte Ollama starten.
+    echo   Fallback-Modus aktiv (Regex statt KI).
     echo.
-    set /p ANTHROPIC_API_KEY="API Key eingeben: "
+) else (
+    echo Ollama verbunden.
 )
 
 REM Create virtual environment if not exists
@@ -32,10 +33,19 @@ echo Installiere Abhängigkeiten...
 call backend\.venv\Scripts\activate.bat
 pip install -r backend\requirements.txt -q
 
+REM Optional: Telegram Bot (Token von @BotFather, Chat-ID vom User)
+REM set TELEGRAM_BOT_TOKEN=dein-bot-token-hier
+REM set TELEGRAM_CHAT_ID=deine-chat-id-hier
+
 REM Start server
 echo.
 echo Starte Server auf http://localhost:8000
-echo Drücken Sie CTRL+C zum Beenden
+if defined TELEGRAM_BOT_TOKEN (
+    echo Telegram Bot: AKTIV
+) else (
+    echo Telegram Bot: DEAKTIVIERT (TELEGRAM_BOT_TOKEN nicht gesetzt)
+)
+echo Druecken Sie CTRL+C zum Beenden
 echo.
 cd backend
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload

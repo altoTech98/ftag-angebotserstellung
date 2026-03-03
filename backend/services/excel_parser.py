@@ -95,7 +95,7 @@ KNOWN_FIELD_PATTERNS = {
     ],
     "wandtyp": [
         "wandtyp", "wand", "wandkonstruktion", "wandaufbau", "mauerwerk",
-        "wandstärke", "wanddicke",
+        "wandstärke", "wanddicke", "mauertyp", "mauerart",
     ],
     "schloss_typ": [
         "schloss", "schlosstyp", "schlossart", "verriegelung",
@@ -127,7 +127,7 @@ KNOWN_FIELD_PATTERNS = {
     ],
     "zargentyp": [
         "zargentyp", "zargenart", "zarge", "umfassungszarge",
-        "blockzarge", "eckzarge",
+        "blockzarge", "eckzarge", "umfassungsart", "umfassung",
     ],
 }
 

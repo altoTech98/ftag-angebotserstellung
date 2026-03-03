@@ -111,4 +111,4 @@ text_cache = MemoryCache(max_items=100, default_ttl=3600, max_bytes=50 * 1024 * 
 offer_cache = MemoryCache(max_items=30, default_ttl=1800, max_bytes=50 * 1024 * 1024)
 
 # Raw file bytes for project/folder uploads (needed for analysis phase)
-project_cache = MemoryCache(max_items=10, default_ttl=3600, max_bytes=100 * 1024 * 1024)
+project_cache = MemoryCache(max_items=10, default_ttl=3600, max_bytes=500 * 1024 * 1024)
