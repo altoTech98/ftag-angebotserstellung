@@ -485,7 +485,7 @@ async function runFullWorkflow() {
 
 async function pollJob(jobId, onProgress, statusPath = '/analyze/status/') {
   const POLL_INTERVAL = 2000; // 2 seconds
-  const MAX_POLLS = 150;      // 5 minutes max
+  const MAX_POLLS = 450;      // 15 minutes max
 
   for (let i = 0; i < MAX_POLLS; i++) {
     await new Promise(r => setTimeout(r, POLL_INTERVAL));

@@ -3,6 +3,7 @@ Claude API Client – Wraps Anthropic SDK for document analysis and offer genera
 """
 
 import os
+import re
 import json
 import logging
 import anthropic
@@ -23,6 +24,49 @@ def get_client() -> anthropic.Anthropic:
             )
         _client = anthropic.Anthropic(api_key=api_key)
     return _client
+
+
+def _repair_json(text: str):
+    """
+    Attempt to repair common JSON issues from Claude responses:
+    - Trailing commas before ] or }
+    - Truncated JSON (close open brackets/braces)
+    - Single-line comments
+    """
+    # Remove single-line comments (// ...)
+    text = re.sub(r'//[^\n]*', '', text)
+
+    # Remove trailing commas before } or ]
+    text = re.sub(r',\s*([}\]])', r'\1', text)
+
+    # Try parsing as-is first
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Try to fix truncated JSON by closing brackets
+    open_braces = text.count('{') - text.count('}')
+    open_brackets = text.count('[') - text.count(']')
+
+    # Find last complete object (ends with })
+    last_complete = text.rfind('}')
+    if last_complete > 0:
+        truncated = text[:last_complete + 1]
+        # Close any remaining open brackets
+        truncated += ']' * max(0, truncated.count('[') - truncated.count(']'))
+        truncated += '}' * max(0, truncated.count('{') - truncated.count('}'))
+        # Remove trailing commas again after truncation
+        truncated = re.sub(r',\s*([}\]])', r'\1', truncated)
+        try:
+            return json.loads(truncated)
+        except json.JSONDecodeError:
+            pass
+
+    # Last resort: add closing brackets
+    fixed = text + '}' * max(0, open_braces) + ']' * max(0, open_brackets)
+    fixed = re.sub(r',\s*([}\]])', r'\1', fixed)
+    return json.loads(fixed)
 
 
 def extract_requirements_from_text(document_text: str) -> dict:
@@ -202,16 +246,32 @@ Erstelle einen detaillierten Gap-Report mit:
     return message.content[0].text
 
 
+def _door_signature(door: dict) -> str:
+    """Create a signature for grouping similar doors."""
+    parts = [
+        str(door.get("tuertyp") or ""),
+        str(door.get("brandschutz") or ""),
+        str(door.get("schallschutz") or ""),
+        str(door.get("einbruchschutz") or ""),
+        str(door.get("breite") or ""),
+        str(door.get("hoehe") or ""),
+        str(door.get("verglasung") or ""),
+        str(door.get("oberflaechenbehandlung") or ""),
+    ]
+    return "|".join(parts).lower()
+
+
 def normalize_door_positions(
     doors: list[dict],
     supplementary_context: str = "",
     unmapped_columns_sample: dict = None,
+    on_progress=None,
 ) -> dict:
     """
     Use Claude to normalize/enrich ALREADY STRUCTURED door data from Excel parsing.
 
-    Instead of extracting from raw text, Claude only normalizes inconsistent values,
-    fills in missing fields from context, and standardizes the output format.
+    Optimization: Groups identical door types together and normalizes only unique types,
+    then applies normalized fields back to all doors in each group.
 
     Args:
         doors: Structured door dicts from excel_parser
@@ -223,20 +283,78 @@ def normalize_door_positions(
     """
     client = get_client()
 
-    # Batch doors in groups of ~100 to stay within token limits
-    BATCH_SIZE = 100
-    all_positions = []
+    # --- Deduplication: group doors by type signature ---
+    groups = {}  # signature -> [door_indices]
+    representatives = {}  # signature -> first door (used for normalization)
+    for i, door in enumerate(doors):
+        sig = _door_signature(door)
+        if sig not in groups:
+            groups[sig] = []
+            representatives[sig] = door
+        groups[sig].append(i)
 
-    for batch_start in range(0, len(doors), BATCH_SIZE):
-        batch = doors[batch_start:batch_start + BATCH_SIZE]
-        batch_positions = _normalize_batch(client, batch, supplementary_context, unmapped_columns_sample)
-        all_positions.extend(batch_positions)
+    unique_doors = list(representatives.values())
+    logger.info(
+        f"Door deduplication: {len(doors)} total → {len(unique_doors)} unique types "
+        f"(saving {len(doors) - len(unique_doors)} duplicate normalizations)"
+    )
+
+    # For large files: skip Claude normalization, use fast fallback
+    # The Excel parser already provides structured data; Claude just cleans field names
+    MAX_UNIQUE_FOR_AI = 60
+    if len(unique_doors) > MAX_UNIQUE_FOR_AI:
+        logger.info(
+            f"Large file ({len(unique_doors)} unique types > {MAX_UNIQUE_FOR_AI}): "
+            f"using fast fallback normalization instead of Claude"
+        )
+        if on_progress:
+            on_progress(f"Schnelle Normalisierung ({len(unique_doors)} Typen)...")
+        all_fallback = _fallback_normalize(unique_doors)
+        normalized_by_sig = {}
+        for orig_door, fb in zip(unique_doors, all_fallback):
+            sig = _door_signature(orig_door)
+            normalized_by_sig[sig] = fb
+    else:
+        # Normalize unique door types via Claude AI
+        BATCH_SIZE = 100
+        normalized_by_sig = {}
+        total_batches = (len(unique_doors) + BATCH_SIZE - 1) // BATCH_SIZE
+
+        for batch_idx, batch_start in enumerate(range(0, len(unique_doors), BATCH_SIZE)):
+            batch = unique_doors[batch_start:batch_start + BATCH_SIZE]
+
+            if on_progress:
+                on_progress(f"KI normalisiert Batch {batch_idx + 1}/{total_batches} ({len(batch)} Typen)...")
+
+            batch_positions = _normalize_batch(client, batch, supplementary_context, unmapped_columns_sample)
+
+            # Map normalized results back by signature
+            for orig_door, normalized in zip(batch, batch_positions):
+                sig = _door_signature(orig_door)
+                normalized_by_sig[sig] = normalized
+
+    # Expand back to all doors, preserving original tuer_nr and menge
+    all_positions = []
+    for i, door in enumerate(doors):
+        sig = _door_signature(door)
+        template = normalized_by_sig.get(sig)
+        if template:
+            pos = dict(template)  # Copy normalized template
+            pos["position"] = door.get("tuer_nr", template.get("position", ""))
+            pos["menge"] = door.get("menge", 1)
+            # Preserve room info
+            if door.get("raum"):
+                beschr = pos.get("beschreibung", "")
+                pos["beschreibung"] = f"{beschr} (Raum: {door['raum']})" if beschr else f"Raum: {door['raum']}"
+        else:
+            # Fallback
+            pos = _fallback_normalize([door])[0]
+        all_positions.append(pos)
 
     # Build standard output format
     projekt = ""
     auftraggeber = ""
     if all_positions:
-        # Try to infer project name from door numbers
         first_nr = all_positions[0].get("position", "")
         if first_nr:
             projekt = f"Projekt (Türliste: {len(all_positions)} Positionen)"
@@ -246,7 +364,8 @@ def normalize_door_positions(
         "auftraggeber": auftraggeber,
         "positionen": all_positions,
         "gesamtanzahl_tueren": sum(p.get("menge", 1) for p in all_positions),
-        "hinweise": f"Strukturiert aus Excel extrahiert ({len(doors)} Zeilen). "
+        "hinweise": f"Strukturiert aus Excel extrahiert ({len(doors)} Zeilen, "
+                    f"{len(unique_doors)} unique Typen). "
                     + (f"PDF-Kontext: {len(supplementary_context)} Zeichen." if supplementary_context else ""),
     }
 
@@ -323,9 +442,10 @@ Antworte NUR mit einem JSON-Array. Pro Tür ein Objekt im Standardformat:
     try:
         message = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=8192,
+            max_tokens=16384,
             system=system_prompt,
             messages=[{"role": "user", "content": user_message}],
+            timeout=180.0,  # 3 minute timeout per batch
         )
 
         response_text = message.content[0].text.strip()
@@ -335,7 +455,13 @@ Antworte NUR mit einem JSON-Array. Pro Tür ein Objekt im Standardformat:
         elif "```" in response_text:
             response_text = response_text.split("```")[1].split("```")[0].strip()
 
-        positions = json.loads(response_text)
+        # Use robust JSON repair
+        try:
+            positions = _repair_json(response_text)
+        except json.JSONDecodeError as je:
+            logger.warning(f"JSON repair also failed: {je}. Response (first 500): {response_text[:500]}")
+            return _fallback_normalize(doors)
+
         if not isinstance(positions, list):
             positions = [positions]
 
@@ -346,11 +472,12 @@ Antworte NUR mit einem JSON-Array. Pro Tür ein Objekt im Standardformat:
             if not p.get("einheit"):
                 p["einheit"] = "Stk"
 
+        logger.info(f"Normalized batch: {len(doors)} doors → {len(positions)} positions via Claude")
         return positions
 
     except Exception as e:
-        logger.warning(f"Claude normalization failed for batch: {e}")
-        # Fallback: convert raw data to standard format without Claude
+        logger.warning(f"Claude normalization failed for batch ({len(doors)} doors): {e}")
+        logger.info("Using fallback normalization for this batch")
         return _fallback_normalize(doors)
 
 
@@ -486,11 +613,11 @@ Antworte NUR mit einem JSON-Array. Pro Position ein Objekt:
         response_text = response_text.split("```")[1].split("```")[0].strip()
 
     try:
-        results = json.loads(response_text)
+        results = _repair_json(response_text)
         if not isinstance(results, list):
             results = [results]
     except json.JSONDecodeError:
-        logger.warning(f"Batch AI match returned invalid JSON: {response_text[:300]}")
+        logger.warning(f"Batch AI match returned invalid JSON (after repair): {response_text[:300]}")
         # Return fallback for all positions
         return [
             {
@@ -637,9 +764,9 @@ Welcher Kandidat passt am besten zur Anforderung?"""
         response_text = response_text.split("```")[1].split("```")[0].strip()
 
     try:
-        result = json.loads(response_text)
+        result = _repair_json(response_text)
     except json.JSONDecodeError:
-        logger.warning(f"AI match returned invalid JSON: {response_text[:200]}")
+        logger.warning(f"AI match returned invalid JSON (after repair): {response_text[:200]}")
         return {
             "best_match_index": candidate_indices[0] if candidate_indices else None,
             "best_match_rank": 1 if candidate_indices else None,

@@ -312,11 +312,27 @@ def get_products_summary() -> list[dict]:
 # AI-POWERED MATCHING (Stage 1 + 2)
 # ─────────────────────────────────────────────
 
+def _matching_signature(pos: dict) -> str:
+    """Create a signature for grouping positions with identical matching criteria."""
+    parts = [
+        str(pos.get("tuertyp") or ""),
+        str(pos.get("brandschutz") or ""),
+        str(pos.get("schallschutz") or ""),
+        str(pos.get("einbruchschutz") or ""),
+        str(pos.get("breite") or ""),
+        str(pos.get("hoehe") or ""),
+        str(pos.get("verglasung") or ""),
+        str(pos.get("oberflaechenbehandlung") or ""),
+    ]
+    return "|".join(parts).lower()
+
+
 def match_requirements_ai(requirements: dict) -> dict:
     """
     AI-enhanced matching: pre-filter + Claude batch matching + feedback loop.
-    All positions are matched in a SINGLE Claude API call (batch).
-    Falls back to keyword matching on error.
+
+    Optimization: Deduplicates positions with identical matching criteria,
+    matches only unique types, then applies results to all positions.
     """
     from services.claude_client import ai_match_products_batch
 
@@ -330,12 +346,29 @@ def match_requirements_ai(requirements: dict) -> dict:
                         "partial_count": 0, "unmatched_count": 0, "match_rate": 0},
         }
 
-    # Stage 1: Pre-filter candidates for ALL positions
-    positions_data = []
-    for pos in positions:
+    # --- Deduplication: group positions by matching signature ---
+    sig_groups = {}  # signature -> [position_indices]
+    sig_representative = {}  # signature -> first position
+    for i, pos in enumerate(positions):
+        sig = _matching_signature(pos)
+        if sig not in sig_groups:
+            sig_groups[sig] = []
+            sig_representative[sig] = pos
+        sig_groups[sig].append(i)
+
+    unique_positions = list(sig_representative.values())
+    unique_sigs = list(sig_representative.keys())
+    logger.info(
+        f"Matching deduplication: {len(positions)} positions → {len(unique_positions)} unique types "
+        f"(saving {len(positions) - len(unique_positions)} duplicate matches)"
+    )
+
+    # Stage 1: Pre-filter candidates for UNIQUE positions only
+    unique_data = []
+    for pos in unique_positions:
         candidates = prefilter_candidates(pos, df, limit=25)
         req_text = _build_requirement_text(pos)
-        positions_data.append({
+        unique_data.append({
             "req_text": req_text,
             "req_fields": pos,
             "candidates_text": format_candidates_for_claude(df, candidates) if candidates else "",
@@ -343,55 +376,58 @@ def match_requirements_ai(requirements: dict) -> dict:
         })
 
     # Collect feedback once (shared across all positions)
-    all_text = " ".join(p["req_text"] for p in positions_data)
+    all_text = " ".join(p["req_text"] for p in unique_data)
     feedback_examples = find_relevant_feedback(all_text, {}, limit=8)
 
-    # Stage 2: Batch AI matching (single Claude call)
+    # Stage 2: Batch AI matching (single Claude call for unique positions)
+    ai_result_by_sig = {}
     try:
-        # Only send positions that have candidates to Claude
-        batch_indices = [i for i, p in enumerate(positions_data) if p["candidate_indices"]]
-        batch_data = [positions_data[i] for i in batch_indices]
+        batch_sigs = [unique_sigs[i] for i, p in enumerate(unique_data) if p["candidate_indices"]]
+        batch_data = [unique_data[i] for i, p in enumerate(unique_data) if p["candidate_indices"]]
 
         if batch_data:
             ai_results = ai_match_products_batch(batch_data, feedback_examples)
-        else:
-            ai_results = []
-
-        # Map AI results back to positions
-        ai_result_map = {}
-        for j, bi in enumerate(batch_indices):
-            if j < len(ai_results):
-                ai_result_map[bi] = ai_results[j]
+            for j, sig in enumerate(batch_sigs):
+                if j < len(ai_results):
+                    ai_result_by_sig[sig] = (ai_results[j], unique_data[unique_sigs.index(sig)]["candidate_indices"])
 
     except Exception as e:
         logger.warning(f"Batch AI matching failed: {e}")
-        ai_result_map = {}
 
-    # Build results
+    # Build results — expand deduplicated matches back to all positions
     matched = []
     unmatched = []
     partial = []
 
     for i, pos in enumerate(positions):
-        if i in ai_result_map:
-            ai_result = ai_result_map[i]
-            match_result = _build_result_from_ai(pos, df, ai_result, positions_data[i]["candidate_indices"])
-        elif not positions_data[i]["candidate_indices"]:
-            match_result = {
-                "status": "unmatched",
-                "confidence": 0.0,
-                "position": pos.get("position", "?"),
-                "beschreibung": pos.get("beschreibung", ""),
-                "menge": pos.get("menge", 1),
-                "einheit": pos.get("einheit", "Stk"),
-                "matched_products": [],
-                "reason": "Keine passenden Kandidaten im Katalog gefunden",
-                "match_criteria": [],
-            }
-        else:
-            # Fallback to keyword matching
-            match_result = _match_single_position(pos, df)
+        sig = _matching_signature(pos)
 
+        if sig in ai_result_by_sig:
+            ai_result, cand_indices = ai_result_by_sig[sig]
+            match_result = _build_result_from_ai(pos, df, ai_result, cand_indices)
+        else:
+            # Check if the unique position had no candidates
+            sig_idx = unique_sigs.index(sig) if sig in unique_sigs else None
+            if sig_idx is not None and not unique_data[sig_idx]["candidate_indices"]:
+                match_result = {
+                    "status": "unmatched",
+                    "confidence": 0.0,
+                    "position": pos.get("position", "?"),
+                    "beschreibung": pos.get("beschreibung", ""),
+                    "menge": pos.get("menge", 1),
+                    "einheit": pos.get("einheit", "Stk"),
+                    "matched_products": [],
+                    "reason": "Keine passenden Kandidaten im Katalog gefunden",
+                    "match_criteria": [],
+                }
+            else:
+                # Fallback to keyword matching
+                match_result = _match_single_position(pos, df)
+
+        # Ensure position-specific fields are correct (not from the representative)
+        match_result["position"] = pos.get("position", "?")
+        match_result["beschreibung"] = pos.get("beschreibung", "")
+        match_result["menge"] = pos.get("menge", 1)
         match_result["original_position"] = pos
 
         if match_result["status"] == "matched":
@@ -403,7 +439,7 @@ def match_requirements_ai(requirements: dict) -> dict:
 
     logger.info(
         f"Batch matching done: {len(matched)} matched, {len(partial)} partial, "
-        f"{len(unmatched)} unmatched ({len(batch_indices)} positions in 1 API call)"
+        f"{len(unmatched)} unmatched ({len(unique_positions)} unique types in 1 API call)"
     )
 
     return {
@@ -658,17 +694,26 @@ def _build_requirement_text(position: dict) -> str:
 def match_requirements(requirements: dict) -> dict:
     """
     Match extracted requirements against the product catalog.
-    Legacy keyword-based matching, used as fallback if AI matching fails.
+    Keyword-based matching with deduplication for large files.
     """
     df = load_product_catalog()
     positions = requirements.get("positionen", [])
 
+    # Deduplicate: match only unique types, then expand results
+    cache = {}  # signature -> match_result template
     matched = []
     unmatched = []
     partial = []
 
     for pos in positions:
-        match_result = _match_single_position(pos, df)
+        sig = _matching_signature(pos)
+        if sig not in cache:
+            cache[sig] = _match_single_position(pos, df)
+
+        match_result = dict(cache[sig])  # Copy template
+        match_result["position"] = pos.get("position", "?")
+        match_result["beschreibung"] = pos.get("beschreibung", "")
+        match_result["menge"] = pos.get("menge", 1)
         match_result["original_position"] = pos
 
         if match_result["status"] == "matched":
@@ -677,6 +722,10 @@ def match_requirements(requirements: dict) -> dict:
             partial.append(match_result)
         else:
             unmatched.append(match_result)
+
+    logger.info(
+        f"Keyword matching: {len(positions)} positions, {len(cache)} unique types matched"
+    )
 
     return {
         "matched": matched,
