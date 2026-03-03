@@ -9,7 +9,9 @@ const API = window.location.hostname === 'localhost'
 
 let state = {
   file: null,
+  files: [],
   fileId: null,
+  projectId: null,
   analysis: null,
   offer: null,
 };
@@ -32,8 +34,16 @@ function switchView(view, btn) {
 }
 
 // ─────────────────────────────────────────────
-// FILE HANDLING (single Excel file)
+// FILE HANDLING (single + multi-file + folder)
 // ─────────────────────────────────────────────
+
+const ALLOWED_EXTS = ['xlsx','xls','xlsm','pdf','docx','doc','txt','jpg','jpeg','png','bmp','tif','tiff','dwg','dxf'];
+const FILE_ICONS = {
+  pdf: '\u{1F4D5}', xlsx: '\u{1F4D7}', xls: '\u{1F4D7}', xlsm: '\u{1F4D7}',
+  docx: '\u{1F4D8}', doc: '\u{1F4D8}', txt: '\u{1F4C4}',
+  jpg: '\u{1F5BC}', jpeg: '\u{1F5BC}', png: '\u{1F5BC}', bmp: '\u{1F5BC}',
+  tif: '\u{1F5BC}', tiff: '\u{1F5BC}', dwg: '\u{1F4D0}', dxf: '\u{1F4D0}',
+};
 
 function handleDragOver(e) {
   e.preventDefault();
@@ -47,31 +57,121 @@ function handleDragLeave() {
 function handleDrop(e) {
   e.preventDefault();
   document.getElementById('drop-zone').classList.remove('drag-over');
-  const files = Array.from(e.dataTransfer.files);
-  if (files.length > 0) {
-    const f = files[0];
-    const ext = f.name.split('.').pop().toLowerCase();
-    if (!['xlsx', 'xls', 'xlsm', 'pdf', 'docx', 'doc', 'txt'].includes(ext)) {
-      showToast('Dateityp nicht unterstuetzt. Erlaubt: Excel, PDF, Word, TXT');
+
+  const items = e.dataTransfer.items;
+  const directFiles = [];
+
+  // Check for folder drop
+  if (items && items.length > 0) {
+    const folderPromises = [];
+    for (let i = 0; i < items.length; i++) {
+      const entry = items[i].webkitGetAsEntry
+        ? items[i].webkitGetAsEntry()
+        : (items[i].getAsEntry ? items[i].getAsEntry() : null);
+      if (entry && entry.isDirectory) {
+        folderPromises.push(readDirectory(entry));
+      } else if (items[i].kind === 'file') {
+        const f = items[i].getAsFile();
+        if (f) directFiles.push(f);
+      }
+    }
+    if (folderPromises.length > 0) {
+      Promise.all(folderPromises).then(results => {
+        processDroppedFiles(directFiles.concat(results.flat()));
+      });
       return;
     }
-    setFile(f);
+  }
+
+  // No folder – use regular files
+  if (directFiles.length === 0) {
+    directFiles.push(...Array.from(e.dataTransfer.files));
+  }
+  processDroppedFiles(directFiles);
+}
+
+function readDirectory(dirEntry) {
+  return new Promise(resolve => {
+    const files = [];
+    const reader = dirEntry.createReader();
+    function readBatch() {
+      reader.readEntries(entries => {
+        if (entries.length === 0) { resolve(files); return; }
+        const promises = [];
+        for (const entry of entries) {
+          if (entry.isFile) {
+            promises.push(new Promise(res => entry.file(f => { files.push(f); res(); })));
+          } else if (entry.isDirectory) {
+            promises.push(readDirectory(entry).then(sub => files.push(...sub)));
+          }
+        }
+        Promise.all(promises).then(readBatch);
+      });
+    }
+    readBatch();
+  });
+}
+
+function processDroppedFiles(files) {
+  const valid = files.filter(f => {
+    const ext = f.name.split('.').pop().toLowerCase();
+    return ALLOWED_EXTS.includes(ext);
+  });
+  if (valid.length === 0) {
+    showToast('Keine unterstuetzten Dateien gefunden.');
+    return;
+  }
+  if (valid.length === 1) {
+    setFile(valid[0]);
+  } else {
+    setFiles(valid);
   }
 }
 
 function handleFileSelect(e) {
   const files = Array.from(e.target.files);
-  if (files.length > 0) setFile(files[0]);
+  if (files.length === 0) return;
+  if (files.length === 1) setFile(files[0]);
+  else processDroppedFiles(files);
+}
+
+function handleFolderSelect(e) {
+  const files = Array.from(e.target.files);
+  if (files.length > 0) processDroppedFiles(files);
 }
 
 function setFile(f) {
   state.file = f;
+  state.files = [];
+  document.getElementById('files-preview').classList.add('hidden');
   document.getElementById('file-preview').classList.remove('hidden');
   document.getElementById('file-name').textContent = f.name;
   document.getElementById('file-size').textContent = fmtSize(f.size);
   const ext = f.name.split('.').pop().toLowerCase();
-  const icons = { pdf: '\u{1F4D5}', xlsx: '\u{1F4D7}', xls: '\u{1F4D7}', xlsm: '\u{1F4D7}', docx: '\u{1F4D8}', doc: '\u{1F4D8}', txt: '\u{1F4C4}' };
-  document.querySelector('#file-preview .file-preview-icon').textContent = icons[ext] || '\u{1F4C4}';
+  document.querySelector('#file-preview .file-preview-icon').textContent = FILE_ICONS[ext] || '\u{1F4C4}';
+  document.getElementById('btn-upload').disabled = false;
+}
+
+function setFiles(files) {
+  state.files = files;
+  state.file = null;
+  document.getElementById('file-preview').classList.add('hidden');
+  document.getElementById('files-preview').classList.remove('hidden');
+
+  const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+  document.getElementById('files-count').textContent = `${files.length} Dateien`;
+  document.getElementById('files-total-size').textContent = fmtSize(totalSize);
+
+  document.getElementById('files-list').innerHTML = files.map(f => {
+    const ext = f.name.split('.').pop().toLowerCase();
+    const icon = FILE_ICONS[ext] || '\u{1F4C4}';
+    return `<div class="file-item">
+      <span class="file-item-icon">${icon}</span>
+      <span class="file-item-name" title="${esc(f.name)}">${esc(f.name)}</span>
+      <span class="file-item-size">${fmtSize(f.size)}</span>
+    </div>`;
+  }).join('');
+
   document.getElementById('btn-upload').disabled = false;
 }
 
@@ -79,7 +179,20 @@ function clearFile() {
   state.file = null;
   document.getElementById('file-preview').classList.add('hidden');
   document.getElementById('file-input').value = '';
-  document.getElementById('btn-upload').disabled = true;
+  if (state.files.length === 0) {
+    document.getElementById('btn-upload').disabled = true;
+  }
+}
+
+function clearFiles() {
+  state.files = [];
+  document.getElementById('files-preview').classList.add('hidden');
+  document.getElementById('files-list').innerHTML = '';
+  document.getElementById('folder-input').value = '';
+  document.getElementById('file-input').value = '';
+  if (!state.file) {
+    document.getElementById('btn-upload').disabled = true;
+  }
 }
 
 function fmtSize(b) {
@@ -93,7 +206,11 @@ function fmtSize(b) {
 // ─────────────────────────────────────────────
 
 function startUpload() {
-  if (state.file) runAnalysisWorkflow();
+  if (state.files.length > 0) {
+    runFolderWorkflow();
+  } else if (state.file) {
+    runAnalysisWorkflow();
+  }
 }
 
 async function runAnalysisWorkflow() {
@@ -158,6 +275,97 @@ async function runAnalysisWorkflow() {
 
   } catch (err) {
     console.error('[Workflow] Analysis failed:', err);
+    showError(err.message);
+    setPill(1);
+  }
+}
+
+async function runFolderWorkflow() {
+  if (state.files.length === 0) return;
+
+  showPanel('processing');
+  setPill(2);
+
+  // Update step labels for folder mode
+  document.querySelector('#step-upload .step-name').textContent = 'Dateien hochladen & klassifizieren';
+  document.querySelector('#step-ai .step-name').textContent = 'Tuerlisten parsen & zusammenfuehren';
+
+  setStep('upload', 'running', `${state.files.length} Dateien werden hochgeladen...`);
+  document.getElementById('processing-subtitle').textContent = 'Dateien werden hochgeladen...';
+
+  try {
+    // 1. Upload all files
+    const form = new FormData();
+    for (const f of state.files) form.append('files', f);
+    const uploadResult = await api('/upload/folder', { method: 'POST', body: form });
+    state.projectId = uploadResult.project_id;
+
+    const summary = uploadResult.summary || {};
+    const classInfo = [];
+    if (summary.tuerliste_count) classInfo.push(`${summary.tuerliste_count} Tuerliste(n)`);
+    if (summary.spezifikation_count) classInfo.push(`${summary.spezifikation_count} Spezifikation(en)`);
+    if (summary.plan_count) classInfo.push(`${summary.plan_count} Plaene`);
+    if (summary.foto_count) classInfo.push(`${summary.foto_count} Fotos`);
+    if (summary.sonstig_count) classInfo.push(`${summary.sonstig_count} Sonstige`);
+
+    setStep('upload', 'done', `${uploadResult.total_files} Dateien: ${classInfo.join(', ')}`);
+
+    if (!summary.tuerliste_count) {
+      throw new Error(
+        'Keine Tuerliste erkannt. Bitte stellen Sie sicher, dass mindestens eine ' +
+        'Excel-Datei mit Tuerlisten-Spalten (Tuer-Nr, Brandschutz, etc.) enthalten ist.'
+      );
+    }
+
+    // 2. Start project analysis (fully automatic, no classification review)
+    setStep('ai', 'running', 'Tuerlisten werden geparst...');
+    document.getElementById('processing-subtitle').textContent = 'Projekt wird analysiert...';
+
+    const { job_id } = await api('/analyze/project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: state.projectId, file_overrides: {} }),
+    });
+
+    const analysis = await pollJob(job_id, (progress) => {
+      document.getElementById('processing-subtitle').textContent = progress || 'Analyse laeuft...';
+      if (progress && progress.includes('Matching')) {
+        setStep('ai', 'done', 'Tuerlisten geparst');
+        setStep('match', 'running', progress);
+      }
+    });
+    state.analysis = analysis;
+
+    const pos = analysis.requirements?.positionen?.length || 0;
+    setStep('ai', 'done', `${pos} Tuerpositionen erkannt`);
+
+    const s = analysis.matching?.summary || {};
+    setStep('match', 'done',
+      `${s.matched_count || 0} erfuellbar, ${s.partial_count || 0} teilweise, ${s.unmatched_count || 0} nicht erfuellbar`
+    );
+    document.getElementById('processing-subtitle').textContent = 'Machbarkeitsanalyse wird erstellt...';
+
+    // 3. Generate result Excel
+    setStep('gen', 'running', 'Machbarkeitsanalyse wird erstellt...');
+    const { job_id: resultJobId } = await api('/result/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requirements: analysis.requirements,
+        matching: analysis.matching,
+      }),
+    });
+    const result = await pollJob(resultJobId, (progress) => {
+      document.getElementById('processing-subtitle').textContent = progress || 'Ergebnis wird erstellt...';
+    }, '/result/status/');
+    state.offer = result;
+    setStep('gen', 'done', result.message);
+
+    setPill(3);
+    showResults(analysis, result);
+
+  } catch (err) {
+    console.error('[FolderWorkflow] Failed:', err);
     showError(err.message);
     setPill(1);
   }
@@ -549,10 +757,18 @@ async function uploadCatalog() {
 // ─────────────────────────────────────────────
 
 function resetAll() {
-  state = { file: null, fileId: null, analysis: null, offer: null };
+  state = { file: null, files: [], fileId: null, projectId: null, analysis: null, offer: null };
   window._analysisItems = [];
 
   clearFile();
+  clearFiles();
+
+  // Reset step labels to defaults
+  document.querySelector('#step-upload .step-name').textContent = 'Datei hochladen';
+  document.querySelector('#step-ai .step-name').textContent = 'Tuerliste parsen';
+  document.querySelector('#step-match .step-name').textContent = 'Produkt-Matching';
+  document.querySelector('#step-gen .step-name').textContent = 'Machbarkeitsanalyse erstellen';
+
   ['upload', 'ai', 'match', 'gen'].forEach(s => setStep(s, 'pending', 'Warte...'));
 
   document.getElementById('stat-grid').innerHTML = '';

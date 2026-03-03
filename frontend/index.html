@@ -58,7 +58,7 @@
         <div class="panel-grid">
           <div class="upload-card">
             <h1 class="section-title">Tuerliste hochladen</h1>
-            <p class="section-desc">Tuerliste oder Ausschreibung hochladen und automatisch analysieren lassen.</p>
+            <p class="section-desc">Einzelne Datei oder kompletten Projektordner hochladen und automatisch analysieren lassen.</p>
 
             <div class="drop-zone" id="drop-zone"
               ondragover="handleDragOver(event)"
@@ -73,13 +73,22 @@
                     <line x1="12" y1="3" x2="12" y2="15"/>
                   </svg>
                 </div>
-                <p class="drop-main">Datei hier ablegen</p>
-                <p class="drop-hint">oder <span class="drop-link">auswaehlen</span> &middot; Excel, PDF, Word, TXT &middot; max. 50 MB</p>
+                <p class="drop-main">Dateien oder Ordner hier ablegen</p>
+                <p class="drop-hint">
+                  oder
+                  <span class="drop-link" onclick="event.stopPropagation(); document.getElementById('file-input').click();">Dateien</span> /
+                  <span class="drop-link" onclick="event.stopPropagation(); document.getElementById('folder-input').click();">Ordner auswaehlen</span>
+                  &middot; Excel, PDF, Word &middot; max. 100 MB
+                </p>
               </div>
-              <input type="file" id="file-input" accept=".xlsx,.xls,.xlsm,.pdf,.docx,.doc,.txt" onchange="handleFileSelect(event)" hidden />
+              <input type="file" id="file-input"
+                accept=".xlsx,.xls,.xlsm,.pdf,.docx,.doc,.txt,.jpg,.jpeg,.png,.bmp,.tif,.tiff,.dwg,.dxf"
+                multiple onchange="handleFileSelect(event)" hidden />
+              <input type="file" id="folder-input"
+                webkitdirectory directory onchange="handleFolderSelect(event)" hidden />
             </div>
 
-            <!-- File preview -->
+            <!-- Single file preview -->
             <div id="file-preview" class="file-preview hidden">
               <div class="file-preview-icon">📗</div>
               <div class="file-preview-info">
@@ -91,6 +100,20 @@
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
               </button>
+            </div>
+
+            <!-- Multi-file preview -->
+            <div id="files-preview" class="files-preview hidden">
+              <div class="files-preview-header">
+                <span class="files-count" id="files-count">0 Dateien</span>
+                <span class="files-total-size" id="files-total-size"></span>
+                <button class="remove-btn" onclick="clearFiles()" title="Alle entfernen">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="files-list" id="files-list"></div>
             </div>
 
             <button class="cta-btn" id="btn-upload" onclick="startUpload()" disabled>
