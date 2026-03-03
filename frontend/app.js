@@ -538,7 +538,7 @@ function showResults(analysis, offer) {
   }
 
   if (!offer.has_offer && !offer.has_gap_report) {
-    dlGrid.innerHTML = '<p style="color:var(--gray-400);font-size:.875rem;grid-column:1/-1;">Keine Dokumente erstellt.</p>';
+    dlGrid.innerHTML = '<p style="color:var(--text-faint);font-size:.875rem;grid-column:1/-1;">Keine Dokumente erstellt.</p>';
   }
 
   // Positions
@@ -564,13 +564,13 @@ function showResults(analysis, offer) {
           <td>${esc(item.beschreibung || pos.beschreibung || '—')}</td>
           <td>${esc(String(pos.menge || item.menge || 1))} ${esc(pos.einheit || 'Stk')}</td>
           <td>${esc(pos.tuertyp || '—')}</td>
-          <td>${pos.brandschutz ? `<span class="tag tag-red">${esc(pos.brandschutz)}</span>` : '<span style="color:var(--gray-300)">—</span>'}</td>
-          <td>${pos.einbruchschutz ? `<span class="tag tag-blue">${esc(pos.einbruchschutz)}</span>` : '<span style="color:var(--gray-300)">—</span>'}</td>
+          <td>${pos.brandschutz ? `<span class="tag tag-red">${esc(pos.brandschutz)}</span>` : '<span style="color:var(--text-faint)">—</span>'}</td>
+          <td>${pos.einbruchschutz ? `<span class="tag tag-blue">${esc(pos.einbruchschutz)}</span>` : '<span style="color:var(--text-faint)">—</span>'}</td>
           <td style="font-size:.75rem;max-width:260px;">
             ${item.review_needed ? `<span class="review-badge" title="Confidence ${(item.confidence * 100).toFixed(0)}% – Status automatisch von '${esc(item.original_status || '')}' angepasst">Prüfen</span> ` : ''}
             ${renderMatchCriteria(item.match_criteria)}
             ${item.reason && (!item.match_criteria || !item.match_criteria.length)
-              ? `<span style="color:var(--gray-500);">${esc(item.reason)}</span>` : ''}
+              ? `<span style="color:var(--text-muted);">${esc(item.reason)}</span>` : ''}
           </td>
           <td class="action-cell">
             <button class="confirm-btn"
@@ -798,7 +798,7 @@ function renderHistoryTable(analyses) {
         <td class="action-cell">
           <button class="correction-btn" onclick="showHistoryDetail('${esc(a.id)}')">Details</button>
           <button class="correction-btn" onclick="rematchHistory('${esc(a.id)}')" title="Mit aktuellen Daten neu matchen">Neu matchen</button>
-          <button class="confirm-btn" onclick="deleteHistory('${esc(a.id)}')" style="color:var(--red-600);background:var(--red-50);border-color:var(--red-100);">&times;</button>
+          <button class="confirm-btn" onclick="deleteHistory('${esc(a.id)}')" style="color:var(--danger);background:var(--danger-light);border-color:var(--danger-border);">&times;</button>
         </td>
       </tr>`;
   }).join('');
@@ -850,7 +850,7 @@ async function showHistoryDetail(historyId) {
           <td>${esc(pos.tuertyp || '—')}</td>
           <td style="font-size:.75rem;">${renderMatchCriteria(item.match_criteria)}${
             item.reason && (!item.match_criteria || !item.match_criteria.length)
-            ? `<span style="color:var(--gray-500);">${esc(item.reason)}</span>` : ''
+            ? `<span style="color:var(--text-muted);">${esc(item.reason)}</span>` : ''
           }</td>
         </tr>`;
       }).join('');
@@ -1153,9 +1153,8 @@ function showToast(message) {
 // ─────────────────────────────────────────────
 
 async function checkServerHealth() {
-  const chip = document.getElementById('server-status');
-  const dot = chip.querySelector('.status-dot');
-  const label = chip.querySelector('span');
+  const dot = document.getElementById('server-status');
+  if (!dot) return;
 
   try {
     const res = await fetch(`${API.replace('/api', '')}/health`);
@@ -1163,29 +1162,26 @@ async function checkServerHealth() {
     const data = await res.json();
 
     if (!data.api_key_set) {
-      chip.style.background = '#ffedd5';
-      chip.style.color = '#ea580c';
-      chip.style.borderColor = '#fed7aa';
-      dot.style.background = '#ea580c';
-      label.textContent = 'API-Key fehlt!';
+      dot.style.background = '#d97706';
+      dot.title = 'API-Key fehlt';
       showToast('ANTHROPIC_API_KEY ist nicht gesetzt. Analyse wird fehlschlagen.');
     } else {
-      chip.style.background = '';
-      chip.style.color = '';
-      chip.style.borderColor = '';
       dot.style.background = '';
-      label.textContent = 'Server verbunden';
+      dot.title = 'Server verbunden';
     }
   } catch (err) {
-    chip.style.background = '#fee2e2';
-    chip.style.color = '#dc2626';
-    chip.style.borderColor = '#fca5a5';
     dot.style.background = '#dc2626';
-    dot.style.animation = 'none';
-    label.textContent = 'Server nicht erreichbar';
+    dot.classList.add('offline');
+    dot.title = 'Server nicht erreichbar';
     console.error('Health check failed:', err);
   }
 }
+
+// Header scroll shadow
+window.addEventListener('scroll', () => {
+  const header = document.getElementById('header');
+  if (header) header.classList.toggle('scrolled', window.scrollY > 0);
+}, { passive: true });
 
 // Run health check on load
 checkServerHealth();

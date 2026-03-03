@@ -6,464 +6,322 @@
   <title>Frank Türen AG – KI-Angebotserstellung</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
 
-  <!-- Sidebar -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-brand">
-      <div class="brand-logo">FT</div>
-      <div class="brand-text">
-        <span class="brand-name">Frank Türen AG</span>
-        <span class="brand-sub">KI-Angebotserstellung</span>
-      </div>
-    </div>
-
-    <nav class="sidebar-nav">
-      <button class="nav-item active" id="nav-offer" onclick="switchView('offer', this)">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="16" y1="13" x2="8" y2="13"/>
-          <line x1="16" y1="17" x2="8" y2="17"/>
-        </svg>
-        <span>Angebot erstellen</span>
-      </button>
-      <button class="nav-item" id="nav-products" onclick="switchView('products', this)">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-          <line x1="8" y1="21" x2="16" y2="21"/>
-          <line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
-        <span>Produktkatalog</span>
-      </button>
-      <button class="nav-item" id="nav-history" onclick="switchView('history', this)">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="12 6 12 12 16 14"/>
-        </svg>
-        <span>Historie</span>
-      </button>
+  <!-- Header -->
+  <header class="header" id="header">
+    <div class="header-brand">Frank Türen AG</div>
+    <nav class="header-nav">
+      <button class="nav-item active" id="nav-offer" onclick="switchView('offer', this)">Angebot</button>
+      <button class="nav-item" id="nav-products" onclick="switchView('products', this)">Produkte</button>
+      <button class="nav-item" id="nav-history" onclick="switchView('history', this)">Historie</button>
     </nav>
-
-    <div class="sidebar-footer">
-      <div class="ai-badge">
-        <div class="ai-dot"></div>
-        <span>Claude AI aktiv</span>
-      </div>
+    <div class="header-status">
+      <div id="server-status"></div>
     </div>
-  </aside>
+  </header>
+
+  <!-- Hidden topbar elements (preserved for app.js) -->
+  <span id="topbar-title"></span>
+  <span id="topbar-sub"></span>
 
   <!-- Main -->
-  <div class="main-wrapper">
+  <main class="main-content">
 
-    <!-- Top bar -->
-    <header class="topbar">
-      <div class="topbar-left">
-        <h1 class="topbar-title" id="topbar-title">Angebot erstellen</h1>
-        <p class="topbar-sub" id="topbar-sub">Ausschreibung hochladen und KI-Analyse starten</p>
-      </div>
-      <div class="topbar-right">
-        <div class="status-chip" id="server-status">
-          <div class="status-dot"></div>
-          <span>Server verbunden</span>
-        </div>
-      </div>
-    </header>
+    <!-- ===== OFFER VIEW ===== -->
+    <div id="view-offer" class="view active">
 
-    <!-- Content -->
-    <main class="content">
+      <!-- STEP 1: Upload -->
+      <div id="panel-upload" class="panel active-panel">
 
-      <!-- ===== OFFER VIEW ===== -->
-      <div id="view-offer" class="view active">
-
-        <!-- STEP 1: Upload -->
-        <div id="panel-upload" class="panel active-panel">
-
-          <!-- Progress pills (4 steps for project workflow) -->
-          <div class="progress-pills">
-            <div class="pill active" id="pill-1">
-              <span class="pill-num">1</span>
-              <span class="pill-label">Upload</span>
-            </div>
-            <div class="pill-connector"></div>
-            <div class="pill" id="pill-2">
-              <span class="pill-num">2</span>
-              <span class="pill-label">Klassifikation</span>
-            </div>
-            <div class="pill-connector"></div>
-            <div class="pill" id="pill-3">
-              <span class="pill-num">3</span>
-              <span class="pill-label">KI-Analyse</span>
-            </div>
-            <div class="pill-connector"></div>
-            <div class="pill" id="pill-4">
-              <span class="pill-num">4</span>
-              <span class="pill-label">Ergebnis</span>
-            </div>
+        <!-- Step Indicator -->
+        <div class="steps-indicator progress-pills">
+          <div class="pill active" id="pill-1">
+            <span class="pill-num">1</span>
+            <span class="pill-label">Upload</span>
           </div>
+          <div class="pill-connector"></div>
+          <div class="pill" id="pill-2">
+            <span class="pill-num">2</span>
+            <span class="pill-label">Klassifikation</span>
+          </div>
+          <div class="pill-connector"></div>
+          <div class="pill" id="pill-3">
+            <span class="pill-num">3</span>
+            <span class="pill-label">KI-Analyse</span>
+          </div>
+          <div class="pill-connector"></div>
+          <div class="pill" id="pill-4">
+            <span class="pill-num">4</span>
+            <span class="pill-label">Ergebnis</span>
+          </div>
+        </div>
 
-          <div class="panel-grid">
-            <!-- Upload card -->
-            <div class="glass-card upload-card">
-              <div class="card-header-row">
-                <div class="card-icon-wrap blue">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div class="panel-grid">
+          <div class="upload-card">
+            <h1 class="section-title">Ausschreibung hochladen</h1>
+            <p class="section-desc">Gesamten Ausschreibungsordner oder einzelne Dateien hochladen und automatisch analysieren lassen.</p>
+
+            <!-- Upload mode toggle -->
+            <div class="upload-mode-toggle">
+              <button class="toggle-btn active" id="toggle-folder" onclick="setUploadMode('folder')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+                Ordner
+              </button>
+              <button class="toggle-btn" id="toggle-files" onclick="setUploadMode('files')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                Dateien
+              </button>
+            </div>
+
+            <div class="drop-zone" id="drop-zone"
+              ondragover="handleDragOver(event)"
+              ondragleave="handleDragLeave(event)"
+              ondrop="handleDrop(event)"
+              onclick="triggerFileInput()">
+              <div class="drop-visual">
+                <div class="drop-circle">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="17 8 12 3 7 8"/>
                     <line x1="12" y1="3" x2="12" y2="15"/>
                   </svg>
                 </div>
-                <div>
-                  <h2 class="card-title">Ausschreibung hochladen</h2>
-                  <p class="card-desc">Gesamten Ausschreibungsordner oder einzelne Dateien</p>
-                </div>
+                <p class="drop-main" id="drop-main-text">Ordner hier ablegen</p>
+                <p class="drop-hint" id="drop-hint-text">oder <span class="drop-link" onclick="triggerFileInput(); event.stopPropagation()">auswählen</span> &middot; PDF, XLSX, DOCX &middot; max. 100 MB</p>
               </div>
+              <input type="file" id="folder-input" webkitdirectory directory onchange="handleFolderSelect(event)" hidden />
+              <input type="file" id="files-input" multiple accept=".pdf,.xlsx,.xls,.xlsm,.docx,.doc,.txt,.jpg,.jpeg,.png,.dwg,.crbx" onchange="handleFilesSelect(event)" hidden />
+            </div>
 
-              <!-- Upload mode toggle -->
-              <div class="upload-mode-toggle">
-                <button class="toggle-btn active" id="toggle-folder" onclick="setUploadMode('folder')">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                  </svg>
-                  Ordner
-                </button>
-                <button class="toggle-btn" id="toggle-files" onclick="setUploadMode('files')">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                  </svg>
-                  Dateien
-                </button>
-              </div>
-
-              <div class="drop-zone" id="drop-zone"
-                ondragover="handleDragOver(event)"
-                ondragleave="handleDragLeave(event)"
-                ondrop="handleDrop(event)"
-                onclick="triggerFileInput()">
-                <div class="drop-visual">
-                  <div class="drop-circle">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                    </svg>
-                  </div>
-                  <p class="drop-main" id="drop-main-text">Ordner hier ablegen</p>
-                  <p class="drop-hint" id="drop-hint-text">oder <span class="drop-link" onclick="triggerFileInput(); event.stopPropagation()">auswählen</span> · PDF, XLSX, DOCX und mehr · max. 500 MB</p>
-                </div>
-                <input type="file" id="folder-input" webkitdirectory directory onchange="handleFolderSelect(event)" hidden />
-                <input type="file" id="files-input" multiple accept=".pdf,.xlsx,.xls,.xlsm,.docx,.doc,.txt,.jpg,.jpeg,.png,.dwg,.crbx" onchange="handleFilesSelect(event)" hidden />
-              </div>
-
-              <!-- Multi-file preview list -->
-              <div id="files-preview" class="files-preview hidden">
-                <div class="files-preview-header">
-                  <span id="files-count" class="files-count">0 Dateien</span>
-                  <span id="files-total-size" class="files-total-size">0 KB</span>
-                  <button class="remove-btn" onclick="clearFiles()" title="Alle entfernen">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
-                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                  </button>
-                </div>
-                <div id="files-list" class="files-list"></div>
-              </div>
-
-              <!-- Legacy single file preview (hidden in project mode) -->
-              <div id="file-preview" class="file-preview hidden">
-                <div class="file-preview-icon" id="file-type-icon">📄</div>
-                <div class="file-preview-info">
-                  <p class="file-preview-name" id="file-name"></p>
-                  <p class="file-preview-size" id="file-size"></p>
-                </div>
-                <button class="remove-btn" onclick="clearFile()" title="Entfernen">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+            <!-- Multi-file preview list -->
+            <div id="files-preview" class="files-preview hidden">
+              <div class="files-preview-header">
+                <span id="files-count" class="files-count">0 Dateien</span>
+                <span id="files-total-size" class="files-total-size">0 KB</span>
+                <button class="remove-btn" onclick="clearFiles()" title="Alle entfernen">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                   </svg>
                 </button>
               </div>
+              <div id="files-list" class="files-list"></div>
+            </div>
 
-              <button class="cta-btn" id="btn-upload" onclick="startUpload()" disabled>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="17 8 12 3 7 8"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
+            <!-- Single file preview -->
+            <div id="file-preview" class="file-preview hidden">
+              <div class="file-preview-icon" id="file-type-icon">📄</div>
+              <div class="file-preview-info">
+                <p class="file-preview-name" id="file-name"></p>
+                <p class="file-preview-size" id="file-size"></p>
+              </div>
+              <button class="remove-btn" onclick="clearFile()" title="Entfernen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
-                Hochladen &amp; Klassifizieren
               </button>
             </div>
 
-            <!-- Info cards -->
-            <div class="info-col">
-              <div class="info-card">
-                <div class="info-icon green">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="info-title">Automatische Erkennung</p>
-                  <p class="info-text">Claude erkennt Türtypen, Massen, Brandschutz- und Sicherheitsklassen</p>
-                </div>
-              </div>
-              <div class="info-card">
-                <div class="info-icon blue">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                    <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="info-title">886 Produkte</p>
-                  <p class="info-text">Abgleich mit der vollständigen FTAG-Produktmatrix</p>
-                </div>
-              </div>
-              <div class="info-card">
-                <div class="info-icon orange">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="info-title">Excel &amp; Word Export</p>
-                  <p class="info-text">Angebot und Gap-Report in beiden Formaten</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- STEP 2: Classification Review -->
-        <div id="panel-classify" class="panel">
-          <div class="glass-card">
-            <div class="card-header-row">
-              <div class="card-icon-wrap blue">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                </svg>
-              </div>
-              <div>
-                <h2 class="card-title">Datei-Klassifikation</h2>
-                <p class="card-desc" id="classify-subtitle">Dateien wurden automatisch klassifiziert</p>
-              </div>
-            </div>
-            <div class="classify-summary" id="classify-summary"></div>
-            <div id="classification-grid" class="classification-grid"></div>
-            <div style="display:flex;gap:1rem;margin-top:1.5rem;">
-              <button class="cta-btn" id="btn-start-analysis" onclick="startProjectAnalysis()">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-                Analyse starten
-              </button>
-              <button class="cta-btn secondary" onclick="resetAll()">Abbrechen</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- STEP 3: Processing -->
-        <div id="panel-processing" class="panel">
-          <div class="glass-card processing-card">
-            <div class="processing-header">
-              <div class="processing-spinner"></div>
-              <div>
-                <h2 class="card-title">Verarbeitung läuft</h2>
-                <p class="card-desc" id="processing-subtitle">Bitte warten...</p>
-              </div>
-            </div>
-            <div class="steps-list">
-              <div class="step-item" id="step-upload">
-                <div class="step-dot pending"></div>
-                <div class="step-body">
-                  <p class="step-name">Dateien hochladen &amp; klassifizieren</p>
-                  <p class="step-status" id="status-upload">Warte...</p>
-                </div>
-              </div>
-              <div class="step-item" id="step-ai">
-                <div class="step-dot pending"></div>
-                <div class="step-body">
-                  <p class="step-name">Excel parsen &amp; KI-Normalisierung</p>
-                  <p class="step-status" id="status-ai">Warte...</p>
-                </div>
-              </div>
-              <div class="step-item" id="step-match">
-                <div class="step-dot pending"></div>
-                <div class="step-body">
-                  <p class="step-name">Produkt-Matching</p>
-                  <p class="step-status" id="status-match">Warte...</p>
-                </div>
-              </div>
-              <div class="step-item" id="step-gen">
-                <div class="step-dot pending"></div>
-                <div class="step-body">
-                  <p class="step-name">Angebot &amp; Gap-Report erstellen</p>
-                  <p class="step-status" id="status-gen">Warte...</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- STEP 3: Results -->
-        <div id="panel-results" class="panel">
-
-          <!-- Stat cards -->
-          <div class="stat-grid" id="stat-grid"></div>
-
-          <!-- Match rate bar -->
-          <div class="glass-card" id="match-rate-card" style="margin-bottom:1.5rem;">
-            <div class="match-rate-header">
-              <span class="match-rate-label">Erfüllungsrate</span>
-              <span class="match-rate-value" id="match-rate-pct">0%</span>
-            </div>
-            <div class="match-bar-bg">
-              <div class="match-bar-fill" id="match-bar" style="width:0%"></div>
-            </div>
-            <p class="match-rate-sub" id="match-rate-sub"></p>
-          </div>
-
-          <!-- Download section -->
-          <div class="glass-card download-card-new" id="download-card">
-            <div class="card-header-row">
-              <div class="card-icon-wrap green">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-              </div>
-              <div>
-                <h2 class="card-title">Dokumente herunterladen</h2>
-                <p class="card-desc">Angebot und Gap-Report in Excel oder Word</p>
-              </div>
-            </div>
-            <div class="download-grid" id="download-grid"></div>
-          </div>
-
-          <!-- Positions -->
-          <div id="positions-container"></div>
-
-          <!-- Reset -->
-          <div style="display:flex; justify-content:center; margin-top:2rem;">
-            <button class="reset-btn" onclick="resetAll()">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/>
-              </svg>
-              Neue Analyse starten
+            <button class="cta-btn" id="btn-upload" onclick="startUpload()" disabled>
+              Hochladen &amp; Klassifizieren
             </button>
           </div>
-        </div>
 
-        <!-- Error -->
-        <div id="panel-error" class="panel">
-          <div class="glass-card error-card">
-            <div class="error-icon-big">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-            </div>
-            <h2 class="error-title">Fehler aufgetreten</h2>
-            <div class="error-detail" id="error-msg" style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:1rem;margin-bottom:1.25rem;font-size:0.9375rem;color:var(--red-600);line-height:1.6;text-align:left;word-break:break-word;"></div>
-            <p style="color:var(--gray-500);font-size:0.8125rem;margin-bottom:1.25rem;">Tipp: Browser-Konsole (F12) zeigt weitere Details.</p>
-            <button class="cta-btn secondary" onclick="resetAll()">Erneut versuchen</button>
-          </div>
+          <!-- Info cards (hidden in clean design) -->
+          <div class="info-col"></div>
         </div>
-
       </div>
 
-      <!-- ===== PRODUCTS VIEW ===== -->
-      <div id="view-products" class="view">
+      <!-- STEP 2: Classification -->
+      <div id="panel-classify" class="panel">
         <div class="glass-card">
-          <div class="card-header-row">
-            <div class="card-icon-wrap blue">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-              </svg>
-            </div>
-            <div>
-              <h2 class="card-title">Produktkatalog</h2>
-              <p class="card-desc">FTAG-Produktmatrix durchsuchen</p>
-            </div>
-          </div>
-          <div class="search-row">
-            <div class="search-wrap">
-              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <input type="text" id="product-search" class="search-input" placeholder="Suchen: T30, RC2, Stahltür..." oninput="searchProducts()" />
-            </div>
-            <button class="cta-btn slim" onclick="loadProducts()">Laden</button>
-          </div>
-          <div id="products-loading" class="loading-state hidden">
-            <div class="mini-spinner"></div>
-            <span>Produkte werden geladen...</span>
-          </div>
-          <p id="products-error" class="error-inline hidden"></p>
-          <p id="products-info" class="info-inline hidden"></p>
-          <div id="products-table-wrap" class="table-wrap hidden">
-            <table class="data-table">
-              <thead id="products-thead"></thead>
-              <tbody id="products-tbody"></tbody>
-            </table>
+          <h2 class="section-title" style="font-size:1.25rem;">Datei-Klassifikation</h2>
+          <p class="section-desc" id="classify-subtitle">Dateien wurden automatisch klassifiziert. Kategorien prüfen und bei Bedarf ändern.</p>
+          <div class="classify-summary" id="classify-summary"></div>
+          <div id="classification-grid" class="classification-grid"></div>
+          <div style="display:flex;gap:0.75rem;margin-top:1.5rem;">
+            <button class="cta-btn" id="btn-start-analysis" onclick="startProjectAnalysis()">
+              Analyse starten
+            </button>
+            <button class="cta-btn secondary" onclick="resetAll()">Abbrechen</button>
           </div>
         </div>
       </div>
 
-      <!-- ===== HISTORY VIEW ===== -->
-      <div id="view-history" class="view">
-        <div class="glass-card">
-          <div class="card-header-row">
-            <div class="card-icon-wrap blue">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12 6 12 12 16 14"/>
-              </svg>
-            </div>
+      <!-- STEP 3: Processing -->
+      <div id="panel-processing" class="panel">
+        <div class="glass-card processing-card">
+          <div class="processing-header">
+            <div class="processing-spinner"></div>
             <div>
-              <h2 class="card-title">Analyse-Historie</h2>
-              <p class="card-desc">Vergangene Analysen einsehen und vergleichen</p>
+              <h2 class="card-title">Verarbeitung läuft</h2>
+              <p class="card-desc" id="processing-subtitle">Bitte warten...</p>
             </div>
           </div>
-          <div id="history-loading" class="loading-state hidden">
-            <div class="mini-spinner"></div>
-            <span>Historie wird geladen...</span>
-          </div>
-          <p id="history-error" class="error-inline hidden"></p>
-          <p id="history-empty" class="info-inline hidden">Noch keine Analysen durchgeführt.</p>
-          <div id="history-table-wrap" class="table-wrap hidden">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Datum</th>
-                  <th>Datei</th>
-                  <th>Projekt</th>
-                  <th>Positionen</th>
-                  <th>Rate</th>
-                  <th>Aktionen</th>
-                </tr>
-              </thead>
-              <tbody id="history-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-        <div id="history-detail" class="hidden" style="margin-top:1.5rem;">
-          <div class="glass-card">
-            <div class="card-header-row" style="justify-content:space-between;">
-              <div>
-                <h2 class="card-title" id="history-detail-title">Analyse-Details</h2>
-                <p class="card-desc" id="history-detail-sub"></p>
+          <div class="steps-list">
+            <div class="step-item" id="step-upload">
+              <div class="step-dot pending"></div>
+              <div class="step-body">
+                <p class="step-name">Dateien hochladen &amp; klassifizieren</p>
+                <p class="step-status" id="status-upload">Warte...</p>
               </div>
-              <button class="cta-btn slim secondary" onclick="closeHistoryDetail()">Schliessen</button>
             </div>
-            <div id="history-detail-stats" class="stat-grid"></div>
-            <div id="history-detail-positions"></div>
+            <div class="step-item" id="step-ai">
+              <div class="step-dot pending"></div>
+              <div class="step-body">
+                <p class="step-name">Excel parsen &amp; KI-Normalisierung</p>
+                <p class="step-status" id="status-ai">Warte...</p>
+              </div>
+            </div>
+            <div class="step-item" id="step-match">
+              <div class="step-dot pending"></div>
+              <div class="step-body">
+                <p class="step-name">Produkt-Matching</p>
+                <p class="step-status" id="status-match">Warte...</p>
+              </div>
+            </div>
+            <div class="step-item" id="step-gen">
+              <div class="step-dot pending"></div>
+              <div class="step-body">
+                <p class="step-name">Angebot &amp; Gap-Report erstellen</p>
+                <p class="step-status" id="status-gen">Warte...</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-    </main>
-  </div>
+      <!-- STEP 4: Results -->
+      <div id="panel-results" class="panel">
+
+        <!-- Stat cards -->
+        <div class="stat-grid" id="stat-grid"></div>
+
+        <!-- Match rate -->
+        <div class="match-rate-card" id="match-rate-card">
+          <div class="match-rate-header">
+            <span class="match-rate-label">Erfüllungsrate</span>
+            <span class="match-rate-value" id="match-rate-pct">0%</span>
+          </div>
+          <div class="match-bar-bg">
+            <div class="match-bar-fill" id="match-bar" style="width:0%"></div>
+          </div>
+          <p class="match-rate-sub" id="match-rate-sub"></p>
+        </div>
+
+        <!-- Downloads -->
+        <div class="download-section" id="download-card">
+          <p class="download-title">Dokumente herunterladen</p>
+          <div class="download-grid" id="download-grid"></div>
+        </div>
+
+        <!-- Positions -->
+        <div id="positions-container"></div>
+
+        <!-- Reset -->
+        <div style="display:flex;justify-content:center;margin-top:2rem;">
+          <button class="reset-btn" onclick="resetAll()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/>
+            </svg>
+            Neue Analyse starten
+          </button>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div id="panel-error" class="panel">
+        <div class="error-card">
+          <div class="error-icon-big">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <h2 class="error-title">Fehler aufgetreten</h2>
+          <div class="error-msg" id="error-msg"></div>
+          <p style="color:var(--text-muted);font-size:0.8125rem;margin-bottom:1.25rem;">Browser-Konsole (F12) zeigt weitere Details.</p>
+          <button class="cta-btn secondary" onclick="resetAll()">Erneut versuchen</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===== PRODUCTS VIEW ===== -->
+    <div id="view-products" class="view">
+      <h1 class="section-title">Produktkatalog</h1>
+      <p class="section-desc">FTAG-Produktmatrix durchsuchen</p>
+      <div class="search-row">
+        <div class="search-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" id="product-search" class="search-input" placeholder="Suchen: T30, RC2, Stahltür..." oninput="searchProducts()" />
+        </div>
+        <button class="cta-btn slim" onclick="loadProducts()">Laden</button>
+      </div>
+      <div id="products-loading" class="loading-state hidden">
+        <div class="mini-spinner"></div>
+        <span>Produkte werden geladen...</span>
+      </div>
+      <p id="products-error" class="error-inline hidden"></p>
+      <p id="products-info" class="info-inline hidden"></p>
+      <div id="products-table-wrap" class="table-wrap hidden" style="border-radius:var(--radius-lg);border-top:1px solid var(--border);">
+        <table class="data-table">
+          <thead id="products-thead"></thead>
+          <tbody id="products-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== HISTORY VIEW ===== -->
+    <div id="view-history" class="view">
+      <h1 class="section-title">Analyse-Historie</h1>
+      <p class="section-desc">Vergangene Analysen einsehen und vergleichen</p>
+      <div id="history-loading" class="loading-state hidden">
+        <div class="mini-spinner"></div>
+        <span>Historie wird geladen...</span>
+      </div>
+      <p id="history-error" class="error-inline hidden"></p>
+      <p id="history-empty" class="info-inline hidden">Noch keine Analysen durchgeführt.</p>
+      <div id="history-table-wrap" class="table-wrap hidden" style="border-radius:var(--radius-lg);border-top:1px solid var(--border);">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Datum</th>
+              <th>Datei</th>
+              <th>Projekt</th>
+              <th>Positionen</th>
+              <th>Rate</th>
+              <th>Aktionen</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody"></tbody>
+        </table>
+      </div>
+      <div id="history-detail" class="hidden" style="margin-top:1.5rem;">
+        <div class="glass-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+            <div>
+              <h2 style="font-size:1rem;font-weight:700;" id="history-detail-title">Analyse-Details</h2>
+              <p style="font-size:0.8125rem;color:var(--text-muted);" id="history-detail-sub"></p>
+            </div>
+            <button class="cta-btn slim secondary" onclick="closeHistoryDetail()">Schliessen</button>
+          </div>
+          <div id="history-detail-stats" class="stat-grid"></div>
+          <div id="history-detail-positions"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
 
   <!-- Correction Modal -->
   <div class="modal-overlay hidden" id="correction-modal">
@@ -471,7 +329,7 @@
       <div class="modal-header">
         <h3 class="modal-title">Produktzuordnung korrigieren</h3>
         <button class="modal-close" onclick="closeCorrection()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
@@ -488,7 +346,7 @@
         <div class="correction-section">
           <p class="correction-label">Richtiges Produkt suchen:</p>
           <div class="search-wrap">
-            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
             <input type="text" id="correction-search-input" class="search-input"
@@ -497,7 +355,7 @@
           </div>
         </div>
         <div id="correction-results" class="correction-results"></div>
-        <div class="correction-section" style="margin-top:1rem;">
+        <div class="correction-section" style="margin-top:0.75rem;">
           <label class="correction-label" for="correction-note-input">Bemerkung (optional):</label>
           <input type="text" id="correction-note-input" class="search-input"
                  placeholder="z.B. Kunde meint immer T30 wenn er Brandschutz sagt" />
@@ -512,6 +370,6 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="/static/app.js"></script>
 </body>
 </html>
