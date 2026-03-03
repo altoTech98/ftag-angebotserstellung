@@ -61,6 +61,11 @@ async def upload_document(file: UploadFile = File(...)):
     # Store extracted text in memory cache
     text_cache.store(file_id, text, filename=file.filename, extension=ext)
 
+    # Also store raw bytes for Excel files (for structured parsing in analyze)
+    if ext in (".xlsx", ".xls", ".xlsm"):
+        from services.memory_cache import project_cache
+        project_cache.store(f"excel_{file_id}", content, filename=file.filename)
+
     return {
         "file_id": file_id,
         "filename": file.filename,

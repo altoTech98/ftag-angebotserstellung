@@ -116,6 +116,75 @@ def _run_offer_generation(requirements: dict, matching: dict) -> dict:
     return results
 
 
+# ─────────────────────────────────────────────
+# RESULT GENERATION (Machbarkeitsanalyse + GAP)
+# ─────────────────────────────────────────────
+
+class GenerateResultRequest(BaseModel):
+    requirements: dict
+    matching: dict
+
+
+@router.post("/result/generate")
+async def generate_result(request: GenerateResultRequest):
+    """Generate Machbarkeitsanalyse + GAP report Excel. Returns job_id."""
+    job = create_job()
+    run_in_background(
+        job, _run_result_generation,
+        request.requirements, request.matching,
+    )
+    return {"job_id": job.id, "status": "started"}
+
+
+@router.get("/result/status/{job_id}")
+async def get_result_status(job_id: str):
+    """Poll the status of a result generation job."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job nicht gefunden")
+    return job.to_dict()
+
+
+def _run_result_generation(requirements: dict, matching: dict) -> dict:
+    """Generate Machbarkeitsanalyse Excel (2-sheet: matching + GAP)."""
+    from services.result_generator import generate_result_excel
+
+    result_id = str(uuid.uuid4())[:8]
+
+    xlsx_bytes = generate_result_excel(matching, requirements, result_id)
+    offer_cache.store(f"result_{result_id}_xlsx", xlsx_bytes, ttl_seconds=1800)
+
+    summary = matching.get("summary", {})
+    return {
+        "result_id": result_id,
+        "has_result": True,
+        "summary": summary,
+        "message": (
+            f"Machbarkeitsanalyse erstellt: {summary.get('matched_count', 0)} machbar, "
+            f"{summary.get('partial_count', 0)} teilweise, "
+            f"{summary.get('unmatched_count', 0)} nicht machbar"
+        ),
+    }
+
+
+@router.get("/result/{result_id}/download")
+async def download_result(result_id: str):
+    """Download Machbarkeitsanalyse + GAP report Excel from memory cache."""
+    key = f"result_{result_id}_xlsx"
+    data = offer_cache.get(key)
+    if data is None:
+        raise HTTPException(
+            status_code=410,
+            detail="Ergebnis nicht gefunden oder abgelaufen. Bitte erneut generieren.",
+        )
+
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="FTAG_Machbarkeit_{result_id}.xlsx"'},
+    )
+
+
 @router.get("/offer/{offer_id}/download")
 async def download_offer(offer_id: str, format: str = "xlsx"):
     """Download offer as Excel (format=xlsx) or Word (format=docx) from memory cache."""

@@ -12,15 +12,12 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from services.document_parser import parse_document_bytes, parse_pdf_specs_bytes
-from services.claude_client import extract_requirements_from_text, normalize_door_positions
+from services.claude_client import extract_requirements_from_text
 from services.excel_parser import parse_tuerliste_bytes, merge_tuerlisten
 from services.project_store import get_project, update_project, update_file_classification
-from services.product_matcher import (
-    get_products_summary,
-    load_product_catalog,
-    match_requirements,
-    match_requirements_ai,
-)
+from services.product_matcher import get_products_summary
+from services.catalog_index import get_catalog_index
+from services.fast_matcher import match_all as fast_match_all
 from services.history_store import save_analysis
 from services.memory_cache import text_cache, project_cache
 from services.job_store import create_job, get_job, update_job, run_in_background
@@ -54,6 +51,15 @@ class AnalyzeRequest(BaseModel):
 @router.post("/analyze")
 async def analyze_document(request: AnalyzeRequest):
     """Start single-file analysis as background job. Returns job_id immediately."""
+    # Check for cached Excel bytes first (structured parsing path)
+    excel_bytes = project_cache.get(f"excel_{request.file_id}")
+
+    if excel_bytes is not None:
+        job = create_job()
+        run_in_background(job, _run_excel_analysis, request.file_id, excel_bytes)
+        return {"job_id": job.id, "status": "started"}
+
+    # Fallback: text-based analysis (PDF/Word)
     text = text_cache.get(request.file_id)
     if text is None:
         raise HTTPException(
@@ -67,31 +73,34 @@ async def analyze_document(request: AnalyzeRequest):
         )
 
     job = create_job()
-    run_in_background(job, _run_single_analysis, request.file_id, text)
-
+    run_in_background(job, _run_text_analysis, request.file_id, text)
     return {"job_id": job.id, "status": "started"}
 
 
-def _run_single_analysis(file_id: str, text: str) -> dict:
-    """Run single-file analysis (called in background thread)."""
-    update_job_by_file = lambda prog: None  # placeholder
+def _run_excel_analysis(file_id: str, excel_bytes: bytes) -> dict:
+    """Run structured Excel analysis (parse columns + fast matching)."""
+    parsed = parse_tuerliste_bytes(excel_bytes)
+    doors = parsed["doors"]
 
-    # Find the job for progress updates
-    # We get job_id from the thread context via the job store
-    import threading
-    # Progress is updated via update_job in the calling wrapper
+    if not doors:
+        raise ValueError("Keine Tuerpositionen in der Datei gefunden.")
 
-    # Extract requirements with Claude
-    requirements = extract_requirements_from_text(text)
+    # Strip internal _raw_row to reduce payload
+    positions = []
+    for d in doors:
+        pos = {k: v for k, v in d.items() if k != "_raw_row" and v is not None}
+        positions.append(pos)
 
-    # Match against product catalog
-    try:
-        match_result = match_requirements_ai(requirements)
-    except Exception as e:
-        logger.warning(f"AI matching failed, falling back to keyword: {e}")
-        match_result = match_requirements(requirements)
+    requirements = {
+        "projekt": file_id,
+        "auftraggeber": "",
+        "positionen": positions,
+        "gesamtanzahl_tueren": sum(d.get("menge", 1) for d in positions),
+        "hinweise": "",
+    }
 
-    # Save to history
+    match_result = fast_match_all(positions)
+
     try:
         save_analysis(file_id=file_id, filename=file_id, requirements=requirements, matching=match_result)
     except Exception as e:
@@ -104,8 +113,32 @@ def _run_single_analysis(file_id: str, text: str) -> dict:
         "status": "analyzed",
         "message": (
             f"Analyse abgeschlossen: {match_result['summary']['total_positions']} Positionen, "
-            f"{match_result['summary']['matched_count']} erfüllbar, "
-            f"{match_result['summary']['unmatched_count']} nicht erfüllbar"
+            f"{match_result['summary']['matched_count']} erfuellbar, "
+            f"{match_result['summary']['unmatched_count']} nicht erfuellbar"
+        ),
+    }
+
+
+def _run_text_analysis(file_id: str, text: str) -> dict:
+    """Run text-based analysis for PDF/Word files (Claude extraction + matching)."""
+    requirements = extract_requirements_from_text(text)
+
+    match_result = fast_match_all(requirements.get("positionen", []))
+
+    try:
+        save_analysis(file_id=file_id, filename=file_id, requirements=requirements, matching=match_result)
+    except Exception as e:
+        logger.warning(f"Failed to save analysis to history: {e}")
+
+    return {
+        "file_id": file_id,
+        "requirements": requirements,
+        "matching": match_result,
+        "status": "analyzed",
+        "message": (
+            f"Analyse abgeschlossen: {match_result['summary']['total_positions']} Positionen, "
+            f"{match_result['summary']['matched_count']} erfuellbar, "
+            f"{match_result['summary']['unmatched_count']} nicht erfuellbar"
         ),
     }
 
@@ -235,47 +268,37 @@ def _run_project_analysis(job_id: str, project_id: str, cached_files: dict) -> d
         if f["category"] in ("plan", "foto", "sonstig"):
             parsed_files_info.append({"filename": f["filename"], "category": f["category"], "status": "skipped"})
 
-    # Step 4: Claude normalization
-    update_job(job_id, progress=f"KI normalisiert {len(doors)} Türpositionen...")
+    # Step 4: Prepare positions for matching
+    # Use raw structured doors directly for AI matching (richer data than
+    # Claude normalization which can lose fields like schloss_typ, zargentyp).
+    # Strip internal _raw_row to reduce payload size.
+    positions = []
+    for d in doors:
+        pos = {k: v for k, v in d.items() if k != "_raw_row" and v is not None}
+        positions.append(pos)
+
+    requirements = {
+        "projekt": project.get("name", project_id),
+        "auftraggeber": "",
+        "positionen": positions,
+        "gesamtanzahl_tueren": sum(d.get("menge", 1) for d in positions),
+        "hinweise": supplementary_context[:2000] if supplementary_context else "",
+    }
+
+    # Step 5: AI product matching (category-aware, batched)
+    pos_count = len(positions)
+    update_job(job_id, progress=f"KI-Produkt-Matching fuer {pos_count} Positionen...")
+
+    def on_match_progress(msg):
+        update_job(job_id, progress=msg)
+
     try:
-        unmapped_sample = None
-        if merged.get("unmapped_columns") and doors:
-            unmapped_sample = {}
-            for col in merged["unmapped_columns"][:10]:
-                values = [d.get("_raw_row", {}).get(col) for d in doors[:5] if d.get("_raw_row", {}).get(col)]
-                if values:
-                    unmapped_sample[col] = values
-
-        def on_norm_progress(msg):
-            update_job(job_id, progress=msg)
-
-        requirements = normalize_door_positions(
-            doors=doors,
-            supplementary_context=supplementary_context[:8000],
-            unmapped_columns_sample=unmapped_sample,
-            on_progress=on_norm_progress,
+        match_result = fast_match_all(
+            positions,
+            on_progress=on_match_progress,
         )
-    except ValueError as e:
-        raise
     except Exception as e:
-        logger.error(f"Claude normalization failed, using fallback: {e}", exc_info=True)
-        from services.claude_client import _fallback_normalize
-        positions = _fallback_normalize(doors)
-        requirements = {
-            "projekt": "", "auftraggeber": "", "positionen": positions,
-            "gesamtanzahl_tueren": sum(p.get("menge", 1) for p in positions),
-            "hinweise": "Fallback-Normalisierung (ohne KI)",
-        }
-
-    # Step 5: Product matching (always keyword for project analysis – fast & reliable)
-    pos_count = len(requirements.get("positionen", []))
-    update_job(job_id, progress=f"Produkt-Matching für {pos_count} Positionen...")
-    try:
-        match_result = match_requirements(requirements)
-    except FileNotFoundError:
-        raise
-    except Exception as e:
-        logger.error(f"Keyword matching failed: {e}", exc_info=True)
+        logger.error(f"AI matching failed: {e}", exc_info=True)
         raise
 
     # Step 6: Save to history
@@ -323,8 +346,8 @@ async def get_products(limit: int = 100, search: str = ""):
         products = [p for p in products if any(search_lower in str(v).lower() for v in p.values())]
 
     try:
-        df = load_product_catalog()
-        total_count = len(df)
+        catalog = get_catalog_index()
+        total_count = len(catalog.all_profiles)
     except Exception:
         total_count = len(products)
 

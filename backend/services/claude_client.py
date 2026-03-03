@@ -489,6 +489,278 @@ def _fallback_normalize(doors: list[dict]) -> list[dict]:
     return positions
 
 
+# ─────────────────────────────────────────────
+# NEW: Category-aware AI matching functions
+# ─────────────────────────────────────────────
+
+def classify_door_categories(
+    unique_doors: list[dict],
+    available_categories: list[str],
+) -> list[dict]:
+    """
+    Classify each unique door type into one of the FTAG product categories.
+    Returns list of {"door_index": int, "category": str, "confidence": float}.
+    """
+    client = get_client()
+
+    categories_str = ", ".join(available_categories)
+    doors_block = ""
+    for i, door in enumerate(unique_doors):
+        parts = []
+        for key in ["tuertyp", "brandschutz", "einbruchschutz", "schallschutz",
+                     "breite", "hoehe", "verglasung", "beschlaege", "besonderheiten",
+                     "fluegel_anzahl", "zargentyp", "beschreibung"]:
+            val = door.get(key)
+            if val:
+                parts.append(f"{key}: {val}")
+        # Also check raw row for extra context
+        raw = door.get("_raw_row", {})
+        if not parts and raw:
+            for k, v in list(raw.items())[:5]:
+                if v and str(v).strip() not in ("", "-"):
+                    parts.append(f"{k}: {str(v)[:50]}")
+        doors_block += f"\nTür {i}: {' | '.join(parts) if parts else 'keine Details'}"
+
+    system_prompt = f"""Du bist ein erfahrener Türen-Fachberater der Frank Türen AG.
+
+## AUFGABE
+Ordne jede Türanforderung einer FTAG-Produktkategorie zu.
+
+## VERFÜGBARE KATEGORIEN
+{categories_str}
+
+## REGELN
+- "Rahmentüre" = Standardtüren mit Stahlrahmen (häufigste Kategorie)
+- "Zargentüre" = Türen mit separater Zarge/Umfassungszarge
+- "Futtertüre" = Türen mit Futterrahmen/Blockfutter
+- "Schiebetüre" = Schiebetüren
+- "Festverglasung" = Feststehende Verglasungen ohne Türfunktion
+- "Brandschutzvorhang" = Textilbasierte Brandschutzabschlüsse
+- "Brandschutztor" = Grosse Brandschutztore (>3m)
+- "Ganzglas Tür" = Vollglas-Türen
+- "Pendeltüre" = Pendeltüren (beide Richtungen)
+- "Vollwand" = Trennwände ohne Türfunktion
+- Wenn unklar, wähle "Rahmentüre" als Standard
+
+## ANTWORTFORMAT
+JSON-Array:
+[{{"door_index": 0, "category": "Rahmentüre", "confidence": 0.9}}, ...]"""
+
+    user_message = f"""Klassifiziere folgende {len(unique_doors)} Türtypen:\n{doors_block}"""
+
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=2048,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+            timeout=60.0,
+        )
+
+        response_text = message.content[0].text.strip()
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+
+        results = _repair_json(response_text)
+        if not isinstance(results, list):
+            results = [results]
+
+        return results
+
+    except Exception as e:
+        logger.warning(f"Category classification failed: {e}")
+        # Fallback: assign all to Rahmentüre
+        return [{"door_index": i, "category": "Rahmentüre", "confidence": 0.3}
+                for i in range(len(unique_doors))]
+
+
+def match_main_products_batch(
+    door_types: list[dict],
+    products_text: str,
+    category_name: str,
+) -> list[dict]:
+    """
+    Match a batch of door types against products in a specific category.
+    Returns list of match results per door type.
+    """
+    client = get_client()
+
+    doors_block = ""
+    for i, door in enumerate(door_types):
+        parts = []
+        for key in ["tuertyp", "brandschutz", "einbruchschutz", "schallschutz",
+                     "breite", "hoehe", "verglasung", "oberflaechenbehandlung",
+                     "besonderheiten", "fluegel_anzahl", "zargentyp",
+                     "schloss_typ", "glas_typ", "tuerschliesser", "beschreibung"]:
+            val = door.get(key)
+            if val:
+                parts.append(f"{key}: {val}")
+        raw = door.get("_raw_row", {})
+        if not parts and raw:
+            for k, v in list(raw.items())[:8]:
+                if v and str(v).strip() not in ("", "-"):
+                    parts.append(f"{k}: {str(v)[:60]}")
+        doors_block += f"\n\n### TÜR {i}:\n{chr(10).join(parts) if parts else 'keine Details'}"
+
+    system_prompt = f"""Du bist ein erfahrener Türen-Fachberater der Frank Türen AG in Buochs NW, Schweiz.
+
+## AUFGABE
+Matche jede Türanforderung gegen die Produkte der Kategorie "{category_name}".
+Jedes Produkt ist als kompakte Zeile mit [Row-Nr] dargestellt.
+
+## BEWERTUNGSKRITERIEN (Priorität)
+1. Brandschutzklasse: EI30=T30, EI60=T60, EI90=T90 (höhere erfüllt niedrigere)
+2. Widerstandsklasse: RC2=WK2, RC3=WK3 (höhere erfüllt niedrigere)
+3. Anzahl Flügel: 1-flg / 2-flg muss passen
+4. Türblatt-Art: muss zum Anforderungsprofil passen
+5. Lichtmass: Kundenmasse müssen innerhalb max. Masse des Produkts liegen
+6. Schallschutz: dB-Wert muss mindestens erreicht werden
+7. Glasausschnitt: falls gefordert, muss Produkt dies unterstützen
+
+## REGELN
+- Wähle das BESTE passende Produkt (höchste Übereinstimmung)
+- "machbar" = alle wesentlichen Anforderungen erfüllt
+- "teilweise_machbar" = Hauptanforderungen erfüllt, Details unklar
+- "nicht_machbar" = keine passende Produktlinie
+- Gib den benötigten Zubehör-Typ an (Schloss, Glas, Schliessblech)
+- Prüfe IMMER ob die Masse des Kunden innerhalb der max. Masse des Produkts liegen
+
+## ANTWORTFORMAT
+JSON-Array mit einem Objekt pro Tür:
+[
+  {{
+    "door_index": 0,
+    "status": "machbar",
+    "matched_row": 42,
+    "confidence": 0.92,
+    "reason": "EI30 Rahmentüre 1-flg passt, Masse innerhalb Bereich",
+    "zubehoer_bedarf": {{
+      "schloss": "Panikschloss gefordert",
+      "glas": "Glasausschnitt OG 30x30",
+      "schliessblech": null
+    }},
+    "gap_hinweise": []
+  }}
+]"""
+
+    user_message = f"""## PRODUKTE ({category_name})
+{products_text}
+
+## TÜRANFORDERUNGEN
+{doors_block}
+
+Matche jede Tür gegen die Produkte."""
+
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=4096,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+            timeout=120.0,
+        )
+
+        response_text = message.content[0].text.strip()
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+
+        results = _repair_json(response_text)
+        if not isinstance(results, list):
+            results = [results]
+
+        return results
+
+    except Exception as e:
+        logger.error(f"Main product matching failed for {category_name}: {e}")
+        return [{"door_index": i, "status": "nicht_machbar", "matched_row": None,
+                 "confidence": 0.0, "reason": f"KI-Matching fehlgeschlagen: {str(e)[:100]}",
+                 "zubehoer_bedarf": {}, "gap_hinweise": []}
+                for i in range(len(door_types))]
+
+
+def match_accessories_batch(
+    requirements: list[dict],
+    accessories_text: str,
+    accessory_type: str,
+) -> list[dict]:
+    """
+    Match accessory requirements against ZZ products.
+    accessory_type: "Schloss", "Glas", or "Schliessblech"
+    """
+    client = get_client()
+
+    reqs_block = ""
+    for i, req in enumerate(requirements):
+        desc = req.get("description", "")
+        door_ref = req.get("door_ref", "")
+        reqs_block += f"\n{i}. Tür {door_ref}: {desc}"
+
+    type_context = {
+        "Schloss": "Achte auf: Schlossart, Panikfunktion, Dornmass, 1-flg/2-flg Kompatibilität.",
+        "Glas": "Achte auf: Brandschutzklasse des Glases, Schallschutz dB, Glasdicke.",
+        "Schliessblech": "Achte auf: Widerstandsklasse (RC), Rahmen- vs Zargen-Variante.",
+    }
+
+    system_prompt = f"""Du bist ein erfahrener Türen-Fachberater der Frank Türen AG.
+
+## AUFGABE
+Matche Zubehör-Anforderungen ({accessory_type}) gegen verfügbare FTAG-Produkte.
+
+## HINWEISE
+{type_context.get(accessory_type, "")}
+
+## ANTWORTFORMAT
+JSON-Array:
+[
+  {{
+    "req_index": 0,
+    "status": "matched" | "gap",
+    "matched_row": 650,
+    "reason": "Passend: Panikschloss Glutz mit SV-Funktion",
+    "alternative_row": null
+  }}
+]"""
+
+    user_message = f"""## VERFÜGBARE {accessory_type.upper()}-PRODUKTE
+{accessories_text}
+
+## ANFORDERUNGEN
+{reqs_block}
+
+Matche jede Anforderung."""
+
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=2048,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+            timeout=90.0,
+        )
+
+        response_text = message.content[0].text.strip()
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+
+        results = _repair_json(response_text)
+        if not isinstance(results, list):
+            results = [results]
+
+        return results
+
+    except Exception as e:
+        logger.error(f"Accessory matching failed for {accessory_type}: {e}")
+        return [{"req_index": i, "status": "gap", "matched_row": None,
+                 "reason": f"KI-Matching fehlgeschlagen: {str(e)[:100]}"}
+                for i in range(len(requirements))]
+
+
 def ai_match_products_batch(
     positions_data: list[dict],
     feedback_examples: list[dict],

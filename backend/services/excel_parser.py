@@ -97,6 +97,38 @@ KNOWN_FIELD_PATTERNS = {
         "wandtyp", "wand", "wandkonstruktion", "wandaufbau", "mauerwerk",
         "wandstärke", "wanddicke",
     ],
+    "schloss_typ": [
+        "schloss", "schlosstyp", "schlossart", "verriegelung",
+        "panikschloss", "einsteckschloss", "mehrfachverriegelung",
+        "schliessung",
+    ],
+    "zylinder": [
+        "zylinder", "zylindertyp", "profilzylinder", "schliesszylinder",
+        "zylinderart",
+    ],
+    "glas_typ": [
+        "glastyp", "glasart", "glasaufbau", "brandschutzglas",
+        "lichtausschnitt typ", "glassorte",
+    ],
+    "schliessblech": [
+        "schliessblech", "schliessstück", "schliessblech typ",
+    ],
+    "tuerschliesser": [
+        "türschliesser", "schliesser", "obentürschliesser",
+        "ots", "bodentürschliesser", "bts",
+    ],
+    "fluegel_anzahl": [
+        "anzahl flügel", "flügelanzahl", "flügel", "1-flg", "2-flg",
+        "einflügelig", "zweiflügelig", "anzahl fluegel",
+    ],
+    "bandtyp": [
+        "bandtyp", "bandart", "türband", "scharnier",
+        "bandsicherung",
+    ],
+    "zargentyp": [
+        "zargentyp", "zargenart", "zarge", "umfassungszarge",
+        "blockzarge", "eckzarge",
+    ],
 }
 
 # ---------------------------------------------------------------------------
@@ -469,6 +501,15 @@ def _extract_door_positions(df: pd.DataFrame, column_mapping: dict) -> list[dict
             "besonderheiten": _clean_string_value(row.get(column_mapping.get("besonderheiten", ""), "")),
             "raum": _clean_string_value(row.get(column_mapping.get("raum", ""), "")),
             "wandtyp": _clean_string_value(row.get(column_mapping.get("wandtyp", ""), "")),
+            # Accessory fields
+            "schloss_typ": _clean_string_value(row.get(column_mapping.get("schloss_typ", ""), "")),
+            "zylinder": _clean_string_value(row.get(column_mapping.get("zylinder", ""), "")),
+            "glas_typ": _clean_string_value(row.get(column_mapping.get("glas_typ", ""), "")),
+            "schliessblech": _clean_string_value(row.get(column_mapping.get("schliessblech", ""), "")),
+            "tuerschliesser": _clean_string_value(row.get(column_mapping.get("tuerschliesser", ""), "")),
+            "fluegel_anzahl": _clean_string_value(row.get(column_mapping.get("fluegel_anzahl", ""), "")),
+            "bandtyp": _clean_string_value(row.get(column_mapping.get("bandtyp", ""), "")),
+            "zargentyp": _clean_string_value(row.get(column_mapping.get("zargentyp", ""), "")),
         }
 
         # Store raw row for reference
@@ -538,7 +579,9 @@ def merge_tuerlisten(parsed_lists: list[dict]) -> dict:
                     "geschoss", "breite", "hoehe", "brandschutz", "schallschutz",
                     "einbruchschutz", "tuertyp", "beschlaege",
                     "oberflaechenbehandlung", "verglasung", "besonderheiten",
-                    "raum", "wandtyp",
+                    "raum", "wandtyp", "schloss_typ", "zylinder", "glas_typ",
+                    "schliessblech", "tuerschliesser", "fluegel_anzahl",
+                    "bandtyp", "zargentyp",
                 ]:
                     existing_val = existing.get(field)
                     new_val = door.get(field)

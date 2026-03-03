@@ -1,6 +1,6 @@
 /**
- * Frank Türen AG – KI Angebotserstellung
- * Modern Frontend App
+ * Frank Tueren AG – KI Machbarkeitsanalyse
+ * Simplified Frontend (single file upload, detail modal, catalog management)
  */
 
 const API = window.location.hostname === 'localhost'
@@ -12,13 +12,10 @@ let state = {
   fileId: null,
   analysis: null,
   offer: null,
-  // Project mode (folder upload)
-  uploadMode: 'folder',  // 'folder' | 'files'
-  files: [],             // Array of File objects
-  projectId: null,
-  projectFiles: [],      // Response from /api/upload/folder
-  classificationOverrides: {},
 };
+
+// Store analysis items for detail modal
+window._analysisItems = [];
 
 // ─────────────────────────────────────────────
 // NAVIGATION
@@ -30,55 +27,19 @@ function switchView(view, btn) {
   document.getElementById(`view-${view}`).classList.add('active');
   btn.classList.add('active');
 
-  const titles = {
-    offer:    ['Angebot erstellen', 'Ausschreibung hochladen und KI-Analyse starten'],
-    products: ['Produktkatalog', 'FTAG-Produktmatrix durchsuchen'],
-    history:  ['Analyse-Historie', 'Vergangene Analysen einsehen und vergleichen'],
-  };
-  document.getElementById('topbar-title').textContent = titles[view][0];
-  document.getElementById('topbar-sub').textContent   = titles[view][1];
-
-  if (view === 'products') loadProducts();
+  if (view === 'catalog') loadCatalogInfo();
   if (view === 'history') loadHistory();
 }
 
 // ─────────────────────────────────────────────
-// UPLOAD MODE TOGGLE
-// ─────────────────────────────────────────────
-
-function setUploadMode(mode) {
-  state.uploadMode = mode;
-  document.getElementById('toggle-folder').classList.toggle('active', mode === 'folder');
-  document.getElementById('toggle-files').classList.toggle('active', mode === 'files');
-
-  const mainText = document.getElementById('drop-main-text');
-  const hintText = document.getElementById('drop-hint-text');
-
-  if (mode === 'folder') {
-    mainText.textContent = 'Ordner hier ablegen';
-    hintText.innerHTML = 'oder <span class="drop-link" onclick="triggerFileInput(); event.stopPropagation()">auswählen</span> · PDF, XLSX, DOCX und mehr · max. 500 MB';
-  } else {
-    mainText.textContent = 'Dateien hier ablegen';
-    hintText.innerHTML = 'oder <span class="drop-link" onclick="triggerFileInput(); event.stopPropagation()">auswählen</span> · Mehrere Dateien möglich · max. 500 MB';
-  }
-}
-
-function triggerFileInput() {
-  if (state.uploadMode === 'folder') {
-    document.getElementById('folder-input').click();
-  } else {
-    document.getElementById('files-input').click();
-  }
-}
-
-// ─────────────────────────────────────────────
-// FILE HANDLING
+// FILE HANDLING (single Excel file)
 // ─────────────────────────────────────────────
 
 function handleDragOver(e) {
   e.preventDefault();
   document.getElementById('drop-zone').classList.add('drag-over');
 }
+
 function handleDragLeave() {
   document.getElementById('drop-zone').classList.remove('drag-over');
 }
@@ -86,332 +47,56 @@ function handleDragLeave() {
 function handleDrop(e) {
   e.preventDefault();
   document.getElementById('drop-zone').classList.remove('drag-over');
-
-  // Check for folder drop via webkitGetAsEntry
-  const items = e.dataTransfer.items;
-  if (items && items.length > 0 && items[0].webkitGetAsEntry) {
-    const entry = items[0].webkitGetAsEntry();
-    if (entry && entry.isDirectory) {
-      collectFolderFiles(entry).then(files => {
-        if (files.length > 0) setFiles(files);
-      });
+  const files = Array.from(e.dataTransfer.files);
+  if (files.length > 0) {
+    const f = files[0];
+    const ext = f.name.split('.').pop().toLowerCase();
+    if (!['xlsx', 'xls', 'xlsm', 'pdf', 'docx', 'doc', 'txt'].includes(ext)) {
+      showToast('Dateityp nicht unterstuetzt. Erlaubt: Excel, PDF, Word, TXT');
       return;
     }
-  }
-
-  // Multi-file drop
-  const files = Array.from(e.dataTransfer.files);
-  if (files.length > 1) {
-    setFiles(files);
-  } else if (files.length === 1) {
-    setFiles(files);
+    setFile(f);
   }
 }
 
-function handleFolderSelect(e) {
+function handleFileSelect(e) {
   const files = Array.from(e.target.files);
-  if (files.length > 0) setFiles(files);
+  if (files.length > 0) setFile(files[0]);
 }
 
-function handleFilesSelect(e) {
-  const files = Array.from(e.target.files);
-  if (files.length > 0) setFiles(files);
-}
-
-async function collectFolderFiles(entry) {
-  const files = [];
-
-  async function readEntry(dirEntry) {
-    return new Promise((resolve) => {
-      if (dirEntry.isFile) {
-        dirEntry.file(f => { files.push(f); resolve(); });
-      } else if (dirEntry.isDirectory) {
-        const reader = dirEntry.createReader();
-        reader.readEntries(async (entries) => {
-          for (const e of entries) {
-            await readEntry(e);
-          }
-          resolve();
-        });
-      } else {
-        resolve();
-      }
-    });
-  }
-
-  await readEntry(entry);
-  return files;
-}
-
-function setFiles(fileList) {
-  state.files = fileList;
-  state.file = null;
-  renderFilesPreview();
+function setFile(f) {
+  state.file = f;
+  document.getElementById('file-preview').classList.remove('hidden');
+  document.getElementById('file-name').textContent = f.name;
+  document.getElementById('file-size').textContent = fmtSize(f.size);
+  const ext = f.name.split('.').pop().toLowerCase();
+  const icons = { pdf: '\u{1F4D5}', xlsx: '\u{1F4D7}', xls: '\u{1F4D7}', xlsm: '\u{1F4D7}', docx: '\u{1F4D8}', doc: '\u{1F4D8}', txt: '\u{1F4C4}' };
+  document.querySelector('#file-preview .file-preview-icon').textContent = icons[ext] || '\u{1F4C4}';
   document.getElementById('btn-upload').disabled = false;
-}
-
-function renderFilesPreview() {
-  const container = document.getElementById('files-preview');
-  const listEl = document.getElementById('files-list');
-  const countEl = document.getElementById('files-count');
-  const sizeEl = document.getElementById('files-total-size');
-
-  if (!state.files.length) {
-    container.classList.add('hidden');
-    return;
-  }
-
-  container.classList.remove('hidden');
-  document.getElementById('file-preview').classList.add('hidden');
-
-  const totalSize = state.files.reduce((sum, f) => sum + f.size, 0);
-  countEl.textContent = `${state.files.length} Dateien`;
-  sizeEl.textContent = fmtSize(totalSize);
-
-  const FILE_ICONS = {
-    '.pdf': '📕', '.xlsx': '📗', '.xls': '📗', '.xlsm': '📗',
-    '.docx': '📘', '.doc': '📘', '.docm': '📘', '.txt': '📄',
-    '.jpg': '🖼️', '.jpeg': '🖼️', '.png': '🖼️',
-    '.dwg': '📐', '.crbx': '📦',
-  };
-
-  listEl.innerHTML = state.files.map((f, i) => {
-    const ext = '.' + f.name.split('.').pop().toLowerCase();
-    const icon = FILE_ICONS[ext] || '📄';
-    const category = guessCategory(f.name);
-    return `
-      <div class="file-item">
-        <span class="file-item-icon">${icon}</span>
-        <span class="file-item-name">${esc(f.name)}</span>
-        <span class="file-item-size">${fmtSize(f.size)}</span>
-        <span class="category-badge ${category}">${categoryLabel(category)}</span>
-      </div>
-    `;
-  }).join('');
-}
-
-function guessCategory(filename) {
-  const name = filename.toLowerCase();
-  const ext = '.' + name.split('.').pop();
-  if (['.dwg', '.dxf'].includes(ext)) return 'plan';
-  if (['.jpg', '.jpeg', '.png', '.bmp', '.tif'].includes(ext)) return 'foto';
-  if (ext === '.crbx') return 'sonstig';
-  if (/t[üu]rliste|t[üu]rmatrix|tuerliste|tuermatrix/.test(name) && ['.xlsx', '.xls', '.xlsm'].includes(ext)) return 'tuerliste';
-  if (/grundriss|situationsplan|lageplan/.test(name)) return 'plan';
-  if (/leistungsverzeichnis|lv[_.\s-]|t[üu]rbuch|typicals|spezifikation|bedingung/.test(name)) return 'spezifikation';
-  if (['.xlsx', '.xls', '.xlsm'].includes(ext)) return 'tuerliste';
-  if (ext === '.pdf') return 'spezifikation';
-  if (['.docx', '.doc', '.docm'].includes(ext)) return 'spezifikation';
-  return 'sonstig';
-}
-
-function categoryLabel(cat) {
-  const labels = {
-    tuerliste: 'Türliste',
-    spezifikation: 'Spezifikation',
-    plan: 'Plan',
-    foto: 'Foto',
-    sonstig: 'Sonstig',
-  };
-  return labels[cat] || cat;
-}
-
-function clearFiles() {
-  state.files = [];
-  state.projectId = null;
-  state.projectFiles = [];
-  state.classificationOverrides = {};
-  document.getElementById('files-preview').classList.add('hidden');
-  document.getElementById('folder-input').value = '';
-  document.getElementById('files-input').value = '';
-  document.getElementById('btn-upload').disabled = true;
 }
 
 function clearFile() {
   state.file = null;
   document.getElementById('file-preview').classList.add('hidden');
+  document.getElementById('file-input').value = '';
   document.getElementById('btn-upload').disabled = true;
 }
 
 function fmtSize(b) {
   if (b < 1024) return `${b} B`;
-  if (b < 1048576) return `${(b/1024).toFixed(1)} KB`;
-  return `${(b/1048576).toFixed(1)} MB`;
+  if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / 1048576).toFixed(1)} MB`;
 }
 
 // ─────────────────────────────────────────────
-// MAIN WORKFLOW
+// MAIN WORKFLOW (upload → analyze → generate)
 // ─────────────────────────────────────────────
 
 function startUpload() {
-  if (state.files.length > 0) {
-    runProjectWorkflow();
-  } else if (state.file) {
-    runFullWorkflow();
-  }
+  if (state.file) runAnalysisWorkflow();
 }
 
-async function runProjectWorkflow() {
-  if (!state.files.length) return;
-
-  showPanel('processing');
-  setPill(1);
-  setStep('upload', 'running', `${state.files.length} Dateien werden hochgeladen...`);
-  document.getElementById('processing-subtitle').textContent = 'Dateien werden hochgeladen...';
-
-  try {
-    // 1. Upload all files
-    const form = new FormData();
-    state.files.forEach(f => form.append('files', f));
-
-    const up = await api('/upload/folder', { method: 'POST', body: form });
-    state.projectId = up.project_id;
-    state.projectFiles = up.files;
-
-    const tl = up.summary.tuerliste_count;
-    const sp = up.summary.spezifikation_count;
-    setStep('upload', 'done',
-      `${up.total_files} Dateien: ${tl} Türliste${tl !== 1 ? 'n' : ''}, ${sp} Spezifikation${sp !== 1 ? 'en' : ''}`
-    );
-
-    // 2. Show classification review
-    setPill(2);
-    renderClassification(up.files, up.summary);
-    showPanel('classify');
-
-  } catch (err) {
-    console.error('[Workflow] Upload/classify failed:', err);
-    showError(err.message);
-    setPill(1);
-  }
-}
-
-function renderClassification(files, summary) {
-  const grid = document.getElementById('classification-grid');
-  const subtitle = document.getElementById('classify-subtitle');
-  const summaryEl = document.getElementById('classify-summary');
-
-  subtitle.textContent = `${files.length} Dateien automatisch klassifiziert`;
-
-  summaryEl.innerHTML = `
-    <div class="classify-summary-badges">
-      ${summary.tuerliste_count ? `<span class="category-badge tuerliste">${summary.tuerliste_count} Türliste${summary.tuerliste_count !== 1 ? 'n' : ''}</span>` : ''}
-      ${summary.spezifikation_count ? `<span class="category-badge spezifikation">${summary.spezifikation_count} Spezifikation${summary.spezifikation_count !== 1 ? 'en' : ''}</span>` : ''}
-      ${summary.plan_count ? `<span class="category-badge plan">${summary.plan_count} Pläne</span>` : ''}
-      ${summary.foto_count ? `<span class="category-badge foto">${summary.foto_count} Fotos</span>` : ''}
-      ${summary.sonstig_count ? `<span class="category-badge sonstig">${summary.sonstig_count} Sonstige</span>` : ''}
-    </div>
-  `;
-
-  // Sort: tuerliste first, then spezifikation, then rest
-  const order = { tuerliste: 0, spezifikation: 1, plan: 2, foto: 3, sonstig: 4 };
-  const sorted = [...files].sort((a, b) => (order[a.category] || 9) - (order[b.category] || 9));
-
-  const FILE_ICONS = {
-    '.pdf': '📕', '.xlsx': '📗', '.xls': '📗', '.xlsm': '📗',
-    '.docx': '📘', '.doc': '📘', '.docm': '📘', '.txt': '📄',
-    '.jpg': '🖼️', '.jpeg': '🖼️', '.png': '🖼️',
-    '.dwg': '📐', '.crbx': '📦',
-  };
-
-  grid.innerHTML = sorted.map(f => {
-    const ext = '.' + f.filename.split('.').pop().toLowerCase();
-    const icon = FILE_ICONS[ext] || '📄';
-    const skipped = ['plan', 'foto', 'sonstig'].includes(f.category);
-
-    return `
-      <div class="classify-card ${skipped ? 'skipped' : ''}" data-file-id="${esc(f.file_id)}">
-        <div class="classify-card-header">
-          <span class="classify-card-icon">${icon}</span>
-          <div class="classify-card-info">
-            <span class="classify-card-name">${esc(f.filename)}</span>
-            <span class="classify-card-meta">${fmtSize(f.size)} · ${esc(f.reason)}</span>
-          </div>
-        </div>
-        <select class="classify-dropdown" onchange="updateClassification('${esc(f.file_id)}', this.value)">
-          <option value="tuerliste" ${f.category === 'tuerliste' ? 'selected' : ''}>Türliste</option>
-          <option value="spezifikation" ${f.category === 'spezifikation' ? 'selected' : ''}>Spezifikation</option>
-          <option value="plan" ${f.category === 'plan' ? 'selected' : ''}>Plan (ignorieren)</option>
-          <option value="foto" ${f.category === 'foto' ? 'selected' : ''}>Foto (ignorieren)</option>
-          <option value="sonstig" ${f.category === 'sonstig' ? 'selected' : ''}>Sonstig (ignorieren)</option>
-        </select>
-      </div>
-    `;
-  }).join('');
-}
-
-function updateClassification(fileId, newCategory) {
-  state.classificationOverrides[fileId] = newCategory;
-
-  // Update visual
-  const card = document.querySelector(`.classify-card[data-file-id="${fileId}"]`);
-  if (card) {
-    card.classList.toggle('skipped', ['plan', 'foto', 'sonstig'].includes(newCategory));
-  }
-}
-
-async function startProjectAnalysis() {
-  if (!state.projectId) return;
-
-  showPanel('processing');
-  setPill(3);
-  setStep('upload', 'done', 'Dateien hochgeladen');
-  setStep('ai', 'running', 'Excel wird geparst & KI normalisiert...');
-  document.getElementById('processing-subtitle').textContent = 'Türliste wird analysiert...';
-
-  try {
-    // Start background job
-    const { job_id } = await api('/analyze/project', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        project_id: state.projectId,
-        file_overrides: state.classificationOverrides,
-      }),
-    });
-
-    // Poll for results
-    const analysis = await pollJob(job_id, (progress) => {
-      document.getElementById('processing-subtitle').textContent = progress || 'KI analysiert...';
-    });
-    state.analysis = analysis;
-
-    const pos = analysis.requirements?.positionen?.length || 0;
-    setStep('ai', 'done', `${pos} Türposition${pos !== 1 ? 'en' : ''} erkannt`);
-
-    const s = analysis.matching?.summary || {};
-    setStep('match', 'done',
-      `${s.matched_count || 0} erfüllbar · ${s.partial_count || 0} teilweise · ${s.unmatched_count || 0} nicht erfüllbar`
-    );
-    document.getElementById('processing-subtitle').textContent = 'Angebot & Gap-Report werden erstellt...';
-
-    // Generate offer (background job)
-    setStep('gen', 'running', 'Dokumente werden generiert...');
-    const { job_id: offerJobId } = await api('/offer/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requirements: analysis.requirements,
-        matching: analysis.matching,
-      }),
-    });
-    const offer = await pollJob(offerJobId, (progress) => {
-      document.getElementById('processing-subtitle').textContent = progress || 'Angebot wird erstellt...';
-    }, '/offer/status/');
-    state.offer = offer;
-    setStep('gen', 'done', offer.message);
-
-    setPill(4);
-    showResults(analysis, offer);
-
-  } catch (err) {
-    console.error('[Workflow] Project analysis failed:', err);
-    showError(err.message);
-    setPill(1);
-  }
-}
-
-async function runFullWorkflow() {
+async function runAnalysisWorkflow() {
   if (!state.file) return;
 
   showPanel('processing');
@@ -425,11 +110,11 @@ async function runFullWorkflow() {
     form.append('file', state.file);
     const up = await api('/upload', { method: 'POST', body: form });
     state.fileId = up.file_id;
-    setStep('upload', 'done', `${up.text_length.toLocaleString('de-CH')} Zeichen extrahiert`);
+    setStep('upload', 'done', `${up.filename} hochgeladen (${up.text_length.toLocaleString('de-CH')} Zeichen)`);
 
-    // 2. Start AI analysis as background job
-    setStep('ai', 'running', 'Claude analysiert die Ausschreibung...');
-    document.getElementById('processing-subtitle').textContent = 'Claude KI analysiert...';
+    // 2. Analyze (background job)
+    setStep('ai', 'running', 'Tuerliste wird geparst...');
+    document.getElementById('processing-subtitle').textContent = 'Tuerliste wird analysiert...';
 
     const { job_id } = await api('/analyze', {
       method: 'POST',
@@ -437,25 +122,24 @@ async function runFullWorkflow() {
       body: JSON.stringify({ file_id: state.fileId }),
     });
 
-    // Poll for results
     const analysis = await pollJob(job_id, (progress) => {
-      document.getElementById('processing-subtitle').textContent = progress || 'Claude KI analysiert...';
+      document.getElementById('processing-subtitle').textContent = progress || 'Analyse laeuft...';
     });
     state.analysis = analysis;
 
     const pos = analysis.requirements?.positionen?.length || 0;
-    setStep('ai', 'done', `${pos} Türposition${pos !== 1 ? 'en' : ''} erkannt`);
+    setStep('ai', 'done', `${pos} Tuerpositionen erkannt`);
 
-    // 3. Matching results (already included in analysis)
+    // 3. Matching results
     const s = analysis.matching?.summary || {};
     setStep('match', 'done',
-      `${s.matched_count || 0} erfüllbar · ${s.partial_count || 0} teilweise · ${s.unmatched_count || 0} nicht erfüllbar`
+      `${s.matched_count || 0} erfuellbar, ${s.partial_count || 0} teilweise, ${s.unmatched_count || 0} nicht erfuellbar`
     );
-    document.getElementById('processing-subtitle').textContent = 'Angebot & Gap-Report werden erstellt...';
+    document.getElementById('processing-subtitle').textContent = 'Machbarkeitsanalyse wird erstellt...';
 
-    // 4. Generate (background job)
-    setStep('gen', 'running', 'Dokumente werden generiert...');
-    const { job_id: offerJobId2 } = await api('/offer/generate', {
+    // 4. Generate result Excel
+    setStep('gen', 'running', 'Machbarkeitsanalyse wird erstellt...');
+    const { job_id: resultJobId } = await api('/result/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -463,17 +147,17 @@ async function runFullWorkflow() {
         matching: analysis.matching,
       }),
     });
-    const offer = await pollJob(offerJobId2, (progress) => {
-      document.getElementById('processing-subtitle').textContent = progress || 'Angebot wird erstellt...';
-    }, '/offer/status/');
-    state.offer = offer;
-    setStep('gen', 'done', offer.message);
+    const result = await pollJob(resultJobId, (progress) => {
+      document.getElementById('processing-subtitle').textContent = progress || 'Ergebnis wird erstellt...';
+    }, '/result/status/');
+    state.offer = result;
+    setStep('gen', 'done', result.message);
 
-    setPill(4);
-    showResults(analysis, offer);
+    setPill(3);
+    showResults(analysis, result);
 
   } catch (err) {
-    console.error('[Workflow] Full workflow failed:', err);
+    console.error('[Workflow] Analysis failed:', err);
     showError(err.message);
     setPill(1);
   }
@@ -484,22 +168,15 @@ async function runFullWorkflow() {
 // ─────────────────────────────────────────────
 
 async function pollJob(jobId, onProgress, statusPath = '/analyze/status/') {
-  const POLL_INTERVAL = 2000; // 2 seconds
-  const MAX_POLLS = 450;      // 15 minutes max
+  const POLL_INTERVAL = 2000;
+  const MAX_POLLS = 450;
 
   for (let i = 0; i < MAX_POLLS; i++) {
     await new Promise(r => setTimeout(r, POLL_INTERVAL));
-
     const job = await api(`${statusPath}${jobId}`);
-
     if (job.progress && onProgress) onProgress(job.progress);
-
-    if (job.status === 'completed') {
-      return job.result;
-    }
-    if (job.status === 'failed') {
-      throw new Error(job.error || 'Verarbeitung fehlgeschlagen');
-    }
+    if (job.status === 'completed') return job.result;
+    if (job.status === 'failed') throw new Error(job.error || 'Verarbeitung fehlgeschlagen');
   }
   throw new Error('Timeout: Bitte erneut versuchen.');
 }
@@ -511,20 +188,20 @@ async function pollJob(jobId, onProgress, statusPath = '/analyze/status/') {
 function showResults(analysis, offer) {
   showPanel('results');
 
-  const req     = analysis.requirements || {};
-  const match   = analysis.matching    || {};
-  const summary = match.summary        || {};
+  const req = analysis.requirements || {};
+  const match = analysis.matching || {};
+  const summary = match.summary || {};
 
-  // Stat cards
+  // Stat cards (clickable – scroll to section)
   const statGrid = document.getElementById('stat-grid');
   const stats = [
-    { num: summary.total_positions || 0,  label: 'Positionen gesamt', cls: 'blue' },
-    { num: summary.matched_count   || 0,  label: 'Erfüllbar',          cls: 'green' },
-    { num: summary.partial_count   || 0,  label: 'Teilweise',          cls: 'orange' },
-    { num: summary.unmatched_count || 0,  label: 'Nicht erfüllbar',    cls: 'red' },
+    { num: summary.total_positions || 0, label: 'Positionen gesamt', cls: 'blue', target: 'positions-container' },
+    { num: summary.matched_count || 0, label: 'Erfuellbar', cls: 'green', target: 'section-matched' },
+    { num: summary.partial_count || 0, label: 'Teilweise', cls: 'orange', target: 'section-partial' },
+    { num: summary.unmatched_count || 0, label: 'Nicht erfuellbar', cls: 'red', target: 'section-unmatched' },
   ];
   statGrid.innerHTML = stats.map((s, i) => `
-    <div class="stat-card ${s.cls}" style="animation-delay:${i * 80}ms">
+    <div class="stat-card ${s.cls} clickable" style="animation-delay:${i * 80}ms" onclick="scrollToSection('${s.target}')">
       <div class="stat-num">${s.num}</div>
       <div class="stat-label">${s.label}</div>
     </div>
@@ -534,7 +211,7 @@ function showResults(analysis, offer) {
   const rate = summary.match_rate || 0;
   document.getElementById('match-rate-pct').textContent = `${rate}%`;
   document.getElementById('match-rate-sub').textContent =
-    `Projekt: ${req.projekt || 'Ausschreibung'} · Auftraggeber: ${req.auftraggeber || 'n/a'}`;
+    `Projekt: ${req.projekt || 'Tuerliste'} · ${summary.total_positions || 0} Positionen`;
   setTimeout(() => {
     document.getElementById('match-bar').style.width = `${rate}%`;
   }, 100);
@@ -543,100 +220,76 @@ function showResults(analysis, offer) {
   const dlGrid = document.getElementById('download-grid');
   dlGrid.innerHTML = '';
 
-  if (offer.has_offer && offer.offer_id) {
+  if (offer.has_result && offer.result_id) {
     dlGrid.innerHTML += `
       <div class="dl-group">
-        <div class="dl-group-title">📄 Angebot</div>
+        <div class="dl-group-title">Machbarkeitsanalyse + GAP-Report</div>
         <div class="dl-buttons">
-          <a href="${API}/offer/${offer.offer_id}/download?format=xlsx" class="dl-btn excel" download="FTAG_Angebot_${offer.offer_id}.xlsx">
-            <span class="dl-icon">📗</span> Excel herunterladen
-          </a>
-          <a href="${API}/offer/${offer.offer_id}/download?format=docx" class="dl-btn word" download="FTAG_Angebot_${offer.offer_id}.docx">
-            <span class="dl-icon">📘</span> Word herunterladen
+          <a href="${API}/result/${offer.result_id}/download" class="dl-btn excel" download="FTAG_Machbarkeit_${offer.result_id}.xlsx">
+            <span class="dl-icon">&#128215;</span> Excel herunterladen
           </a>
         </div>
       </div>
     `;
   }
 
-  if (offer.has_gap_report && offer.report_id) {
-    dlGrid.innerHTML += `
-      <div class="dl-group">
-        <div class="dl-group-title">⚠️ Gap-Report</div>
-        <div class="dl-buttons">
-          <a href="${API}/report/${offer.report_id}/download?format=xlsx" class="dl-btn orange-btn" download="FTAG_Gap_Report_${offer.report_id}.xlsx">
-            <span class="dl-icon">📗</span> Excel herunterladen
-          </a>
-          <a href="${API}/report/${offer.report_id}/download?format=docx" class="dl-btn orange-word" download="FTAG_Gap_Report_${offer.report_id}.docx">
-            <span class="dl-icon">📘</span> Word herunterladen
-          </a>
-        </div>
-      </div>
-    `;
-  }
-
-  if (!offer.has_offer && !offer.has_gap_report) {
+  if (!offer.has_result) {
     dlGrid.innerHTML = '<p style="color:var(--text-faint);font-size:.875rem;grid-column:1/-1;">Keine Dokumente erstellt.</p>';
   }
 
-  // Positions
+  // Build flat list of all items for detail modal
+  window._analysisItems = [];
+  const sections = [
+    { items: match.matched || [], status: 'matched', label: 'Erfuellbare Positionen', cls: 'green', icon: '&#10003;' },
+    { items: match.partial || [], status: 'partial', label: 'Teilweise erfuellbare Positionen', cls: 'orange', icon: '&#9888;' },
+    { items: match.unmatched || [], status: 'unmatched', label: 'Nicht erfuellbare Positionen', cls: 'red', icon: '&#10007;' },
+  ];
+
+  sections.forEach(sec => {
+    sec.items.forEach(item => {
+      window._analysisItems.push({ ...item, _status: sec.status });
+    });
+  });
+
+  // Positions table
   const container = document.getElementById('positions-container');
   container.innerHTML = '';
 
-  const sections = [
-    { items: match.matched  || [], label: 'Erfüllbare Positionen',         cls: 'green',  icon: '✅' },
-    { items: match.partial  || [], label: 'Teilweise erfüllbare Positionen', cls: 'orange', icon: '⚠️' },
-    { items: match.unmatched|| [], label: 'Nicht erfüllbare Positionen',    cls: 'red',    icon: '❌' },
-  ];
-
-  sections.forEach(({ items, label, cls, icon }) => {
+  let globalIdx = 0;
+  sections.forEach(({ items, label, cls, icon, status }) => {
     if (!items.length) return;
-    const tagCls = { green: 'tag-green', orange: 'tag-orange', red: 'tag-red' }[cls];
 
     const rows = items.map(item => {
+      const idx = globalIdx++;
       const pos = item.original_position || item;
-      const matchedJson = esc(JSON.stringify(item.matched_products || []));
+
+      // FTAG product name
+      const products = item.matched_products || [];
+      let ftag = '—';
+      if (products.length > 0) {
+        const p = products[0];
+        ftag = p['Tuerblatt / Verglasungsart / Rollkasten']
+          || p[Object.keys(p).find(k => k.includes('blatt') || k.includes('Verglasungsart')) || '']
+          || Object.values(p)[1] || '—';
+      }
+
       return `
-        <tr>
+        <tr onclick="openDetailModal(${idx})" class="clickable-row">
           <td><strong>${esc(item.position || pos.position || '—')}</strong></td>
-          <td>${esc(item.beschreibung || pos.beschreibung || '—')}</td>
-          <td>${esc(String(pos.menge || item.menge || 1))} ${esc(pos.einheit || 'Stk')}</td>
-          <td>${esc(pos.tuertyp || '—')}</td>
-          <td>${pos.brandschutz ? `<span class="tag tag-red">${esc(pos.brandschutz)}</span>` : '<span style="color:var(--text-faint)">—</span>'}</td>
-          <td>${pos.einbruchschutz ? `<span class="tag tag-blue">${esc(pos.einbruchschutz)}</span>` : '<span style="color:var(--text-faint)">—</span>'}</td>
-          <td style="font-size:.75rem;max-width:260px;">
-            ${item.review_needed ? `<span class="review-badge" title="Confidence ${(item.confidence * 100).toFixed(0)}% – Status automatisch von '${esc(item.original_status || '')}' angepasst">Prüfen</span> ` : ''}
-            ${renderMatchCriteria(item.match_criteria)}
-            ${item.reason && (!item.match_criteria || !item.match_criteria.length)
-              ? `<span style="color:var(--text-muted);">${esc(item.reason)}</span>` : ''}
-          </td>
-          <td class="action-cell">
-            <button class="confirm-btn"
-              data-position="${esc(item.position || pos.position || '')}"
-              data-beschreibung="${esc(item.beschreibung || pos.beschreibung || '')}"
-              data-tuertyp="${esc(pos.tuertyp || '')}"
-              data-brandschutz="${esc(pos.brandschutz || '')}"
-              data-einbruchschutz="${esc(pos.einbruchschutz || '')}"
-              data-matched-product="${matchedJson}"
-              data-status="${esc(item.status || cls)}"
-              onclick="confirmMatch(this)" title="Match bestätigen">&#10003;</button>
-            <button class="correction-btn"
-              data-position="${esc(item.position || pos.position || '')}"
-              data-beschreibung="${esc(item.beschreibung || pos.beschreibung || '')}"
-              data-tuertyp="${esc(pos.tuertyp || '')}"
-              data-brandschutz="${esc(pos.brandschutz || '')}"
-              data-einbruchschutz="${esc(pos.einbruchschutz || '')}"
-              data-breite="${esc(String(pos.breite || ''))}"
-              data-hoehe="${esc(String(pos.hoehe || ''))}"
-              data-status="${esc(item.status || cls)}"
-              data-matched-product="${matchedJson}"
-              onclick="openCorrection(this)">Korrektur</button>
+          <td>${esc(item.beschreibung || pos.beschreibung || pos.tuertyp || '—')}</td>
+          <td>${esc(String(pos.menge || item.menge || 1))}</td>
+          <td>${esc(pos.brandschutz || '—')}</td>
+          <td style="font-size:.8rem;" title="${esc(ftag)}">${esc(ftag.substring(0, 35))}${ftag.length > 35 ? '...' : ''}</td>
+          <td>${esc(item.category || '—')}</td>
+          <td style="font-size:.75rem;">
+            ${item.confidence ? `<span style="color:var(--text-faint);">${(item.confidence * 100).toFixed(0)}%</span> ` : ''}
+            ${item.reason ? `<span style="color:var(--text-muted);">${esc(item.reason.substring(0, 60))}</span>` : ''}
           </td>
         </tr>`;
     }).join('');
 
     container.innerHTML += `
-      <div class="positions-section">
+      <div class="positions-section" id="section-${status}">
         <div class="section-header ${cls}">
           <span>${icon}</span>
           <span>${label}</span>
@@ -646,7 +299,7 @@ function showResults(analysis, offer) {
           <table class="data-table">
             <thead><tr>
               <th>Pos.</th><th>Beschreibung</th><th>Menge</th>
-              <th>Türtyp</th><th>Brandschutz</th><th>Einbruchschutz</th><th>Hinweis</th><th>Aktion</th>
+              <th>Brandschutz</th><th>FTAG Produkt</th><th>Kategorie</th><th>Begruendung</th>
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>
@@ -655,28 +308,257 @@ function showResults(analysis, offer) {
   });
 }
 
+function scrollToSection(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ─────────────────────────────────────────────
+// DETAIL MODAL (clickable positions)
+// ─────────────────────────────────────────────
+
+function openDetailModal(index) {
+  const item = window._analysisItems[index];
+  if (!item) return;
+
+  const pos = item.original_position || item;
+  const modal = document.getElementById('detail-modal');
+  const title = document.getElementById('detail-modal-title');
+  const body = document.getElementById('detail-modal-body');
+
+  title.textContent = `Position ${item.position || pos.position || index + 1}`;
+
+  // Build customer requirement fields
+  const fields = [
+    ['Tuer-Nr', pos.position || item.position],
+    ['Beschreibung', item.beschreibung || pos.beschreibung],
+    ['Tuertyp', pos.tuertyp],
+    ['Brandschutz', pos.brandschutz],
+    ['Schallschutz', pos.schallschutz],
+    ['Einbruchschutz', pos.einbruchschutz || pos.widerstandsklasse],
+    ['Breite', pos.breite ? `${pos.breite} mm` : null],
+    ['Hoehe', pos.hoehe ? `${pos.hoehe} mm` : null],
+    ['Menge', pos.menge],
+    ['Raum', pos.raum_bezeichnung || pos.raum],
+    ['Geschoss', pos.geschoss],
+    ['Zargentyp', pos.zargentyp],
+    ['Schlosstyp', pos.schloss_typ],
+    ['Bandtyp', pos.bandtyp || pos.band],
+    ['Oberflaechentyp', pos.oberflaechentyp || pos.oberflaeche],
+    ['Glasausschnitt', pos.glasausschnitt || pos.verglasung],
+    ['Fluegel', pos.fluegel_anzahl || pos.anzahl_fluegel],
+  ].filter(([, v]) => v != null && v !== '' && v !== '—');
+
+  const fieldsHtml = fields.map(([label, value]) =>
+    `<div class="detail-field"><span class="detail-field-label">${esc(label)}</span><span class="detail-field-value">${esc(String(value))}</span></div>`
+  ).join('');
+
+  // FTAG product
+  const products = item.matched_products || [];
+  let productHtml = '<p style="color:var(--text-muted);">Kein passendes Produkt gefunden</p>';
+  if (products.length > 0) {
+    const p = products[0];
+    const productFields = Object.entries(p)
+      .filter(([k, v]) => v != null && v !== '' && !k.startsWith('_'))
+      .slice(0, 10)
+      .map(([k, v]) => `<div class="detail-field"><span class="detail-field-label">${esc(k)}</span><span class="detail-field-value">${esc(String(v))}</span></div>`)
+      .join('');
+    productHtml = `<div class="detail-fields">${productFields}</div>`;
+  }
+
+  // Match criteria / GAP
+  const criteria = item.match_criteria || [];
+  let criteriaHtml = '';
+  if (criteria.length) {
+    criteriaHtml = `
+      <h4 style="font-size:.875rem;font-weight:600;margin:1rem 0 .5rem;">Kriterien</h4>
+      <div class="detail-criteria">
+        ${criteria.map(c => {
+          const cls = c.status === 'ok' ? 'criteria-ok' : c.status === 'fehlt' ? 'criteria-fehlt' : 'criteria-teilweise';
+          const icon = c.status === 'ok' ? '&#10003;' : c.status === 'fehlt' ? '&#10007;' : '~';
+          return `<div class="detail-gap-item ${cls}">
+            <span>${icon} <strong>${esc(c.kriterium || '')}</strong></span>
+            <span style="color:var(--text-muted);font-size:.8rem;">${esc(c.detail || '')}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+  }
+
+  // Reason
+  const reasonHtml = item.reason
+    ? `<div style="margin-top:.75rem;padding:.5rem .75rem;background:var(--bg-hover);border-radius:var(--radius);font-size:.8125rem;color:var(--text-muted);">${esc(item.reason)}</div>`
+    : '';
+
+  // Status badge
+  const statusMap = {
+    matched: { label: 'Erfuellbar', cls: 'tag-green' },
+    partial: { label: 'Teilweise', cls: 'tag-orange' },
+    unmatched: { label: 'Nicht erfuellbar', cls: 'tag-red' },
+  };
+  const st = statusMap[item._status] || { label: item._status, cls: '' };
+
+  body.innerHTML = `
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;">
+      <span class="tag ${st.cls}">${st.label}</span>
+      ${item.confidence ? `<span style="color:var(--text-faint);font-size:.8125rem;">Konfidenz: ${(item.confidence * 100).toFixed(0)}%</span>` : ''}
+      <span style="color:var(--text-faint);font-size:.8125rem;">Kategorie: ${esc(item.category || '—')}</span>
+    </div>
+
+    <h4 style="font-size:.875rem;font-weight:600;margin-bottom:.5rem;">Kundenanforderung</h4>
+    <div class="detail-fields">${fieldsHtml}</div>
+
+    <h4 style="font-size:.875rem;font-weight:600;margin:1rem 0 .5rem;">FTAG Produkt</h4>
+    ${productHtml}
+
+    ${criteriaHtml}
+    ${reasonHtml}
+  `;
+
+  modal.classList.remove('hidden');
+}
+
+function closeDetailModal() {
+  document.getElementById('detail-modal').classList.add('hidden');
+}
+
+// ─────────────────────────────────────────────
+// CATALOG MANAGEMENT
+// ─────────────────────────────────────────────
+
+let _catalogFile = null;
+
+async function loadCatalogInfo() {
+  const loading = document.getElementById('catalog-info-loading');
+  const content = document.getElementById('catalog-info-content');
+  const errEl = document.getElementById('catalog-info-error');
+
+  loading.classList.remove('hidden');
+  content.classList.add('hidden');
+  errEl.classList.add('hidden');
+
+  try {
+    const data = await api('/catalog/info');
+    loading.classList.add('hidden');
+    content.classList.remove('hidden');
+
+    const statsEl = document.getElementById('catalog-stats');
+    statsEl.innerHTML = [
+      { num: data.total_products, label: 'Produkte gesamt', cls: 'blue' },
+      { num: data.main_products, label: 'Hauptprodukte', cls: 'green' },
+      { num: data.accessory_products, label: 'Zubehoer', cls: 'orange' },
+      { num: data.categories, label: 'Kategorien', cls: '' },
+    ].map(s => `
+      <div class="stat-card ${s.cls}">
+        <div class="stat-num">${s.num}</div>
+        <div class="stat-label">${s.label}</div>
+      </div>
+    `).join('');
+
+    const catEl = document.getElementById('catalog-categories');
+    if (data.category_breakdown) {
+      const cats = Object.entries(data.category_breakdown).sort((a, b) => b[1] - a[1]);
+      catEl.innerHTML = `
+        <p style="font-size:.8125rem;font-weight:600;margin-bottom:.5rem;">Kategorien</p>
+        <div style="display:flex;flex-wrap:wrap;gap:.375rem;">
+          ${cats.map(([name, count]) =>
+            `<span class="tag tag-blue">${esc(name)}: ${count}</span>`
+          ).join('')}
+        </div>
+        <p style="font-size:.75rem;color:var(--text-faint);margin-top:.5rem;">
+          Datei: ${esc(data.filename)} &middot; Letzte Aenderung: ${esc(data.last_modified)}
+        </p>
+      `;
+    }
+  } catch (err) {
+    loading.classList.add('hidden');
+    errEl.classList.remove('hidden');
+    errEl.textContent = `Katalog konnte nicht geladen werden: ${err.message}`;
+  }
+}
+
+function handleCatalogDragOver(e) {
+  e.preventDefault();
+  document.getElementById('catalog-drop-zone').classList.add('drag-over');
+}
+
+function handleCatalogDragLeave() {
+  document.getElementById('catalog-drop-zone').classList.remove('drag-over');
+}
+
+function handleCatalogDrop(e) {
+  e.preventDefault();
+  document.getElementById('catalog-drop-zone').classList.remove('drag-over');
+  const files = Array.from(e.dataTransfer.files);
+  if (files.length > 0) {
+    if (!files[0].name.toLowerCase().endsWith('.xlsx')) {
+      showToast('Nur .xlsx Dateien erlaubt.');
+      return;
+    }
+    setCatalogFile(files[0]);
+  }
+}
+
+function handleCatalogFileSelect(e) {
+  const files = Array.from(e.target.files);
+  if (files.length > 0) setCatalogFile(files[0]);
+}
+
+function setCatalogFile(f) {
+  _catalogFile = f;
+  const preview = document.getElementById('catalog-upload-preview');
+  preview.classList.remove('hidden');
+  document.getElementById('catalog-file-name').textContent = f.name;
+  document.getElementById('catalog-file-size').textContent = fmtSize(f.size);
+  document.getElementById('btn-catalog-upload').disabled = false;
+}
+
+function clearCatalogFile() {
+  _catalogFile = null;
+  document.getElementById('catalog-upload-preview').classList.add('hidden');
+  document.getElementById('catalog-file-input').value = '';
+  document.getElementById('btn-catalog-upload').disabled = true;
+}
+
+async function uploadCatalog() {
+  if (!_catalogFile) return;
+
+  const btn = document.getElementById('btn-catalog-upload');
+  btn.disabled = true;
+  btn.textContent = 'Wird hochgeladen...';
+
+  try {
+    const form = new FormData();
+    form.append('file', _catalogFile);
+    const result = await api('/catalog/upload', { method: 'POST', body: form });
+
+    showToast(result.message);
+    clearCatalogFile();
+    btn.textContent = 'Katalog hochladen';
+
+    // Reload catalog info
+    loadCatalogInfo();
+  } catch (err) {
+    showToast(`Fehler: ${err.message}`);
+    btn.disabled = false;
+    btn.textContent = 'Katalog hochladen';
+  }
+}
+
 // ─────────────────────────────────────────────
 // RESET
 // ─────────────────────────────────────────────
 
 function resetAll() {
-  state = {
-    file: null, fileId: null, analysis: null, offer: null,
-    uploadMode: state.uploadMode || 'folder',
-    files: [], projectId: null, projectFiles: [],
-    classificationOverrides: {},
-  };
+  state = { file: null, fileId: null, analysis: null, offer: null };
+  window._analysisItems = [];
 
-  clearFiles();
   clearFile();
-  ['upload','ai','match','gen'].forEach(s => setStep(s, 'pending', 'Warte...'));
+  ['upload', 'ai', 'match', 'gen'].forEach(s => setStep(s, 'pending', 'Warte...'));
 
   document.getElementById('stat-grid').innerHTML = '';
   document.getElementById('download-grid').innerHTML = '';
   document.getElementById('positions-container').innerHTML = '';
   document.getElementById('match-bar').style.width = '0%';
-  document.getElementById('classification-grid').innerHTML = '';
-  document.getElementById('classify-summary').innerHTML = '';
 
   showPanel('upload');
   setPill(1);
@@ -697,10 +579,10 @@ function showError(msg) {
 }
 
 function setPill(n) {
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 3; i++) {
     const el = document.getElementById(`pill-${i}`);
     if (!el) continue;
-    el.classList.remove('active','done');
+    el.classList.remove('active', 'done');
     if (i < n) el.classList.add('done');
     if (i === n) el.classList.add('active');
   }
@@ -708,77 +590,34 @@ function setPill(n) {
 
 const DOT_SVG = {
   running: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><circle cx="12" cy="12" r="3" fill="white"/></svg>`,
-  done:    `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`,
-  error:   `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  done: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`,
+  error: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
   pending: '',
 };
 
-function setStep(id, state, statusText) {
-  const item   = document.getElementById(`step-${id}`);
-  const dot    = item.querySelector('.step-dot');
+function setStep(id, dotState, statusText) {
+  const item = document.getElementById(`step-${id}`);
+  if (!item) return;
+  const dot = item.querySelector('.step-dot');
   const status = item.querySelector('.step-status');
-
-  dot.className = `step-dot ${state}`;
-  dot.innerHTML = DOT_SVG[state] || '';
+  dot.className = `step-dot ${dotState}`;
+  dot.innerHTML = DOT_SVG[dotState] || '';
   status.textContent = statusText;
 }
 
 function esc(str) {
   return String(str ?? '')
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ─────────────────────────────────────────────
-// PRODUCTS
-// ─────────────────────────────────────────────
-
-let _searchTimer;
-
-async function loadProducts() {
-  const loading = document.getElementById('products-loading');
-  const errEl   = document.getElementById('products-error');
-  const infoEl  = document.getElementById('products-info');
-  const tableW  = document.getElementById('products-table-wrap');
-
-  loading.classList.remove('hidden');
-  errEl.classList.add('hidden');
-  tableW.classList.add('hidden');
-
-  try {
-    const q = document.getElementById('product-search').value.trim();
-    const url = q ? `/products?search=${encodeURIComponent(q)}&limit=100` : '/products?limit=100';
-    const data = await api(url);
-
-    loading.classList.add('hidden');
-    infoEl.classList.remove('hidden');
-    infoEl.textContent = `${data.returned} von ${data.total} Produkten`;
-
-    renderProducts(data.products);
-  } catch (err) {
-    loading.classList.add('hidden');
-    errEl.classList.remove('hidden');
-    errEl.textContent = `Fehler: ${err.message}`;
-  }
-}
-
-function searchProducts() {
-  clearTimeout(_searchTimer);
-  _searchTimer = setTimeout(loadProducts, 400);
-}
-
-function renderProducts(products) {
-  const tableW = document.getElementById('products-table-wrap');
-  if (!products?.length) { tableW.classList.add('hidden'); return; }
-
-  const cols = [...new Set(products.slice(0,5).flatMap(p => Object.keys(p)))].slice(0, 8);
-
-  document.getElementById('products-thead').innerHTML =
-    '<tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>';
-
-  document.getElementById('products-tbody').innerHTML =
-    products.map(p => '<tr>' + cols.map(c => `<td>${esc(p[c] || '')}</td>`).join('') + '</tr>').join('');
-
-  tableW.classList.remove('hidden');
+function showToast(message) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
 }
 
 // ─────────────────────────────────────────────
@@ -859,9 +698,9 @@ async function showHistoryDetail(historyId) {
     const statsEl = document.getElementById('history-detail-stats');
     statsEl.innerHTML = [
       { num: summary.total_positions || 0, label: 'Positionen', cls: 'blue' },
-      { num: summary.matched_count || 0, label: 'Erfüllbar', cls: 'green' },
+      { num: summary.matched_count || 0, label: 'Erfuellbar', cls: 'green' },
       { num: summary.partial_count || 0, label: 'Teilweise', cls: 'orange' },
-      { num: summary.unmatched_count || 0, label: 'Nicht erfüllbar', cls: 'red' },
+      { num: summary.unmatched_count || 0, label: 'Nicht erfuellbar', cls: 'red' },
     ].map(s => `
       <div class="stat-card ${s.cls}">
         <div class="stat-num">${s.num}</div>
@@ -873,9 +712,9 @@ async function showHistoryDetail(historyId) {
     container.innerHTML = '';
     const match = data.matching || {};
     const sections = [
-      { items: match.matched || [], label: 'Erfüllbar', cls: 'green', icon: '&#10003;' },
+      { items: match.matched || [], label: 'Erfuellbar', cls: 'green', icon: '&#10003;' },
       { items: match.partial || [], label: 'Teilweise', cls: 'orange', icon: '~' },
-      { items: match.unmatched || [], label: 'Nicht erfüllbar', cls: 'red', icon: '&#10007;' },
+      { items: match.unmatched || [], label: 'Nicht erfuellbar', cls: 'red', icon: '&#10007;' },
     ];
     sections.forEach(({ items, label, cls, icon }) => {
       if (!items.length) return;
@@ -899,7 +738,7 @@ async function showHistoryDetail(historyId) {
             <span class="section-badge">${items.length}</span>
           </div>
           <div class="table-wrap"><table class="data-table">
-            <thead><tr><th>Pos.</th><th>Beschreibung</th><th>Menge</th><th>Türtyp</th><th>Kriterien</th></tr></thead>
+            <thead><tr><th>Pos.</th><th>Beschreibung</th><th>Menge</th><th>Tuertyp</th><th>Kriterien</th></tr></thead>
             <tbody>${rows}</tbody>
           </table></div>
         </div>`;
@@ -916,8 +755,8 @@ function closeHistoryDetail() {
 }
 
 async function rematchHistory(historyId) {
-  if (!confirm('Analyse mit aktuellen Feedback-Daten und Synonymen neu matchen?')) return;
-  showToast('Rematch wird durchgeführt...');
+  if (!confirm('Analyse mit aktuellen Daten neu matchen?')) return;
+  showToast('Rematch wird durchgefuehrt...');
   try {
     const result = await api(`/history/${historyId}/rematch`, { method: 'POST' });
     showToast(result.message);
@@ -928,10 +767,10 @@ async function rematchHistory(historyId) {
 }
 
 async function deleteHistory(historyId) {
-  if (!confirm('Diese Analyse wirklich löschen?')) return;
+  if (!confirm('Diese Analyse wirklich loeschen?')) return;
   try {
     await api(`/history/${historyId}`, { method: 'DELETE' });
-    showToast('Analyse gelöscht.');
+    showToast('Analyse geloescht.');
     loadHistory();
   } catch (err) {
     showToast(`Fehler: ${err.message}`);
@@ -939,34 +778,18 @@ async function deleteHistory(historyId) {
 }
 
 // ─────────────────────────────────────────────
-// API HELPER
+// MATCH CRITERIA RENDERING
 // ─────────────────────────────────────────────
 
-async function api(path, opts = {}) {
-  const url = path.startsWith('http') ? path : `${API}${path}`;
-  let res;
-  try {
-    res = await fetch(url, opts);
-  } catch (networkErr) {
-    console.error(`[API] Network error for ${path}:`, networkErr);
-    throw new Error('Server nicht erreichbar. Ist der Server gestartet?');
-  }
-  if (!res.ok) {
-    let msg = `HTTP ${res.status}`;
-    let detail = null;
-    try {
-      const body = await res.json();
-      detail = body.detail;
-      msg = detail || msg;
-    } catch {}
-    // Special handling for expired cache (410 Gone)
-    if (res.status === 410) {
-      msg = detail || 'Datei abgelaufen – bitte erneut hochladen.';
-    }
-    console.error(`[API] Error ${res.status} for ${path}:`, detail || msg);
-    throw new Error(msg);
-  }
-  return res.json();
+function renderMatchCriteria(criteria) {
+  if (!criteria || !criteria.length) return '';
+  return criteria.map(c => {
+    const statusCls = c.status === 'ok' ? 'criteria-ok'
+      : c.status === 'fehlt' ? 'criteria-fehlt'
+      : 'criteria-teilweise';
+    const icon = c.status === 'ok' ? '&#10003;' : c.status === 'fehlt' ? '&#10007;' : '~';
+    return `<span class="criteria-tag ${statusCls}" title="${esc(c.detail || '')}">${icon} ${esc(c.kriterium || '')}</span>`;
+  }).join(' ');
 }
 
 // ─────────────────────────────────────────────
@@ -983,7 +806,6 @@ function openCorrection(btn) {
   correctionState.positionData = { ...d };
   correctionState.selectedProduct = null;
 
-  // Show current match info
   let products = [];
   try { products = JSON.parse(d.matchedProduct || '[]'); } catch {}
   const currentProduct = products.length > 0
@@ -994,17 +816,14 @@ function openCorrection(btn) {
   const reqParts = [d.beschreibung, d.tuertyp, d.brandschutz, d.einbruchschutz].filter(Boolean);
   document.getElementById('correction-requirement').textContent = reqParts.join(' | ') || '---';
 
-  // Reset search
   document.getElementById('correction-search-input').value = '';
   document.getElementById('correction-results').innerHTML = '';
   document.getElementById('correction-note-input').value = '';
   document.getElementById('btn-save-correction').disabled = true;
   document.getElementById('btn-save-correction').textContent = 'Korrektur speichern';
 
-  // Show modal
   document.getElementById('correction-modal').classList.remove('hidden');
 
-  // Pre-populate search with tuertyp + brandschutz
   const autoSearch = [d.tuertyp, d.brandschutz].filter(Boolean).join(' ');
   if (autoSearch) {
     document.getElementById('correction-search-input').value = autoSearch;
@@ -1107,7 +926,7 @@ async function saveCorrection() {
       body: JSON.stringify(body),
     });
     closeCorrection();
-    showToast('Korrektur gespeichert – wird beim nächsten Matching berücksichtigt.');
+    showToast('Korrektur gespeichert.');
   } catch (err) {
     showToast(`Fehler: ${err.message}`);
     const btn = document.getElementById('btn-save-correction');
@@ -1117,73 +936,33 @@ async function saveCorrection() {
 }
 
 // ─────────────────────────────────────────────
-// MATCH CRITERIA RENDERING
+// API HELPER
 // ─────────────────────────────────────────────
 
-function renderMatchCriteria(criteria) {
-  if (!criteria || !criteria.length) return '';
-  return criteria.map(c => {
-    const statusCls = c.status === 'ok' ? 'criteria-ok'
-      : c.status === 'fehlt' ? 'criteria-fehlt'
-      : 'criteria-teilweise';
-    const icon = c.status === 'ok' ? '&#10003;' : c.status === 'fehlt' ? '&#10007;' : '~';
-    return `<span class="criteria-tag ${statusCls}" title="${esc(c.detail || '')}">${icon} ${esc(c.kriterium || '')}</span>`;
-  }).join(' ');
-}
-
-// ─────────────────────────────────────────────
-// POSITIVE FEEDBACK (Bestätigen)
-// ─────────────────────────────────────────────
-
-async function confirmMatch(btn) {
-  const d = btn.dataset;
-  let products = [];
-  try { products = JSON.parse(d.matchedProduct || '[]'); } catch {}
-  if (!products.length) {
-    showToast('Kein Produkt zum Bestätigen vorhanden.');
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = '...';
-
+async function api(path, opts = {}) {
+  const url = path.startsWith('http') ? path : `${API}${path}`;
+  let res;
   try {
-    await api('/feedback/confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requirement_text: [d.beschreibung, d.tuertyp, d.brandschutz, d.einbruchschutz]
-          .filter(Boolean).join(' | '),
-        requirement_fields: {
-          tuertyp: d.tuertyp || null,
-          brandschutz: d.brandschutz || null,
-          einbruchschutz: d.einbruchschutz || null,
-        },
-        confirmed_product: {
-          product_summary: Object.values(products[0]).join(' | '),
-        },
-        position_id: d.position || '?',
-        match_status_was: d.status || 'unknown',
-      }),
-    });
-    btn.textContent = '&#10003;';
-    btn.classList.add('confirmed');
-    showToast('Match bestätigt – wird beim nächsten Matching berücksichtigt.');
-  } catch (err) {
-    btn.disabled = false;
-    btn.textContent = '&#10003;';
-    showToast(`Fehler: ${err.message}`);
+    res = await fetch(url, opts);
+  } catch (networkErr) {
+    console.error(`[API] Network error for ${path}:`, networkErr);
+    throw new Error('Server nicht erreichbar. Ist der Server gestartet?');
   }
-}
-
-function showToast(message) {
-  const existing = document.querySelector('.toast');
-  if (existing) existing.remove();
-  const toast = document.createElement('div');
-  toast.className = 'toast';
-  toast.textContent = message;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    let detail = null;
+    try {
+      const body = await res.json();
+      detail = body.detail;
+      msg = detail || msg;
+    } catch {}
+    if (res.status === 410) {
+      msg = detail || 'Datei abgelaufen – bitte erneut hochladen.';
+    }
+    console.error(`[API] Error ${res.status} for ${path}:`, detail || msg);
+    throw new Error(msg);
+  }
+  return res.json();
 }
 
 // ─────────────────────────────────────────────
@@ -1201,8 +980,7 @@ async function checkServerHealth() {
 
     if (!data.api_key_set) {
       dot.style.background = '#d97706';
-      dot.title = 'API-Key fehlt';
-      showToast('ANTHROPIC_API_KEY ist nicht gesetzt. Analyse wird fehlschlagen.');
+      dot.title = 'API-Key fehlt (wird fuer Text-Analyse benoetigt)';
     } else {
       dot.style.background = '';
       dot.title = 'Server verbunden';
@@ -1214,6 +992,14 @@ async function checkServerHealth() {
     console.error('Health check failed:', err);
   }
 }
+
+// Close modals with Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeDetailModal();
+    closeCorrection();
+  }
+});
 
 // Header scroll shadow
 window.addEventListener('scroll', () => {

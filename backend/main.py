@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from routers import upload, analyze, offer, feedback, history
+from routers import upload, analyze, offer, feedback, history, catalog
 
 # Base directory for data files
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -42,6 +42,7 @@ app.include_router(analyze.router, prefix="/api")
 app.include_router(offer.router, prefix="/api")
 app.include_router(feedback.router, prefix="/api")
 app.include_router(history.router, prefix="/api")
+app.include_router(catalog.router, prefix="/api")
 
 # Serve frontend static files (with no-cache headers to prevent stale JS/CSS)
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
@@ -66,13 +67,16 @@ async def add_cache_headers(request: Request, call_next):
 
 @app.on_event("startup")
 async def startup_event():
-    """Pre-load product catalog and TF-IDF matrix at startup."""
+    """Pre-load catalog index at startup."""
     try:
-        from services.product_matcher import load_product_catalog
-        load_product_catalog()
-        logging.getLogger(__name__).info("Product catalog pre-loaded at startup")
+        from services.catalog_index import get_catalog_index
+        index = get_catalog_index()
+        logging.getLogger(__name__).info(
+            f"Catalog index pre-loaded: {len(index.main_products)} main products, "
+            f"{len(index.all_profiles)} total"
+        )
     except Exception as e:
-        logging.getLogger(__name__).warning(f"Could not pre-load product catalog: {e}")
+        logging.getLogger(__name__).warning(f"Could not pre-load catalog index: {e}")
 
 
 @app.get("/health")
