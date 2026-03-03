@@ -11,6 +11,7 @@ from typing import Optional
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data")
 HISTORY_FILE = os.path.join(DATA_DIR, "analysis_history.json")
+MAX_HISTORY_ENTRIES = 50
 
 
 def load_history() -> list[dict]:
@@ -51,6 +52,11 @@ def save_analysis(
     }
 
     entries.append(entry)
+
+    # Enforce maximum entries to prevent unbounded growth
+    if len(entries) > MAX_HISTORY_ENTRIES:
+        entries = entries[-MAX_HISTORY_ENTRIES:]
+
     os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
     with open(HISTORY_FILE, "w", encoding="utf-8") as f:
         json.dump(entries, f, ensure_ascii=False, indent=2)

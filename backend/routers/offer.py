@@ -1,14 +1,13 @@
 """
-Offer Router – Offer generation and download endpoints.
+Offer Router – Offer generation and download endpoints (in-memory, no disk writes).
 POST /api/offer/generate
 GET  /api/offer/{id}/download
 GET  /api/report/{id}/download
 """
 
-import os
 import uuid
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from services.claude_client import generate_offer_text, generate_gap_report_text
@@ -16,10 +15,9 @@ from services.offer_generator import (
     generate_offer_excel, generate_gap_report_excel,
     generate_offer_word, generate_gap_report_word,
 )
+from services.memory_cache import offer_cache
 
 router = APIRouter()
-
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "outputs")
 
 
 class GenerateOfferRequest(BaseModel):
@@ -31,7 +29,7 @@ class GenerateOfferRequest(BaseModel):
 async def generate_offer(request: GenerateOfferRequest):
     """
     Generate an offer and/or gap report based on analysis results.
-    Returns offer_id and report_id for downloading.
+    Stores generated documents in memory cache for download.
     """
     requirements = request.requirements
     matching = request.matching
@@ -70,8 +68,13 @@ async def generate_offer(request: GenerateOfferRequest):
                 detail=f"Angebotserstellung fehlgeschlagen: {str(e)}",
             )
 
-        generate_offer_excel(offer_text, offer_positions, requirements, offer_id)
-        generate_offer_word(offer_text, offer_positions, requirements, offer_id)
+        # Generate both formats in memory and cache them
+        xlsx_bytes = generate_offer_excel(offer_text, offer_positions, requirements, offer_id)
+        docx_bytes = generate_offer_word(offer_text, offer_positions, requirements, offer_id)
+
+        offer_cache.store(f"offer_{offer_id}_xlsx", xlsx_bytes, ttl_seconds=1800)
+        offer_cache.store(f"offer_{offer_id}_docx", docx_bytes, ttl_seconds=1800)
+
         results["offer_id"] = offer_id
         results["has_offer"] = True
         results["offer_positions_count"] = len(offer_positions)
@@ -89,8 +92,12 @@ async def generate_offer(request: GenerateOfferRequest):
                 detail=f"Gap-Report Erstellung fehlgeschlagen: {str(e)}",
             )
 
-        generate_gap_report_excel(gap_text, unmatched, partial, requirements, report_id)
-        generate_gap_report_word(gap_text, unmatched, partial, requirements, report_id)
+        xlsx_bytes = generate_gap_report_excel(gap_text, unmatched, partial, requirements, report_id)
+        docx_bytes = generate_gap_report_word(gap_text, unmatched, partial, requirements, report_id)
+
+        offer_cache.store(f"report_{report_id}_xlsx", xlsx_bytes, ttl_seconds=1800)
+        offer_cache.store(f"report_{report_id}_docx", docx_bytes, ttl_seconds=1800)
+
         results["report_id"] = report_id
         results["has_gap_report"] = True
         results["gap_positions_count"] = len(gap_positions)
@@ -110,31 +117,49 @@ async def generate_offer(request: GenerateOfferRequest):
 
 @router.get("/offer/{offer_id}/download")
 async def download_offer(offer_id: str, format: str = "xlsx"):
-    """Download offer as Excel (format=xlsx) or Word (format=docx)."""
+    """Download offer as Excel (format=xlsx) or Word (format=docx) from memory cache."""
+    key = f"offer_{offer_id}_{format}"
+    data = offer_cache.get(key)
+    if data is None:
+        raise HTTPException(
+            status_code=410,
+            detail="Angebot nicht gefunden oder abgelaufen. Bitte erneut generieren.",
+        )
+
     if format == "docx":
-        file_path = os.path.join(OUTPUT_DIR, f"angebot_{offer_id}.docx")
         media = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         fname = f"FTAG_Angebot_{offer_id}.docx"
     else:
-        file_path = os.path.join(OUTPUT_DIR, f"angebot_{offer_id}.xlsx")
         media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         fname = f"FTAG_Angebot_{offer_id}.xlsx"
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail=f"Angebot '{offer_id}' nicht gefunden")
-    return FileResponse(file_path, media_type=media, filename=fname)
+
+    return Response(
+        content=data,
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 @router.get("/report/{report_id}/download")
 async def download_gap_report(report_id: str, format: str = "xlsx"):
-    """Download gap report as Excel (format=xlsx) or Word (format=docx)."""
+    """Download gap report as Excel (format=xlsx) or Word (format=docx) from memory cache."""
+    key = f"report_{report_id}_{format}"
+    data = offer_cache.get(key)
+    if data is None:
+        raise HTTPException(
+            status_code=410,
+            detail="Gap-Report nicht gefunden oder abgelaufen. Bitte erneut generieren.",
+        )
+
     if format == "docx":
-        file_path = os.path.join(OUTPUT_DIR, f"gap_report_{report_id}.docx")
         media = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         fname = f"FTAG_Gap_Report_{report_id}.docx"
     else:
-        file_path = os.path.join(OUTPUT_DIR, f"gap_report_{report_id}.xlsx")
         media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         fname = f"FTAG_Gap_Report_{report_id}.xlsx"
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail=f"Gap-Report '{report_id}' nicht gefunden")
-    return FileResponse(file_path, media_type=media, filename=fname)
+
+    return Response(
+        content=data,
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )

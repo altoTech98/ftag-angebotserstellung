@@ -10,6 +10,7 @@ Instead of converting 200-column Excel to text, this parser:
 Handles varying column structures across customers (39–217 columns).
 """
 
+import io
 import os
 import re
 import logging
@@ -37,33 +38,39 @@ KNOWN_FIELD_PATTERNS = {
         "breite", "b [mm]", "b[mm]", "b (mm)", "lichte breite", "tb",
         "türbreite", "breite mm", "breite [mm]", "lichte b",
         "rohbaumass breite", "rbm breite", "width",
+        "rm-b rohbaumass breite", "dm-b durchgang breite", "durchgang breite",
     ],
     "hoehe": [
         "höhe", "hoehe", "h [mm]", "h[mm]", "h (mm)", "lichte höhe", "th",
         "türhöhe", "höhe mm", "höhe [mm]", "lichte h", "lichte höhe",
         "rohbaumass höhe", "rbm höhe", "height",
+        "rm-h rohbaumass höhe", "dm-h durchgang höhe", "durchgang höhe",
     ],
     "brandschutz": [
         "brandschutz", "feuerschutz", "bs", "feuerwiderstand",
         "brandschutzklasse", "brand", "fire", "ei30", "ei60", "ei90",
         "feuerwiderstandsklasse", "brandschutzanforderung",
+        "brand-/rauchschutz", "rauchschutz",
     ],
     "schallschutz": [
         "schallschutz", "ss", "rw", "schalldämmung", "schall",
         "schallschutzklasse", "schalldämmwert", "rw [db]", "rw[db]",
+        "schalldämmwert (db)",
     ],
     "einbruchschutz": [
         "einbruchschutz", "rc", "wk", "einbruch", "sicherheit",
         "widerstandsklasse", "einbruchsicherheit", "rc-klasse",
+        "einbruch-widerstandsklasse",
     ],
     "tuertyp": [
-        "türtyp", "tuertyp", "typ", "türart", "element", "elementtyp",
-        "tür typ", "door type", "konstruktion",
+        "türtyp", "tuertyp", "türart", "elementtyp",
+        "tür typ", "door type", "konstruktion", "bauart",
+        "türblatt",
     ],
     "beschlaege": [
         "beschläge", "beschlag", "drücker", "druecker", "schloss",
         "schliesser", "schliessung", "beschlaege", "bänder", "band",
-        "türdrücker", "türschliesser",
+        "türdrücker", "türschliesser", "türband",
     ],
     "oberflaechenbehandlung": [
         "oberfläche", "oberflaeche", "farbe", "ral", "beschichtung",
@@ -71,11 +78,12 @@ KNOWN_FIELD_PATTERNS = {
         "farbgebung", "ral-ton",
     ],
     "verglasung": [
-        "verglasung", "glas", "verglast", "lichtausschnitt", "la",
-        "fenster", "seitenteil", "glasausschnitt", "glasart",
+        "verglasung", "verglast", "lichtausschnitt",
+        "seitenteil", "glasausschnitt", "glasart",
+        "durchsicht (glas",
     ],
     "menge": [
-        "menge", "anzahl", "stk", "stück", "quantity", "qty", "anz",
+        "menge", "stk", "stück", "quantity", "qty",
     ],
     "besonderheiten": [
         "bemerkung", "besonderheit", "hinweis", "kommentar", "notiz",
@@ -83,7 +91,7 @@ KNOWN_FIELD_PATTERNS = {
     ],
     "raum": [
         "raum", "raumbezeichnung", "raumnummer", "raum-nr", "raum nr",
-        "zimmer", "room", "raumname", "nutzung",
+        "zimmer", "room", "raumname", "nutzung", "zugehöriger raum",
     ],
     "wandtyp": [
         "wandtyp", "wand", "wandkonstruktion", "wandaufbau", "mauerwerk",
@@ -118,20 +126,32 @@ def _best_field_match(column_name: str) -> tuple[str | None, float]:
     best_score = 0.0
 
     for field, patterns in KNOWN_FIELD_PATTERNS.items():
+        field_best = 0.0
         for pattern in patterns:
-            # Exact substring match (high priority)
-            if pattern in col_lower or col_lower in pattern:
-                score = 0.95 if pattern == col_lower else 0.85
-                if score > best_score:
-                    best_score = score
-                    best_field = field
-                continue
+            # Exact match (highest priority)
+            if pattern == col_lower:
+                score = 0.98
+            # Substring match: only for patterns >= 4 chars to avoid false positives
+            # (e.g., "ss" in "glasmass" → false schallschutz match)
+            elif len(pattern) >= 4 and pattern in col_lower:
+                # Score higher for longer pattern matches (more specific)
+                specificity = len(pattern) / len(col_lower)
+                score = 0.80 + min(specificity * 0.15, 0.15)
+            elif len(pattern) >= 4 and col_lower in pattern:
+                score = 0.80
+            else:
+                # Fuzzy match (only for patterns >= 4 chars)
+                if len(pattern) < 4:
+                    continue
+                ratio = _fuzzy_ratio(col_lower, pattern)
+                score = ratio if ratio >= 0.75 else 0.0
 
-            # Fuzzy match
-            ratio = _fuzzy_ratio(col_lower, pattern)
-            if ratio > best_score and ratio >= 0.75:
-                best_score = ratio
-                best_field = field
+            if score > field_best:
+                field_best = score
+
+        if field_best > best_score:
+            best_score = field_best
+            best_field = field
 
     return best_field, best_score
 
@@ -170,20 +190,22 @@ def _normalize_einbruchschutz(value) -> str | None:
 
 
 def _extract_dimension_mm(value) -> int | None:
-    """Extract numeric mm value: '900mm' → 900, '0.9m' → 900, '900' → 900."""
+    """Extract numeric mm value: '900mm' → 900, '0.9m' → 900, '1.066' → 1066, '900' → 900."""
     if pd.isna(value):
         return None
     s = str(value).strip()
     if not s:
         return None
 
-    # Try direct integer
+    # Try direct numeric conversion
     try:
-        v = int(float(s))
+        v_float = float(s)
+        if 0.1 <= v_float < 15:
+            # Likely meters (e.g. 1.066m → 1066mm, 0.9m → 900mm)
+            return int(round(v_float * 1000))
+        v = int(v_float)
         if 100 <= v <= 9999:
             return v
-        if 0 < v < 10:
-            return int(v * 1000)  # Likely meters
         return v if v > 0 else None
     except (ValueError, OverflowError):
         pass
@@ -211,6 +233,11 @@ def _clean_string_value(value) -> str | None:
 # Main functions
 # ---------------------------------------------------------------------------
 
+def parse_tuerliste_bytes(content: bytes) -> dict:
+    """Parse an Excel Türliste from raw bytes. See parse_tuerliste for return format."""
+    return _parse_tuerliste_from_excel(pd.ExcelFile(io.BytesIO(content)))
+
+
 def parse_tuerliste(file_path: str) -> dict:
     """
     Parse an Excel Türliste into structured door positions.
@@ -236,7 +263,11 @@ def parse_tuerliste(file_path: str) -> dict:
             "header_row_index": int,
         }
     """
-    xl = pd.ExcelFile(file_path)
+    return _parse_tuerliste_from_excel(pd.ExcelFile(file_path))
+
+
+def _parse_tuerliste_from_excel(xl: pd.ExcelFile) -> dict:
+    """Internal: parse Türliste from an already-opened ExcelFile."""
 
     # Find the right sheet
     sheet_name = _find_tuerliste_sheet(xl)
@@ -327,16 +358,28 @@ def _find_tuerliste_sheet(xl: pd.ExcelFile) -> str | None:
 
 def _find_header_row(df: pd.DataFrame) -> int | None:
     """
-    Auto-detect the header row by finding the first row with many string values.
-    Also checks for door-related keywords.
+    Auto-detect the header row by scoring candidate rows.
+
+    Prefers rows with more door-specific keywords over rows that merely
+    have many string values. This correctly handles multi-row headers where
+    group headers (Row 4) have enough strings but actual column headers (Row 6)
+    have more domain-specific keywords.
     """
-    for i in range(min(15, len(df))):
+    _DOOR_KEYWORDS = [
+        "tür", "pos", "brand", "schall", "breit", "höh", "geschoss",
+        "einbruch", "wand", "raum", "zarge", "schloss", "beschlag",
+        "verglasung", "glas", "durchsicht", "öffnung", "flügel",
+        "rohbau", "durchgang", "zylinder", "türblatt",
+    ]
+
+    candidates = []  # (row_index, door_kw_count, non_empty_count)
+
+    for i in range(min(20, len(df))):
         row = df.iloc[i]
         non_empty = row[row.astype(str).str.strip() != ""]
         if len(non_empty) < 5:
             continue
 
-        # Count string-like values
         string_count = sum(
             1 for v in non_empty
             if isinstance(v, str) and len(str(v).strip()) > 1
@@ -344,16 +387,24 @@ def _find_header_row(df: pd.DataFrame) -> int | None:
         if string_count < 5:
             continue
 
-        # Bonus: check for door keywords
         row_text = " ".join(str(v).lower() for v in non_empty)
-        door_kw_count = sum(
-            1 for kw in ["tür", "pos", "brand", "schall", "breit", "höh", "geschoss"]
-            if kw in row_text
-        )
-        if door_kw_count >= 2 or string_count >= 8:
-            return i
+        door_kw_count = sum(1 for kw in _DOOR_KEYWORDS if kw in row_text)
 
-    return None
+        if door_kw_count >= 2 or string_count >= 8:
+            candidates.append((i, door_kw_count, len(non_empty)))
+
+    if not candidates:
+        return None
+
+    # Prefer row with most door keywords, then most non-empty cells
+    candidates.sort(key=lambda x: (x[1], x[2]), reverse=True)
+    best = candidates[0]
+    logger.info(
+        f"Header row detected: row {best[0]} "
+        f"(door_keywords={best[1]}, non_empty={best[2]}, "
+        f"candidates checked: {[c[0] for c in candidates]})"
+    )
+    return best[0]
 
 
 def _map_columns(df: pd.DataFrame) -> dict[str, str]:

@@ -1,13 +1,10 @@
 """
-Offer Generator – Creates Excel and text-based offers and gap reports.
+Offer Generator – Creates Excel and Word offers and gap reports in memory.
+All functions return bytes (no disk writes).
 """
 
-import os
-import uuid
+import io
 from datetime import datetime, timedelta
-from typing import Optional
-
-OUTPUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "outputs"))
 
 
 def generate_offer_excel(
@@ -15,27 +12,20 @@ def generate_offer_excel(
     matched_positions: list,
     requirements: dict,
     offer_id: str,
-) -> str:
-    """
-    Generate an Excel offer file.
-    Returns the file path.
-    """
+) -> bytes:
+    """Generate an Excel offer in memory. Returns raw bytes."""
     import openpyxl
-    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side, numbers
-    from openpyxl.utils import get_column_letter
-
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    file_path = os.path.join(OUTPUT_DIR, f"angebot_{offer_id}.xlsx")
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Angebot"
 
     # Colors
-    header_fill = PatternFill("solid", fgColor="1F3A5F")  # Dark blue
-    subheader_fill = PatternFill("solid", fgColor="2E6DA4")  # Medium blue
-    alt_row_fill = PatternFill("solid", fgColor="EBF3FB")  # Light blue
-    total_fill = PatternFill("solid", fgColor="F0F0F0")  # Light gray
+    header_fill = PatternFill("solid", fgColor="1F3A5F")
+    subheader_fill = PatternFill("solid", fgColor="2E6DA4")
+    alt_row_fill = PatternFill("solid", fgColor="EBF3FB")
+    total_fill = PatternFill("solid", fgColor="F0F0F0")
 
     # Fonts
     title_font = Font(name="Arial", size=16, bold=True, color="1F3A5F")
@@ -133,17 +123,13 @@ def generate_offer_excel(
 
     # Positions
     total_sum = 0
-    pos_start_row = row
 
-    all_positions = matched_positions
-
-    for i, pos_data in enumerate(all_positions):
+    for i, pos_data in enumerate(matched_positions):
         pos = pos_data.get("original_position", pos_data)
         position_nr = pos.get("position", str(i + 1))
         menge = pos.get("menge", 1) or 1
         einheit = pos.get("einheit", "Stk")
 
-        # Build description
         tuertyp = pos.get("tuertyp", "Tür")
         breite = pos.get("breite")
         hoehe = pos.get("hoehe")
@@ -161,7 +147,6 @@ def generate_offer_excel(
 
         description = " | ".join(filter(None, desc_parts))
 
-        # Estimate unit price
         unit_price = _estimate_price(pos)
         total_price = unit_price * int(menge)
         total_sum += total_price
@@ -254,8 +239,10 @@ def generate_offer_excel(
     ws[f"A{row}"] = "Buochs NW"
     ws[f"A{row}"].font = normal_font
 
-    wb.save(file_path)
-    return file_path
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
 
 
 def generate_gap_report_excel(
@@ -264,16 +251,10 @@ def generate_gap_report_excel(
     partial_positions: list,
     requirements: dict,
     report_id: str,
-) -> str:
-    """
-    Generate a gap report Excel file.
-    Returns the file path.
-    """
+) -> bytes:
+    """Generate a gap report Excel in memory. Returns raw bytes."""
     import openpyxl
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    file_path = os.path.join(OUTPUT_DIR, f"gap_report_{report_id}.xlsx")
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -445,8 +426,10 @@ def generate_gap_report_excel(
         ws[f"A{row}"].font = normal_font
         row += 1
 
-    wb.save(file_path)
-    return file_path
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
 
 
 def generate_offer_word(
@@ -454,21 +437,16 @@ def generate_offer_word(
     matched_positions: list,
     requirements: dict,
     offer_id: str,
-) -> str:
-    """Generate a Word (.docx) offer file. Returns file path."""
+) -> bytes:
+    """Generate a Word (.docx) offer in memory. Returns raw bytes."""
     from docx import Document
     from docx.shared import Pt, Cm, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
-    from docx.enum.table import WD_ALIGN_VERTICAL
     from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    file_path = os.path.join(OUTPUT_DIR, f"angebot_{offer_id}.docx")
-
     doc = Document()
 
-    # Page margins
     for section in doc.sections:
         section.top_margin = Cm(2)
         section.bottom_margin = Cm(2)
@@ -621,8 +599,10 @@ def generate_offer_word(
     p.runs[0].font.size = Pt(10)
     doc.add_paragraph("Buochs NW").runs[0].font.size = Pt(10)
 
-    doc.save(file_path)
-    return file_path
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
 
 
 def generate_gap_report_word(
@@ -631,16 +611,13 @@ def generate_gap_report_word(
     partial_positions: list,
     requirements: dict,
     report_id: str,
-) -> str:
-    """Generate a Word (.docx) gap report. Returns file path."""
+) -> bytes:
+    """Generate a Word (.docx) gap report in memory. Returns raw bytes."""
     from docx import Document
     from docx.shared import Pt, Cm, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
-
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    file_path = os.path.join(OUTPUT_DIR, f"gap_report_{report_id}.docx")
 
     doc = Document()
     for section in doc.sections:
@@ -733,8 +710,10 @@ def generate_gap_report_word(
         p = doc.add_paragraph(rec, style="List Number")
         p.runs[0].font.size = Pt(10)
 
-    doc.save(file_path)
-    return file_path
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
 
 
 def _estimate_price(position: dict) -> float:
@@ -742,7 +721,7 @@ def _estimate_price(position: dict) -> float:
     Estimate a price for a door position based on its specifications.
     Returns price in CHF (excl. VAT, excl. installation).
     """
-    base_price = 950.0  # Base price for a standard door
+    base_price = 950.0
 
     tuertyp = (position.get("tuertyp") or "").lower()
     brandschutz = (position.get("brandschutz") or "").upper()
@@ -750,7 +729,6 @@ def _estimate_price(position: dict) -> float:
     breite = position.get("breite") or 900
     hoehe = position.get("hoehe") or 2100
 
-    # Door type multiplier
     if "stahl" in tuertyp:
         base_price = 1100.0
     elif "alu" in tuertyp or "aluminium" in tuertyp:
@@ -758,7 +736,6 @@ def _estimate_price(position: dict) -> float:
     elif "holz" in tuertyp:
         base_price = 850.0
 
-    # Fire protection premium
     fire_premiums = {
         "T30": 400, "EI30": 400,
         "T60": 700, "EI60": 700,
@@ -770,7 +747,6 @@ def _estimate_price(position: dict) -> float:
             base_price += premium
             break
 
-    # Burglar resistance premium
     burglary_premiums = {
         "RC2": 500, "WK2": 500,
         "RC3": 900, "WK3": 900,
@@ -781,8 +757,7 @@ def _estimate_price(position: dict) -> float:
             base_price += premium
             break
 
-    # Size adjustment
-    area = (breite * hoehe) / (900 * 2100)  # Normalized to standard size
+    area = (breite * hoehe) / (900 * 2100)
     if area > 1.3:
         base_price *= 1.2
     elif area > 1.6:

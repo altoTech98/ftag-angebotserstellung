@@ -11,9 +11,6 @@ COPY backend/ ./backend/
 COPY frontend/ ./frontend/
 COPY data/ ./data/
 
-# Create directories for uploads and outputs
-RUN mkdir -p uploads outputs
-
 EXPOSE 8000
 
 CMD ["sh", "-c", "cd backend && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

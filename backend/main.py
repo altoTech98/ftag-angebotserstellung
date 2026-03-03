@@ -18,10 +18,8 @@ from fastapi.responses import FileResponse
 
 from routers import upload, analyze, offer, feedback, history
 
-# Ensure output directories exist (absolute paths, consistent with routers/services)
+# Base directory for data files
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.makedirs(os.path.join(BASE_DIR, "uploads"), exist_ok=True)
-os.makedirs(os.path.join(BASE_DIR, "outputs"), exist_ok=True)
 
 app = FastAPI(
     title="Frank Türen AG – Angebotserstellung",
@@ -55,7 +53,28 @@ if os.path.exists(frontend_path):
         return FileResponse(os.path.join(frontend_path, "index.html"))
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Pre-load product catalog and TF-IDF matrix at startup."""
+    try:
+        from services.product_matcher import load_product_catalog
+        load_product_catalog()
+        logging.getLogger(__name__).info("Product catalog pre-loaded at startup")
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"Could not pre-load product catalog: {e}")
+
+
 @app.get("/health")
 async def health_check():
     api_key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "service": "Frank Türen AG Angebotserstellung", "api_key_set": api_key_set}
+    from services.memory_cache import text_cache, offer_cache, project_cache
+    return {
+        "status": "ok",
+        "service": "Frank Türen AG Angebotserstellung",
+        "api_key_set": api_key_set,
+        "cache": {
+            "text": text_cache.stats(),
+            "offer": offer_cache.stats(),
+            "project": project_cache.stats(),
+        },
+    }

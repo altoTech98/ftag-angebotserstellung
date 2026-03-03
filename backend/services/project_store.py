@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 PROJECTS_FILE = os.path.join(DATA_DIR, "projects.json")
+MAX_PROJECTS = 20
 
 
 def _load_projects() -> list[dict]:
@@ -51,17 +52,29 @@ def create_project(files: list[dict], project_id: str = None) -> dict:
     """
     if not project_id:
         project_id = str(uuid.uuid4())[:12]
+
+    # Strip file_path from entries (no longer stored on disk)
+    clean_files = []
+    for f in files:
+        clean = {k: v for k, v in f.items() if k != "file_path"}
+        clean_files.append(clean)
+
     project = {
         "project_id": project_id,
-        "files": files,
+        "files": clean_files,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "status": "classified",  # classified → analyzing → analyzed → error
-        "total_files": len(files),
-        "summary": _compute_summary(files),
+        "total_files": len(clean_files),
+        "summary": _compute_summary(clean_files),
     }
 
     projects = _load_projects()
     projects.insert(0, project)
+
+    # Enforce maximum projects
+    if len(projects) > MAX_PROJECTS:
+        projects = projects[:MAX_PROJECTS]
+
     _save_projects(projects)
 
     return project

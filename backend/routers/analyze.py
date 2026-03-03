@@ -1,19 +1,18 @@
 """
 Analyze Router – Document analysis with Claude AI and product listing.
-POST /api/analyze          – Single-file analysis (legacy)
+POST /api/analyze          – Single-file analysis
 POST /api/analyze/project  – Multi-file project analysis
 GET  /api/products
 """
 
 import os
 import logging
-from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from services.document_parser import parse_document, parse_pdf_specs
+from services.document_parser import parse_document_bytes, parse_pdf_specs_bytes
 from services.claude_client import extract_requirements_from_text, normalize_door_positions
-from services.excel_parser import parse_tuerliste, merge_tuerlisten
+from services.excel_parser import parse_tuerliste_bytes, merge_tuerlisten
 from services.project_store import get_project, update_project, update_file_classification
 from services.product_matcher import (
     get_products_summary,
@@ -22,12 +21,11 @@ from services.product_matcher import (
     match_requirements_ai,
 )
 from services.history_store import save_analysis
+from services.memory_cache import text_cache, project_cache
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "uploads")
 
 
 class AnalyzeRequest(BaseModel):
@@ -38,23 +36,14 @@ class AnalyzeRequest(BaseModel):
 async def analyze_document(request: AnalyzeRequest):
     """
     Analyze an uploaded document with Claude AI.
-    Extracts structured door requirements and matches against product catalog.
+    Reads extracted text from memory cache (no disk access).
     """
-    # Find uploaded file
-    file_path = _find_uploaded_file(request.file_id)
-    if not file_path:
+    # Read text from cache
+    text = text_cache.get(request.file_id)
+    if text is None:
         raise HTTPException(
-            status_code=404,
-            detail=f"Datei mit ID '{request.file_id}' nicht gefunden",
-        )
-
-    # Parse document to text
-    try:
-        text = parse_document(file_path)
-    except Exception as e:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Dokument konnte nicht gelesen werden: {str(e)}",
+            status_code=410,
+            detail="Datei abgelaufen oder nicht gefunden. Bitte erneut hochladen.",
         )
 
     if not text.strip():
@@ -91,10 +80,9 @@ async def analyze_document(request: AnalyzeRequest):
 
     # Auto-save to history
     try:
-        upload_filename = os.path.basename(file_path) if file_path else request.file_id
         save_analysis(
             file_id=request.file_id,
-            filename=upload_filename,
+            filename=request.file_id,
             requirements=requirements,
             matching=match_result,
         )
@@ -123,14 +111,15 @@ class AnalyzeProjectRequest(BaseModel):
 async def analyze_project(request: AnalyzeProjectRequest):
     """
     Analyze an entire project (folder upload) with structured Excel parsing.
+    Reads file bytes from memory cache (no disk access).
 
     Pipeline:
     1. Load project, apply classification overrides
-    2. Parse Excel Türliste(n) → structured door data
+    2. Parse Excel Türliste(n) from cached bytes
     3. Merge if multiple Türlisten
-    4. Parse PDF specs for supplementary context
-    5. Claude normalization (structured, not raw text)
-    6. Product matching (existing pipeline, unchanged)
+    4. Parse PDF specs from cached bytes
+    5. Claude normalization
+    6. Product matching
     7. Save to history
     """
     logger.info(f"Starting project analysis for {request.project_id} with overrides: {request.file_overrides}")
@@ -141,6 +130,14 @@ async def analyze_project(request: AnalyzeProjectRequest):
         raise HTTPException(
             status_code=404,
             detail=f"Projekt '{request.project_id}' nicht gefunden",
+        )
+
+    # Get cached file bytes
+    cached_files = project_cache.get(f"project_{request.project_id}")
+    if cached_files is None:
+        raise HTTPException(
+            status_code=410,
+            detail="Projektdateien abgelaufen. Bitte erneut hochladen.",
         )
 
     # Apply user classification overrides
@@ -159,7 +156,7 @@ async def analyze_project(request: AnalyzeProjectRequest):
 
     parsed_files_info = []
 
-    # 2. Parse Excel Türlisten
+    # 2. Parse Excel Türlisten from cached bytes
     tuerlisten_files = [f for f in files if f["category"] == "tuerliste"]
     logger.info(f"Found {len(tuerlisten_files)} Türlisten, {len(files)} total files")
     if not tuerlisten_files:
@@ -171,8 +168,18 @@ async def analyze_project(request: AnalyzeProjectRequest):
 
     parsed_tuerlisten = []
     for tf in tuerlisten_files:
+        file_bytes = cached_files.get(tf["file_id"])
+        if not file_bytes:
+            parsed_files_info.append({
+                "filename": tf["filename"],
+                "category": "tuerliste",
+                "status": "error",
+                "error": "Datei nicht im Cache gefunden",
+                "doors_found": 0,
+            })
+            continue
         try:
-            parsed = parse_tuerliste(tf["file_path"])
+            parsed = parse_tuerliste_bytes(file_bytes)
             parsed_tuerlisten.append(parsed)
             parsed_files_info.append({
                 "filename": tf["filename"],
@@ -217,16 +224,19 @@ async def analyze_project(request: AnalyzeProjectRequest):
             detail="Keine Türpositionen in der Türliste gefunden.",
         )
 
-    # 4. Parse PDF specs for supplementary context
+    # 4. Parse PDF specs from cached bytes
     spec_files = [f for f in files if f["category"] == "spezifikation" and f["parseable"]]
     supplementary_context = ""
     for sf in spec_files[:3]:  # Max 3 spec files
+        file_bytes = cached_files.get(sf["file_id"])
+        if not file_bytes:
+            continue
         try:
             ext = os.path.splitext(sf["filename"])[1].lower()
             if ext == ".pdf":
-                text = parse_pdf_specs(sf["file_path"], max_chars=4000)
+                text = parse_pdf_specs_bytes(file_bytes, max_chars=4000)
             else:
-                text = parse_document(sf["file_path"])
+                text = parse_document_bytes(file_bytes, ext)
                 if len(text) > 4000:
                     text = text[:4000] + "\n... [gekürzt]"
             if text.strip():
@@ -259,7 +269,6 @@ async def analyze_project(request: AnalyzeProjectRequest):
 
     # 5. Claude normalization
     try:
-        # Collect unmapped column samples for Claude
         unmapped_sample = None
         if merged.get("unmapped_columns") and doors:
             unmapped_sample = {}
@@ -282,7 +291,6 @@ async def analyze_project(request: AnalyzeProjectRequest):
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         logger.error(f"Claude normalization failed, using fallback: {e}", exc_info=True)
-        # Use fallback normalization (built into claude_client)
         from services.claude_client import _fallback_normalize
         positions = _fallback_normalize(doors)
         requirements = {
@@ -293,7 +301,7 @@ async def analyze_project(request: AnalyzeProjectRequest):
             "hinweise": "Fallback-Normalisierung (ohne KI)",
         }
 
-    # 6. Product matching (existing pipeline, unchanged)
+    # 6. Product matching
     try:
         match_result = match_requirements_ai(requirements)
     except FileNotFoundError as e:
@@ -355,7 +363,6 @@ async def get_products(limit: int = 100, search: str = ""):
             detail=f"Produktliste konnte nicht geladen werden: {str(e)}",
         )
 
-    # Filter by search term
     if search:
         search_lower = search.lower()
         products = [
@@ -363,7 +370,6 @@ async def get_products(limit: int = 100, search: str = ""):
             if any(search_lower in str(v).lower() for v in p.values())
         ]
 
-    # Get total count
     try:
         df = load_product_catalog()
         total_count = len(df)
@@ -375,13 +381,3 @@ async def get_products(limit: int = 100, search: str = ""):
         "returned": len(products[:limit]),
         "products": products[:limit],
     }
-
-
-def _find_uploaded_file(file_id: str) -> str | None:
-    """Find an uploaded file by its ID."""
-    if not os.path.exists(UPLOAD_DIR):
-        return None
-    for filename in os.listdir(UPLOAD_DIR):
-        if filename.startswith(file_id):
-            return os.path.join(UPLOAD_DIR, filename)
-    return None

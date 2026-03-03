@@ -14,9 +14,11 @@ Categories:
 - sonstig:        Unknown / unsupported (SKIP)
 """
 
+import io
 import os
 import re
 import logging
+from typing import Optional
 
 import pandas as pd
 
@@ -93,9 +95,18 @@ DOOR_HEADER_KEYWORDS = {
 MIN_DOOR_HEADERS = 3
 
 
-def classify_file(filename: str, file_path: str) -> dict:
+def classify_file(
+    filename: str,
+    file_path: Optional[str] = None,
+    content: Optional[bytes] = None,
+) -> dict:
     """
     Classify a single file.
+
+    Args:
+        filename: Original filename (for extension/pattern matching)
+        file_path: Path on disk (legacy, optional)
+        content: Raw file bytes (preferred for in-memory operation)
 
     Returns:
         {
@@ -154,7 +165,7 @@ def classify_file(filename: str, file_path: str) -> dict:
 
     # Tier 3: Excel header content inspection
     if ext in (".xlsx", ".xls", ".xlsm"):
-        result = _classify_excel_by_content(file_path, filename)
+        result = _classify_excel_by_content(filename, content=content, file_path=file_path)
         if result:
             return result
         # Default for Excel without clear door headers
@@ -210,18 +221,31 @@ def classify_files(files: list[dict]) -> list[dict]:
     """
     results = []
     for f in files:
-        classification = classify_file(f["filename"], f["file_path"])
+        classification = classify_file(
+            f["filename"],
+            file_path=f.get("file_path"),
+            content=f.get("content"),
+        )
         results.append({**f, **classification})
     return results
 
 
-def _classify_excel_by_content(file_path: str, filename: str) -> dict | None:
+def _classify_excel_by_content(
+    filename: str,
+    content: Optional[bytes] = None,
+    file_path: Optional[str] = None,
+) -> dict | None:
     """
     Inspect Excel column headers to determine if it's a door list.
     Returns classification dict or None if inconclusive.
     """
     try:
-        xl = pd.ExcelFile(file_path)
+        if content is not None:
+            xl = pd.ExcelFile(io.BytesIO(content))
+        elif file_path:
+            xl = pd.ExcelFile(file_path)
+        else:
+            return None
         for sheet_name in xl.sheet_names:
             try:
                 df = pd.read_excel(xl, sheet_name=sheet_name, header=None, nrows=15, dtype=str)

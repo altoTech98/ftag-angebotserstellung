@@ -921,6 +921,10 @@ async function api(path, opts = {}) {
       detail = body.detail;
       msg = detail || msg;
     } catch {}
+    // Special handling for expired cache (410 Gone)
+    if (res.status === 410) {
+      msg = detail || 'Datei abgelaufen – bitte erneut hochladen.';
+    }
     console.error(`[API] Error ${res.status} for ${path}:`, detail || msg);
     throw new Error(msg);
   }

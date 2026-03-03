@@ -1,6 +1,6 @@
 """
-Upload Router – Handles file upload and initial parsing.
-POST /api/upload         – Single file upload (legacy)
+Upload Router – Handles file upload and initial parsing (in-memory, no disk writes).
+POST /api/upload         – Single file upload
 POST /api/upload/folder  – Multi-file / folder upload with classification
 """
 
@@ -9,17 +9,16 @@ import uuid
 import logging
 from typing import List
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from fastapi.responses import JSONResponse
 
-from services.document_parser import parse_document
+from services.document_parser import parse_document_bytes
 from services.file_classifier import classify_file
 from services.project_store import create_project
+from services.memory_cache import text_cache, project_cache
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "uploads")
 ALLOWED_EXTENSIONS = {".pdf", ".xlsx", ".xls", ".docx", ".doc", ".txt"}
 FOLDER_ALLOWED_EXTENSIONS = {
     ".pdf", ".xlsx", ".xls", ".xlsm", ".docx", ".doc", ".docm", ".txt",
@@ -27,7 +26,7 @@ FOLDER_ALLOWED_EXTENSIONS = {
     ".dwg", ".dxf", ".crbx",
 }
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
-MAX_TOTAL_SIZE = 500 * 1024 * 1024  # 500 MB for folder uploads
+MAX_TOTAL_SIZE = 100 * 1024 * 1024  # 100 MB for folder uploads (Railway-safe)
 
 
 @router.post("/upload")
@@ -35,9 +34,8 @@ async def upload_document(file: UploadFile = File(...)):
     """
     Upload an Ausschreibung (tender) document.
     Accepts: PDF, Excel, Word, TXT
-    Returns: file_id and extracted text preview
+    Parses in-memory, stores only extracted text in cache.
     """
-    # Validate file extension
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
@@ -45,30 +43,24 @@ async def upload_document(file: UploadFile = File(...)):
             detail=f"Dateityp '{ext}' nicht unterstützt. Erlaubt: {', '.join(ALLOWED_EXTENSIONS)}",
         )
 
-    # Save file
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    file_id = str(uuid.uuid4())
-    safe_filename = f"{file_id}{ext}"
-    file_path = os.path.join(UPLOAD_DIR, safe_filename)
-
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="Datei zu groß (max. 50 MB)")
 
-    with open(file_path, "wb") as f:
-        f.write(content)
+    file_id = str(uuid.uuid4())
 
-    # Parse document to text
+    # Parse document in memory – no disk write
     try:
-        text = parse_document(file_path)
+        text = parse_document_bytes(content, ext)
     except Exception as e:
-        os.remove(file_path)
         raise HTTPException(
             status_code=422,
             detail=f"Dokument konnte nicht gelesen werden: {str(e)}",
         )
 
-    # Return file info + text preview
+    # Store extracted text in memory cache
+    text_cache.store(file_id, text, filename=file.filename, extension=ext)
+
     return {
         "file_id": file_id,
         "filename": file.filename,
@@ -84,23 +76,21 @@ async def upload_document(file: UploadFile = File(...)):
 async def upload_folder(files: List[UploadFile] = File(...)):
     """
     Upload multiple files (folder upload or multi-select).
-    Creates a project, saves files, classifies each one.
+    Creates a project, classifies each file in-memory.
+    Parseable file bytes are cached for later analysis.
     """
     logger.info(f"Folder upload: {len(files)} files received")
     if not files:
         raise HTTPException(status_code=400, detail="Keine Dateien hochgeladen")
 
     project_id = str(uuid.uuid4())[:12]
-    project_dir = os.path.join(UPLOAD_DIR, project_id)
-    os.makedirs(project_dir, exist_ok=True)
-
     total_size = 0
     file_entries = []
+    file_bytes_map = {}  # file_id -> bytes (for parseable files only)
 
     for uploaded_file in files:
         ext = os.path.splitext(uploaded_file.filename)[1].lower()
 
-        # Skip unsupported extensions silently
         if ext not in FOLDER_ALLOWED_EXTENSIONS:
             logger.info(f"Skipping unsupported file: {uploaded_file.filename}")
             continue
@@ -115,19 +105,12 @@ async def upload_folder(files: List[UploadFile] = File(...)):
                 detail=f"Gesamtgrösse überschreitet {MAX_TOTAL_SIZE // (1024*1024)} MB",
             )
 
-        # Save file with UUID prefix to avoid name collisions
         file_id = str(uuid.uuid4())[:8]
-        # Keep original filename for classification (strip path separators)
         safe_name = uploaded_file.filename.replace("/", "_").replace("\\", "_")
-        save_name = f"{file_id}_{safe_name}"
-        file_path = os.path.join(project_dir, save_name)
 
-        with open(file_path, "wb") as f:
-            f.write(content)
-
-        # Classify the file
+        # Classify file using bytes (no disk)
         try:
-            classification = classify_file(safe_name, file_path)
+            classification = classify_file(safe_name, content=content)
         except Exception as e:
             logger.warning(f"Classification failed for {safe_name}: {e}")
             classification = {
@@ -137,11 +120,15 @@ async def upload_folder(files: List[UploadFile] = File(...)):
                 "parseable": False,
             }
 
+        # Keep bytes for parseable files (needed during analysis)
+        if classification["parseable"]:
+            file_bytes_map[file_id] = content
+
         file_entries.append({
             "file_id": file_id,
             "filename": safe_name,
-            "file_path": file_path,
             "size": file_size,
+            "extension": ext,
             **classification,
         })
 
@@ -151,7 +138,11 @@ async def upload_folder(files: List[UploadFile] = File(...)):
             detail="Keine unterstützten Dateien im Upload gefunden",
         )
 
-    # Create project in store with our pre-generated ID
+    # Cache file bytes for analysis phase
+    if file_bytes_map:
+        project_cache.store(f"project_{project_id}", file_bytes_map)
+
+    # Create project in store (metadata only, no file_path)
     project = create_project(file_entries, project_id=project_id)
 
     return {

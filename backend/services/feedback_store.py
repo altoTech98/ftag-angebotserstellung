@@ -11,6 +11,7 @@ from typing import Optional
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data")
 FEEDBACK_FILE = os.path.join(DATA_DIR, "matching_feedback.json")
+MAX_FEEDBACK_ENTRIES = 500
 
 
 def load_feedback() -> list[dict]:
@@ -30,6 +31,11 @@ def save_feedback_entry(entry: dict) -> dict:
     entry["id"] = f"fb_{uuid.uuid4().hex[:8]}"
     entry["timestamp"] = datetime.now().isoformat()
     entries.append(entry)
+
+    # Enforce maximum entries
+    if len(entries) > MAX_FEEDBACK_ENTRIES:
+        entries = entries[-MAX_FEEDBACK_ENTRIES:]
+
     os.makedirs(os.path.dirname(FEEDBACK_FILE), exist_ok=True)
     with open(FEEDBACK_FILE, "w", encoding="utf-8") as f:
         json.dump(entries, f, ensure_ascii=False, indent=2)
