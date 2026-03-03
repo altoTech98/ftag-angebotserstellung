@@ -5,25 +5,27 @@ __pycache__/
 .venv/
 venv/
 
-# Uploads & generated outputs (runtime files)
+# Runtime data (generated at runtime, not part of source)
 uploads/
 outputs/
-backend/uploads/
-backend/outputs/
+data/analysis_history.json
+data/projects.json
+data/produktuebersicht_backup_*.xlsx
 
 # Environment
 .env
 *.env
 
-# Claude Code settings
+# Test files
+test_*
+analyze_kunde*.py
+
+# Claude Code
 .claude/
 
-# Screenshots & temp files
-screenshot*.ps1
-screenshot*.png
-test_offer_payload*.json
-
-# OS
+# Temp / OS
+nul
+*.ps1
 .DS_Store
 Thumbs.db
 
