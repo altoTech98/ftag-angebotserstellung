@@ -328,7 +328,7 @@ async def health_check() -> dict:
     """
     try:
         from services.availability_manager import get_availability_manager
-        from services.local_llm import check_ollama_status
+        from services.local_llm import check_ollama_status_live
         from services.memory_cache import text_cache, offer_cache, project_cache
         from services.catalog_index import get_catalog_index
         
@@ -336,8 +336,8 @@ async def health_check() -> dict:
         availability_mgr = get_availability_manager()
         am_status = availability_mgr.get_status()
         
-        # Check Ollama
-        ollama_status = check_ollama_status()
+        # Check Ollama (live check without cache)
+        ollama_status = check_ollama_status_live()
         
         # Check Catalog
         try:

@@ -32,7 +32,7 @@ OLLAMA_TIMEOUT_LONG = 120.0     # offer/report generation
 
 # Cache for status check
 _status_cache = {"result": None, "timestamp": 0}
-_STATUS_CACHE_TTL = 30  # seconds
+_STATUS_CACHE_TTL = 5  # seconds - reduced from 30s for faster status updates
 
 
 # ─── Core Ollama Helper ─────────────────────────────────────
@@ -143,7 +143,7 @@ def _extract_json_from_response(text: str):
 def check_ollama_status() -> dict:
     """
     Check if Ollama is running and what models are available.
-    Results are cached for 30 seconds.
+    Results are cached for 5 seconds for performance.
     """
     now = time.time()
     if _status_cache["result"] is not None and (now - _status_cache["timestamp"]) < _STATUS_CACHE_TTL:
@@ -166,6 +166,29 @@ def check_ollama_status() -> dict:
 
     _status_cache["result"] = result
     _status_cache["timestamp"] = now
+    return result
+
+
+def check_ollama_status_live() -> dict:
+    """
+    Live check for Ollama status WITHOUT caching.
+    Used by health check endpoint for real-time status.
+    """
+    result = {"available": False, "models": [], "model_loaded": False}
+
+    try:
+        response = httpx.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5.0)
+        response.raise_for_status()
+        data = response.json()
+
+        models = [m.get("name", "") for m in data.get("models", [])]
+        result["available"] = True
+        result["models"] = models
+        result["model_loaded"] = any(OLLAMA_MODEL in m for m in models)
+
+    except Exception:
+        pass
+
     return result
 
 
