@@ -365,7 +365,9 @@ async def health_check() -> dict:
                 "products": catalog_count,
             },
             "ollama": {
-                "status": "ok" if ollama_status else "unavailable",
+                "status": "ok" if ollama_status.get("available") else "unavailable",
+                "available": ollama_status.get("available", False),
+                "models": ollama_status.get("models", []),
                 "model": settings.OLLAMA_MODEL,
                 "fallback_enabled": settings.OLLAMA_FALLBACK_ENABLED,
             },
