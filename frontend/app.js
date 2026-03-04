@@ -1200,18 +1200,27 @@ async function api(path, opts = {}) {
 // ─────────────────────────────────────────────
 
 async function checkServerHealth() {
-  const dot = document.getElementById('server-status');
+  const serverDot = document.getElementById('server-dot');
+  const serverText = document.getElementById('server-text');
   const ollamaDot = document.getElementById('ollama-dot');
   const ollamaText = document.getElementById('ollama-text');
-  if (!dot) return;
+  if (!serverDot) return;
 
   try {
-    const res = await fetch(`${API.replace('/api', '')}/health`);
+    const healthUrl = `${API.replace('/api', '')}/health`;
+    const res = await fetch(healthUrl, {
+      method: 'GET',
+      credentials: 'omit',
+      headers: { 'Accept': 'application/json' }
+    });
+    
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    dot.style.background = '';
-    dot.title = 'Server verbunden';
+    // Server is online
+    serverDot.style.background = '#16a34a';
+    if (serverText) serverText.textContent = 'Server (online)';
+    serverDot.title = 'Server verbunden';
 
     // Ollama status
     if (ollamaDot && ollamaText) {
@@ -1227,14 +1236,14 @@ async function checkServerHealth() {
       }
     }
   } catch (err) {
-    dot.style.background = '#dc2626';
-    dot.classList.add('offline');
-    dot.title = 'Server nicht erreichbar';
+    serverDot.style.background = '#dc2626';
+    if (serverText) serverText.textContent = 'Server (offline)';
+    serverDot.title = 'Server nicht erreichbar';
     if (ollamaDot) {
       ollamaDot.style.background = '#6b7280';
       if (ollamaText) ollamaText.textContent = 'Ollama (?)';
     }
-    console.error('Health check failed:', err);
+    console.warn('[Health Check] Server offline:', err.message);
   }
 }
 
