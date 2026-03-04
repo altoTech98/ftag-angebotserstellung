@@ -1252,5 +1252,6 @@ window.addEventListener('scroll', () => {
   if (header) header.classList.toggle('scrolled', window.scrollY > 0);
 }, { passive: true });
 
-// Run health check on load
+// Run health check on load and periodically
 checkServerHealth();
+setInterval(checkServerHealth, 3000); // Check every 3 seconds
