@@ -489,6 +489,62 @@ def _tool_status(name: str, params: dict) -> str:
 
 # ─── Agentic Loop ────────────────────────────────────────────
 
+# Use haiku for lower token cost and faster responses (30k tokens/min limit)
+AGENT_MODEL = os.environ.get("AGENT_MODEL", "claude-haiku-4-5-20251001")
+
+
+def _ensure_valid_history(conversation: list[dict]):
+    """
+    Fix conversation history to ensure valid alternating user/assistant
+    and that tool_results have matching tool_use blocks.
+    Removes orphaned messages at the end if needed.
+    """
+    if not conversation:
+        return
+
+    # The conversation must end with a user message (for the next API call)
+    # or be in a clean state. Remove trailing broken pairs.
+    while conversation:
+        last = conversation[-1]
+        role = last.get("role", "")
+        content = last.get("content", "")
+
+        # If last message is assistant with tool_use but no following tool_result, remove it
+        if role == "assistant" and isinstance(content, list):
+            has_tool_use = any(
+                isinstance(b, dict) and b.get("type") == "tool_use"
+                for b in content
+            )
+            if has_tool_use:
+                # Check if there's no matching tool_result after this
+                conversation.pop()
+                continue
+
+        # If last is user with tool_results but previous isn't assistant with tool_use, remove
+        if role == "user" and isinstance(content, list):
+            has_tool_result = any(
+                isinstance(b, dict) and b.get("type") == "tool_result"
+                for b in content
+            )
+            if has_tool_result:
+                conversation.pop()
+                continue
+
+        break
+
+    # Ensure alternating roles (user, assistant, user, assistant...)
+    cleaned = []
+    for msg in conversation:
+        if cleaned and cleaned[-1].get("role") == msg.get("role"):
+            # Same role twice: keep the latest
+            cleaned[-1] = msg
+        else:
+            cleaned.append(msg)
+
+    conversation.clear()
+    conversation.extend(cleaned)
+
+
 async def process_message(
     chat_id: str,
     user_message: str,
@@ -496,10 +552,10 @@ async def process_message(
 ) -> str:
     """
     Process a user message through Claude agentic loop with tools.
-
     Returns final response text.
     """
     import anthropic
+    import time
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -508,28 +564,52 @@ async def process_message(
     client = anthropic.Anthropic(api_key=api_key)
     conversation = _get_conversation(chat_id)
 
+    # Fix any corruption from previous errors
+    _ensure_valid_history(conversation)
+
     # Add user message
     conversation.append({"role": "user", "content": user_message})
 
     loop = asyncio.get_event_loop()
 
     for iteration in range(MAX_ITERATIONS):
-        try:
-            response = client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=4096,
-                system=SYSTEM_PROMPT,
-                tools=TOOLS,
-                messages=conversation,
-                timeout=120.0,
-            )
-        except Exception as e:
-            logger.error(f"Claude API error: {e}")
-            error_msg = f"Claude API Fehler: {str(e)[:300]}"
-            conversation.append({"role": "assistant", "content": error_msg})
-            return error_msg
+        # Call Claude API with retry for rate limits
+        response = None
+        for retry in range(3):
+            try:
+                response = client.messages.create(
+                    model=AGENT_MODEL,
+                    max_tokens=4096,
+                    system=SYSTEM_PROMPT,
+                    tools=TOOLS,
+                    messages=conversation,
+                    timeout=120.0,
+                )
+                break
+            except anthropic.RateLimitError as e:
+                wait = (retry + 1) * 15  # 15s, 30s, 45s
+                logger.warning(f"Rate limit hit, waiting {wait}s (retry {retry+1}/3)")
+                if on_status:
+                    try:
+                        await on_status(f"Rate-Limit, warte {wait}s...")
+                    except Exception:
+                        pass
+                await asyncio.sleep(wait)
+            except anthropic.BadRequestError as e:
+                # Conversation history corrupted — reset and retry
+                logger.error(f"Bad request (resetting history): {e}")
+                conversation.clear()
+                conversation.append({"role": "user", "content": user_message})
+                if retry < 2:
+                    continue
+                return f"API Fehler: {str(e)[:200]}\nKonversation wurde zurueckgesetzt."
+            except Exception as e:
+                logger.error(f"Claude API error: {e}")
+                return f"Claude API Fehler: {str(e)[:300]}"
 
-        # Add assistant response to history
+        if response is None:
+            return "Rate-Limit erreicht. Bitte 1 Minute warten und nochmal versuchen."
+
         # Convert content blocks to serializable format
         content_list = []
         for block in response.content:
@@ -545,28 +625,23 @@ async def process_message(
         conversation.append({"role": "assistant", "content": content_list})
 
         if response.stop_reason == "end_turn":
-            # Extract final text
             parts = [b.text for b in response.content if b.type == "text"]
             return "\n".join(parts) if parts else "Fertig."
 
         elif response.stop_reason == "tool_use":
-            # Execute tools
             tool_results = []
             for block in response.content:
                 if block.type == "tool_use":
-                    # Send status
                     if on_status:
                         try:
                             await on_status(_tool_status(block.name, block.input))
                         except Exception:
                             pass
 
-                    # Execute in thread pool
                     result = await loop.run_in_executor(
                         None, _execute_tool, block.name, block.input
                     )
-
-                    logger.info(f"Tool {block.name}: {result[:100]}...")
+                    logger.info(f"Tool {block.name}: {result[:80]}...")
 
                     tool_results.append({
                         "type": "tool_result",
@@ -577,7 +652,6 @@ async def process_message(
             conversation.append({"role": "user", "content": tool_results})
 
         else:
-            # Unknown stop reason
             parts = [b.text for b in response.content if hasattr(b, "text")]
             return "\n".join(parts) if parts else f"Stop: {response.stop_reason}"
 

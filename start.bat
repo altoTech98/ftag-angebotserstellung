@@ -33,9 +33,9 @@ echo Installiere Abhängigkeiten...
 call backend\.venv\Scripts\activate.bat
 pip install -r backend\requirements.txt -q
 
-REM Optional: Telegram Bot (Token von @BotFather, Chat-ID vom User)
-REM set TELEGRAM_BOT_TOKEN=dein-bot-token-hier
-REM set TELEGRAM_CHAT_ID=deine-chat-id-hier
+REM Telegram Bot (Token von @BotFather, Chat-ID vom User)
+set TELEGRAM_BOT_TOKEN=8524632357:AAH3l0vI7gdACBXa7MEyEpFfGRy2CrchwBo
+set TELEGRAM_CHAT_ID=8458317986
 
 REM Start server
 echo.

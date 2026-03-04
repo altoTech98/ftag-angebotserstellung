@@ -19,6 +19,7 @@ from services.offer_generator import (
 )
 from services.memory_cache import offer_cache
 from services.job_store import create_job, get_job, update_job, run_in_background
+from services.price_calculator import get_price_calculator
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,19 @@ async def get_offer_status(job_id: str):
     return job.to_dict()
 
 
+@router.get("/offer/{offer_id}/totals")
+async def get_offer_totals(offer_id: str):
+    """Get pricing totals for an offer"""
+    key = f"offer_{offer_id}_totals"
+    totals = offer_cache.get(key)
+    if totals is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Preisdaten nicht gefunden. Angebot möglicherweise abgelaufen."
+        )
+    return totals
+
+
 def _run_offer_generation(requirements: dict, matching: dict) -> dict:
     """Run offer + gap report generation in background thread."""
     matched = matching.get("matched", [])
@@ -71,11 +85,24 @@ def _run_offer_generation(requirements: dict, matching: dict) -> dict:
         "has_offer": False,
         "has_gap_report": False,
         "summary": matching.get("summary", {}),
+        "pricing_info": None,
     }
 
+    # Calculate prices with ERP integration
+    price_calc = get_price_calculator()
+    
     # Generate offer if there are matched/partial positions
     offer_positions = matched + partial
     if offer_positions:
+        # Enrich positions with pricing
+        for position in offer_positions:
+            matched_product = position.get("matched_product", {})
+            price_info = price_calc.calculate_position_price(matched_product)
+            position["price_calculation"] = price_info
+        
+        # Calculate totals
+        offer_totals = price_calc.calculate_offer_totals(offer_positions)
+        
         offer_text = generate_offer_text(requirements, offer_positions, project_info)
 
         xlsx_bytes = generate_offer_excel(offer_text, offer_positions, requirements, offer_id)
@@ -83,10 +110,12 @@ def _run_offer_generation(requirements: dict, matching: dict) -> dict:
 
         offer_cache.store(f"offer_{offer_id}_xlsx", xlsx_bytes, ttl_seconds=1800)
         offer_cache.store(f"offer_{offer_id}_docx", docx_bytes, ttl_seconds=1800)
+        offer_cache.store(f"offer_{offer_id}_totals", offer_totals, ttl_seconds=1800)
 
         results["offer_id"] = offer_id
         results["has_offer"] = True
         results["offer_positions_count"] = len(offer_positions)
+        results["pricing_info"] = offer_totals
 
     # Generate gap report if there are unmatched/partial positions
     gap_positions = unmatched + partial

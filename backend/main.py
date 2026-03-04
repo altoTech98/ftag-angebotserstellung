@@ -1,118 +1,394 @@
 """
 Frank Türen AG – KI-gestützte Angebotserstellung
-FastAPI Backend Entry Point
+Production-Grade FastAPI Backend mit vollständigem Error-Handling
 """
 
 import os
+import sys
 import logging
 from contextlib import asynccontextmanager
+from typing import Optional
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-)
+# Konfiguration laden BEVOR FastAPI initialisiert wird
+from config import settings, BASE_DIR
+from services.logger_setup import setup_logging
 
-from fastapi import FastAPI, Request
+# Logger initialisieren
+setup_logging()
+logger = logging.getLogger(__name__)
+
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware as GZIPMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
 
-from routers import upload, analyze, offer, feedback, history, catalog
+# Router
+from routers import upload, analyze, offer, feedback, history, catalog, erp
+from services.exceptions import FrankTuerenError
+from services.erp_connector import get_erp_connector
 
-# Base directory for data files
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# ─────────────────────────────────────────────────────────────────────────────
+# LIFESPAN MANAGEMENT
+# ─────────────────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: startup and shutdown."""
-    _logger = logging.getLogger(__name__)
-
-    # Startup: pre-load catalog
+    """
+    Application lifespan: startup and shutdown hooks.
+    Pre-loads critical resources und säuberung beim Shutdown.
+    """
+    logger.info(f"🚀 Starting Frank Türen AG Backend | Environment: {settings.ENVIRONMENT.value}")
+    
+    # ─────── STARTUP ────────────
+    startup_errors = []
+    
+    # 1. Pre-load Catalog
     try:
         from services.catalog_index import get_catalog_index
         index = get_catalog_index()
-        _logger.info(
-            f"Catalog index pre-loaded: {len(index.main_products)} main products, "
-            f"{len(index.all_profiles)} total"
+        logger.info(
+            f"✅ Catalog loaded | Main products: {len(index.main_products)}, "
+            f"Total items: {len(index.all_profiles)}"
         )
     except Exception as e:
-        _logger.warning(f"Could not pre-load catalog index: {e}")
-
-    # Startup: start Telegram bot
+        msg = f"⚠️ Catalog pre-load failed: {e}"
+        logger.warning(msg)
+        startup_errors.append(msg)
+    
+    # 2. Test Ollama Verbindung
     try:
-        from services.telegram_bot import start_bot
-        await start_bot()
+        from services.local_llm import check_ollama_status
+        status_result = check_ollama_status()
+        if status_result:
+            logger.info(f"✅ Ollama connected | Model: {settings.OLLAMA_MODEL}")
+        else:
+            logger.warning("⚠️ Ollama not available | Using fallback mode")
+            if not settings.OLLAMA_FALLBACK_ENABLED:
+                startup_errors.append("Ollama required but not available")
     except Exception as e:
-        _logger.warning(f"Telegram bot start failed: {e}")
-
+        logger.warning(f"⚠️ Ollama check failed: {e}")
+    
+    # 3. Test Telegram Bot (optional)
+    if settings.TELEGRAM_ENABLED:
+        try:
+            from services.telegram_bot import start_bot
+            await start_bot()
+            logger.info("✅ Telegram bot started")
+        except Exception as e:
+            logger.warning(f"⚠️ Telegram bot start failed: {e}")
+    
+    # 4. Initialize Cache
+    try:
+        from services.memory_cache import text_cache, offer_cache, project_cache
+        logger.info(f"✅ Caching system initialized | Max size: {settings.CACHE_MAX_SIZE_MB}MB")
+    except Exception as e:
+        logger.error(f"❌ Cache initialization failed: {e}")
+        startup_errors.append(f"Cache init failed: {e}")
+    
+    # 5. Initialize ERP Connector (if enabled)
+    if settings.ERP_ENABLED:
+        try:
+            erp_connector = get_erp_connector()
+            
+            # Test connection
+            is_healthy = erp_connector.health_check()
+            if is_healthy:
+                logger.info(f"✅ ERP (Bohr) connected | URL: {settings.ERP_BOHR_URL}")
+            else:
+                logger.warning(f"⚠️ ERP (Bohr) not available | Fallback to estimates: {settings.ERP_FALLBACK_TO_ESTIMATE}")
+        except Exception as e:
+            logger.warning(f"⚠️ ERP initialization failed: {e}")
+            if not settings.ERP_FALLBACK_TO_ESTIMATE:
+                startup_errors.append(f"ERP init failed: {e}")
+    else:
+        logger.info("ℹ️ ERP integration disabled | Using estimated prices")
+    
+    # Log startup result
+    if startup_errors:
+        logger.warning(f"⚠️ Startup warnings:\n" + "\n".join(startup_errors))
+    else:
+        logger.info("✅ All startup checks passed")
+    
     yield
-
-    # Shutdown: stop Telegram bot
+    
+    # ─────── SHUTDOWN ──────────
+    logger.info("🛑 Shutting down...")
+    
     try:
-        from services.telegram_bot import stop_bot
-        await stop_bot()
+        if settings.TELEGRAM_ENABLED:
+            from services.telegram_bot import stop_bot
+            await stop_bot()
+            logger.info("✅ Telegram bot stopped")
     except Exception as e:
-        _logger.warning(f"Telegram bot shutdown error: {e}")
+        logger.warning(f"Telegram bot shutdown error: {e}")
+    
+    # Cleanup old uploads
+    try:
+        from services.file_cleanup import cleanup_old_files
+        deleted = cleanup_old_files()
+        logger.info(f"✅ Cleanup: deleted {deleted} old files")
+    except Exception as e:
+        logger.warning(f"File cleanup failed: {e}")
+    
+    logger.info("✅ Shutdown complete")
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# APP INITIALIZATION
+# ─────────────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="Frank Türen AG – Angebotserstellung",
-    description="KI-gestützte Ausschreibungsanalyse und Angebotserstellung",
-    version="1.0.0",
+    title=settings.API_TITLE,
+    description=settings.API_DESCRIPTION,
+    version=settings.API_VERSION,
+    docs_url="/docs" if settings.DEBUG else None,
+    redoc_url="/redoc" if settings.DEBUG else None,
     lifespan=lifespan,
 )
 
-# CORS for frontend
+# ─────────────────────────────────────────────────────────────────────────────
+# MIDDLEWARE
+# ─────────────────────────────────────────────────────────────────────────────
+
+# 1. CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS if settings.ENVIRONMENT != "production" else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    max_age=3600,
 )
 
-# Register routers
-app.include_router(upload.router, prefix="/api")
-app.include_router(analyze.router, prefix="/api")
-app.include_router(offer.router, prefix="/api")
-app.include_router(feedback.router, prefix="/api")
-app.include_router(history.router, prefix="/api")
-app.include_router(catalog.router, prefix="/api")
+# 2. GZIP Compression (nur für größere Responses)
+if settings.ENABLE_COMPRESSION:
+    app.add_middleware(GZIPMiddleware, minimum_size=settings.COMPRESSION_MIN_SIZE_BYTES)
 
-# Serve frontend static files (with no-cache headers to prevent stale JS/CSS)
-frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
-if os.path.exists(frontend_path):
-    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
-
-    @app.get("/")
-    async def serve_frontend():
-        return FileResponse(
-            os.path.join(frontend_path, "index.html"),
-            headers={"Cache-Control": "no-cache, must-revalidate"},
+# 3. Custom Middleware für Error-Handling & Caching Headers
+@app.middleware("http")
+async def error_and_cache_middleware(request: Request, call_next):
+    """
+    Middleware für:
+    - Error-Handling
+    - Cache-Control Headers
+    - Request Logging
+    """
+    try:
+        response = await call_next(request)
+        
+        # Cache-Control Headers
+        if request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        elif request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        
+        # Security Headers
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains" if not settings.DEBUG else ""
+        
+        return response
+    except Exception as e:
+        logger.exception(f"Middleware error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal Server Error", "detail": str(e) if settings.DEBUG else "Interner Fehler"},
         )
 
 
-@app.middleware("http")
-async def add_cache_headers(request: Request, call_next):
-    response = await call_next(request)
-    if request.url.path.startswith("/static/"):
-        response.headers["Cache-Control"] = "no-cache, must-revalidate"
-    return response
+# ─────────────────────────────────────────────────────────────────────────────
+# EXCEPTION HANDLERS
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.exception_handler(FrankTuerenError)
+async def frank_tueren_error_handler(request: Request, exc: FrankTuerenError):
+    """Handler für Custom Frank Türen Exceptions"""
+    logger.warning(f"{exc.error_code}: {exc.message}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=exc.to_dict(),
+    )
 
 
-@app.get("/health")
-async def health_check():
-    from services.local_llm import check_ollama_status
-    from services.memory_cache import text_cache, offer_cache, project_cache
-    ollama = check_ollama_status()
-    return {
-        "status": "ok",
-        "service": "Frank Türen AG Angebotserstellung",
-        "ollama": ollama,
-        "cache": {
-            "text": text_cache.stats(),
-            "offer": offer_cache.stats(),
-            "project": project_cache.stats(),
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handler für Pydantic Validation Errors"""
+    logger.warning(f"Validation error: {exc}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "error": "VALIDATION_ERROR",
+            "message": "Validierungsfehler in Request",
+            "details": exc.errors(),
         },
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Fallback handler für unerwartete Exceptions"""
+    logger.exception(f"Unhandled exception: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "INTERNAL_SERVER_ERROR",
+            "message": "Interner Fehler" if not settings.DEBUG else str(exc),
+        },
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ROUTER REGISTRATION
+# ─────────────────────────────────────────────────────────────────────────────
+
+logger.info("Registering routers...")
+app.include_router(upload.router, prefix="/api", tags=["Upload"])
+app.include_router(analyze.router, prefix="/api", tags=["Analysis"])
+app.include_router(offer.router, prefix="/api", tags=["Offer"])
+app.include_router(feedback.router, prefix="/api", tags=["Feedback"])
+app.include_router(history.router, prefix="/api", tags=["History"])
+app.include_router(catalog.router, prefix="/api", tags=["Catalog"])
+
+# ERP Router (nur wenn ERP enabled)
+if settings.ERP_ENABLED:
+    app.include_router(erp.router)
+    logger.info("✅ ERP router registered")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STATIC FILES & FRONTEND
+# ─────────────────────────────────────────────────────────────────────────────
+
+frontend_path = BASE_DIR / "frontend"
+if frontend_path.exists():
+    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+
+    @app.get("/", name="Frontend")
+    async def serve_frontend():
+        """Serve index.html with no-cache headers"""
+        index_file = frontend_path / "index.html"
+        if index_file.exists():
+            return FileResponse(
+                index_file,
+                headers={
+                    "Cache-Control": "no-cache, must-revalidate",
+                    "Content-Type": "text/html; charset=utf-8",
+                },
+            )
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Frontend not found"},
+        )
+else:
+    logger.warning(f"Frontend directory not found: {frontend_path}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HEALTH & INFO ENDPOINTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/health", name="Health Check")
+async def health_check() -> dict:
+    """
+    Health check endpoint.
+    Returns status of all critical services.
+    """
+    try:
+        from services.local_llm import check_ollama_status
+        from services.memory_cache import text_cache, offer_cache, project_cache
+        from services.catalog_index import get_catalog_index
+        
+        # Check Ollama
+        ollama_status = check_ollama_status()
+        
+        # Check Catalog
+        try:
+            catalog = get_catalog_index()
+            catalog_ok = len(catalog.main_products) > 0
+            catalog_count = len(catalog.all_profiles)
+        except Exception as e:
+            logger.warning(f"Catalog health check failed: {e}")
+            catalog_ok = False
+            catalog_count = 0
+        
+        return {
+            "status": "ok" if catalog_ok else "degraded",
+            "service": "Frank Türen AG – Angebotserstellung",
+            "version": settings.API_VERSION,
+            "environment": settings.ENVIRONMENT.value,
+            "catalog": {
+                "status": "ok" if catalog_ok else "error",
+                "products": catalog_count,
+            },
+            "ollama": {
+                "status": "ok" if ollama_status else "unavailable",
+                "model": settings.OLLAMA_MODEL,
+                "fallback_enabled": settings.OLLAMA_FALLBACK_ENABLED,
+            },
+            "cache": {
+                "text": text_cache.stats(),
+                "offer": offer_cache.stats(),
+                "project": project_cache.stats(),
+            },
+        }
+    except Exception as e:
+        logger.exception(f"Health check error: {e}")
+        return {
+            "status": "error",
+            "service": "Frank Türen AG – Angebotserstellung",
+            "error": str(e) if settings.DEBUG else "Health check failed",
+        }
+
+
+@app.get("/info", name="Application Info")
+async def app_info() -> dict:
+    """Get application information and settings"""
+    return {
+        "name": settings.API_TITLE,
+        "version": settings.API_VERSION,
+        "environment": settings.ENVIRONMENT.value,
+        "debug": settings.DEBUG,
+        "settings": settings.to_dict(),
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ROOT ENDPOINT
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/", include_in_schema=False)
+async def root():
+    """Root endpoint - redirects to frontend"""
+    return {
+        "message": "Frank Türen AG – KI-gestützte Angebotserstellung",
+        "version": settings.API_VERSION,
+        "docs": "/docs" if settings.DEBUG else None,
+        "health": "/health",
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STARTUP LOGGING
+# ─────────────────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    import uvicorn
+    
+    logger.info(f"Starting uvicorn server...")
+    logger.info(f"  Host: {settings.HOST}")
+    logger.info(f"  Port: {settings.PORT}")
+    logger.info(f"  Reload: {settings.RELOAD}")
+    logger.info(f"  Workers: {settings.WORKERS if not settings.RELOAD else 'auto (reload mode)'}")
+    
+    uvicorn.run(
+        "main:app",
+        host=settings.HOST,
+        port=settings.PORT,
+        reload=settings.RELOAD,
+        log_level=settings.LOG_LEVEL.lower(),
+        access_log=True,
+    )

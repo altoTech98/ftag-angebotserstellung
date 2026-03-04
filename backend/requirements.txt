@@ -1,12 +1,59 @@
-fastapi==0.115.6
-uvicorn[standard]==0.32.1
-python-multipart==0.0.20
+# ═══════════════════════════════════════════════════════════════
+# Frank Türen AG – Production Requirements
+# Python 3.12+ | Optimiert für Performance & Zuverlässigkeit
+# ═══════════════════════════════════════════════════════════════
+
+# ─── Web Framework ───
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.20
+aiofiles>=24.1.0
+
+# ─── Data Processing ───
 pandas==2.2.3
 openpyxl==3.1.5
+xlsxwriter==3.2.0
+numpy==1.26.4
+
+# ─── Document Processing ───
 pdfplumber==0.11.4
 python-docx==1.1.2
-xlsxwriter==3.2.0
-aiofiles==24.1.0
+Pillow==10.2.0  # Image processing for OCR
+
+# ─── External APIs ───
 httpx==0.28.1
-python-telegram-bot==21.10
+requests==2.32.3  # For ERP API integration
 anthropic>=0.42.0
+python-telegram-bot==21.10
+
+# ─── Database & Storage ───
+sqlalchemy==2.0.25  # For future DB integration
+
+# ─── Monitoring & Logging ───
+python-json-logger==2.0.7  # Structured logging
+prometheus-client==0.19.0  # Metrics
+
+# ─── Security ───
+cryptography==41.0.7
+python-jose[cryptography]==3.3.0  # For JWT auth
+passlib[bcrypt]==1.7.4  # Password hashing
+python-multipart==0.0.20
+
+# ─── Validation ───
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# ─── Environment & Config ───
+python-dotenv==1.0.1
+
+# ─── Production Server ───
+gunicorn==23.0.0
+psycopg2-binary==2.9.9  # PostgreSQL adapter (optional)
+
+# ─── Development & Testing ───
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
+black==23.12.1  # Code formatter
+ruff==0.1.14  # Linter
+mypy==1.7.1  # Type checker
