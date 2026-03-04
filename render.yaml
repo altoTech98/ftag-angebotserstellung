@@ -4,6 +4,18 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: free
+    healthCheckPath: /health
+    autoDeploy: true
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: PORT
+        value: 8000
+      - key: OLLAMA_URL
+        value: http://localhost:11434
+      - key: OLLAMA_MODEL
+        value: llama3.2
