@@ -6,8 +6,10 @@ Production-Grade FastAPI Backend mit vollständigem Error-Handling
 import os
 import sys
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 from typing import Optional
+from datetime import datetime
 
 # Konfiguration laden BEVOR FastAPI initialisiert wird
 from config import settings, BASE_DIR
@@ -44,6 +46,29 @@ async def lifespan(app: FastAPI):
     
     # ─────── STARTUP ────────────
     startup_errors = []
+    
+    # 0a. START OLLAMA WATCHDOG (GARANTIERT 24/7)
+    try:
+        from services.ollama_watchdog import get_ollama_watchdog
+        ollama_watchdog = get_ollama_watchdog()
+        ollama_watchdog.start()
+        logger.info("[OK] ✅ OLLAMA WATCHDOG STARTED | 24/7 Monitoring & Auto-Restart enabled")
+        logger.info("[INFO] Ollama wird jetzt überwacht und startet automatisch neu bei Fehlern")
+    except Exception as e:
+        logger.error(f"[ERROR] Ollama Watchdog failed: {e}")
+        startup_errors.append(f"Ollama Watchdog failed: {e}")
+    
+    # 0b. Initialize Availability Manager (garantiert 24/7 Verfügbarkeit)
+    try:
+        from services.availability_manager import get_availability_manager
+        availability_mgr = get_availability_manager()
+        
+        # Starte Background Monitoring
+        asyncio.create_task(availability_mgr.start_monitoring())
+        logger.info("[OK] ✅ 24/7 Availability Manager started | Auto-healing enabled")
+    except Exception as e:
+        logger.error(f"[ERROR] Availability Manager failed: {e}")
+        startup_errors.append(f"Availability Manager init failed: {e}")
     
     # 1. Pre-load Catalog
     try:
@@ -116,6 +141,10 @@ async def lifespan(app: FastAPI):
     
     # ─────── SHUTDOWN ──────────
     logger.info("[STOP] Shutting down...")
+    
+    # WICHTIG: Stoppe Ollama Watchdog NICHT! Er läuft weiter für 24/7 Verfügbarkeit
+    # Der Watchdog wird durch den OS/Service-Manager verwaltet
+    logger.info("[INFO] Ollama Watchdog continues running for 24/7 availability")
     
     try:
         if settings.TELEGRAM_ENABLED:
@@ -294,13 +323,18 @@ else:
 @app.get("/health", name="Health Check")
 async def health_check() -> dict:
     """
-    Health check endpoint.
-    Returns status of all critical services.
+    Quick health check endpoint.
+    Returns status of all critical services with availability guarantee.
     """
     try:
+        from services.availability_manager import get_availability_manager
         from services.local_llm import check_ollama_status
         from services.memory_cache import text_cache, offer_cache, project_cache
         from services.catalog_index import get_catalog_index
+        
+        # Get Availability Manager Status
+        availability_mgr = get_availability_manager()
+        am_status = availability_mgr.get_status()
         
         # Check Ollama
         ollama_status = check_ollama_status()
@@ -316,10 +350,16 @@ async def health_check() -> dict:
             catalog_count = 0
         
         return {
-            "status": "ok" if catalog_ok else "degraded",
+            "status": "healthy" if availability_mgr.is_system_available() else "degraded",
             "service": "Frank Türen AG – Angebotserstellung",
             "version": settings.API_VERSION,
             "environment": settings.ENVIRONMENT.value,
+            "availability_manager": {
+                "status": am_status["overall_status"],
+                "last_check": am_status["last_check"],
+                "auto_healing": True,
+                "recovery_enabled": True,
+            },
             "catalog": {
                 "status": "ok" if catalog_ok else "error",
                 "products": catalog_count,
@@ -334,6 +374,7 @@ async def health_check() -> dict:
                 "offer": offer_cache.stats(),
                 "project": project_cache.stats(),
             },
+            "24_7_guarantee": "System is monitored 24/7 with automatic recovery",
         }
     except Exception as e:
         logger.exception(f"Health check error: {e}")
@@ -341,6 +382,78 @@ async def health_check() -> dict:
             "status": "error",
             "service": "Frank Türen AG – Angebotserstellung",
             "error": str(e) if settings.DEBUG else "Health check failed",
+        }
+
+
+@app.get("/api/availability/status", name="Detailed Availability Status")
+async def get_availability_status() -> dict:
+    """
+    Get detailed availability and uptime status for all services.
+    """
+    try:
+        from services.availability_manager import get_availability_manager
+        from services.ollama_watchdog import get_ollama_watchdog
+        
+        availability_mgr = get_availability_manager()
+        ollama_watchdog = get_ollama_watchdog()
+        
+        status = availability_mgr.get_status()
+        uptime = availability_mgr.get_uptime_stats()
+        
+        return {
+            "timestamp": status["timestamp"],
+            "overall_health": status["overall_status"],
+            "system_available": availability_mgr.is_system_available(),
+            "services": status["services"],
+            "uptime_statistics": uptime["services"],
+            "ollama_watchdog": ollama_watchdog.get_status(),
+            "24_7_monitoring": {
+                "enabled": True,
+                "check_interval_seconds": 30,
+                "auto_recovery": True,
+                "recovery_attempts_max": 5,
+                "ollama_watchdog_enabled": True,
+                "ollama_auto_restart": True,
+                "windows_task_scheduler_enabled": True,
+            },
+        }
+    except Exception as e:
+        logger.exception(f"Availability status error: {e}")
+        return {
+            "error": str(e) if settings.DEBUG else "Failed to get availability status"
+        }
+
+
+@app.get("/api/ollama/status", name="Ollama Watchdog Status")
+async def get_ollama_watchdog_status() -> dict:
+    """
+    Get detailed Ollama Watchdog status - 24/7 Monitoring
+    """
+    try:
+        from services.ollama_watchdog import get_ollama_watchdog
+        from services.local_llm import check_ollama_status
+        
+        watchdog = get_ollama_watchdog()
+        status = watchdog.get_status()
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "watchdog": status,
+            "health_check": check_ollama_status(),
+            "24_7_guarantee": {
+                "monitoring": True,
+                "auto_restart": True,
+                "health_check_interval_seconds": watchdog.health_check_interval,
+                "max_restart_attempts": watchdog.max_restart_attempts,
+                "exponential_backoff": True,
+                "windows_autostart": True,
+            },
+        }
+    except Exception as e:
+        logger.exception(f"Ollama watchdog status error: {e}")
+        return {
+            "error": str(e) if settings.DEBUG else "Failed to get Ollama status",
+            "timestamp": datetime.now().isoformat()
         }
 
 

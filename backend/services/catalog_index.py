@@ -458,3 +458,12 @@ def format_products_for_claude(profiles: list[ProductProfile]) -> str:
 def invalidate_catalog_cache():
     """Clear the catalog index cache (call after catalog file changes)."""
     get_catalog_index.cache_clear()
+
+
+def reload_catalog():
+    """Force reload of the entire catalog index (used for recovery)."""
+    logger.info("Reloading catalog index...")
+    invalidate_catalog_cache()
+    index = get_catalog_index()
+    logger.info(f"Catalog reloaded: {len(index.main_products)} main products")
+    return index
