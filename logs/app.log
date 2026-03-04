@@ -3,3 +3,103 @@
 2026-03-04 06:14:23,064 [INFO] services.logger_setup:115 - setup_logging: Logging initialisiert | Environment: Environment.DEVELOPMENT
 2026-03-04 06:14:59,949 [INFO] services.logger_setup:115 - setup_logging: Logging initialisiert | Environment: Environment.DEVELOPMENT
 2026-03-04 06:15:27,227 [INFO] services.logger_setup:115 - setup_logging: Logging initialisiert | Environment: Environment.DEVELOPMENT
+2026-03-04 11:07:08,666 [INFO] services.logger_setup:115 - setup_logging: Logging initialisiert | Environment: Environment.DEVELOPMENT
+2026-03-04 11:07:41,605 [INFO] services.logger_setup:115 - setup_logging: Logging initialisiert | Environment: Environment.DEVELOPMENT
+2026-03-04 11:09:25,478 [INFO] services.logger_setup:115 - setup_logging: Logging initialisiert | Environment: Environment.DEVELOPMENT
+2026-03-04 11:09:27,092 [INFO] __main__:248 - <module>: Registering routers...
+2026-03-04 11:09:27,220 [INFO] __main__:381 - <module>: Starting uvicorn server...
+2026-03-04 11:09:27,220 [INFO] __main__:382 - <module>:   Host: 0.0.0.0
+2026-03-04 11:09:27,220 [INFO] __main__:383 - <module>:   Port: 8000
+2026-03-04 11:09:27,220 [INFO] __main__:384 - <module>:   Reload: True
+2026-03-04 11:09:27,220 [INFO] __main__:385 - <module>:   Workers: auto (reload mode)
+2026-03-04 11:09:27,386 [INFO] services.logger_setup:115 - setup_logging: Logging initialisiert | Environment: Environment.DEVELOPMENT
+2026-03-04 11:09:29,036 [INFO] __mp_main__:248 - <module>: Registering routers...
+2026-03-04 11:09:29,450 [INFO] services.logger_setup:115 - setup_logging: Logging initialisiert | Environment: Environment.DEVELOPMENT
+2026-03-04 11:09:29,451 [INFO] main:248 - <module>: Registering routers...
+2026-03-04 11:09:29,465 [INFO] uvicorn.error:82 - _serve: Started server process [9408]
+2026-03-04 11:09:29,465 [INFO] uvicorn.error:48 - startup: Waiting for application startup.
+2026-03-04 11:09:33,910 [INFO] services.catalog_index:388 - _load_catalog_df: Loaded FTAG catalog: 884 products, 318 columns
+2026-03-04 11:09:34,093 [INFO] services.catalog_index:442 - get_catalog_index: Catalog index built: 553 main products, 331 accessories, 14 categories
+2026-03-04 11:09:34,094 [INFO] services.catalog_index:448 - get_catalog_index:   Rahmentüre: 236 products
+2026-03-04 11:09:34,094 [INFO] services.catalog_index:448 - get_catalog_index:   ZZ (Schloss): 224 products
+2026-03-04 11:09:34,094 [INFO] services.catalog_index:448 - get_catalog_index:   Zargentüre: 148 products
+2026-03-04 11:09:34,094 [INFO] services.catalog_index:448 - get_catalog_index:   ZZ (Glas): 68 products
+2026-03-04 11:09:34,094 [INFO] services.catalog_index:448 - get_catalog_index:   Futtertüre: 62 products
+2026-03-04 11:09:34,094 [INFO] services.catalog_index:448 - get_catalog_index:   ZZ (Schliessblech): 39 products
+2026-03-04 11:09:34,095 [INFO] services.catalog_index:448 - get_catalog_index:   Brandschutzvorhang: 34 products
+2026-03-04 11:09:34,095 [INFO] services.catalog_index:448 - get_catalog_index:   Schiebetüre: 21 products
+2026-03-04 11:09:34,095 [INFO] services.catalog_index:448 - get_catalog_index:   Festverglasung: 17 products
+2026-03-04 11:09:34,095 [INFO] services.catalog_index:448 - get_catalog_index:   Vollwand: 11 products
+2026-03-04 11:09:34,095 [INFO] services.catalog_index:448 - get_catalog_index:   Brandschutztor: 8 products
+2026-03-04 11:09:34,096 [INFO] services.catalog_index:448 - get_catalog_index:   Steigzonen/Elektrofronten: 8 products
+2026-03-04 11:09:34,096 [INFO] services.catalog_index:448 - get_catalog_index:   Ganzglas Tür: 4 products
+2026-03-04 11:09:34,096 [INFO] services.catalog_index:448 - get_catalog_index:   Pendeltüre: 4 products
+2026-03-04 11:09:37,067 [INFO] httpx:1025 - _send_single_request: HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2026-03-04 11:09:39,584 [INFO] httpx:1740 - _send_single_request: HTTP Request: POST https://api.telegram.org/bot8524632357:AAH3l0vI7gdACBXa7MEyEpFfGRy2CrchwBo/getMe "HTTP/1.1 200 OK"
+2026-03-04 11:09:39,585 [INFO] telegram.ext.Application:631 - start: Application started
+2026-03-04 11:09:39,618 [INFO] httpx:1740 - _send_single_request: HTTP Request: POST https://api.telegram.org/bot8524632357:AAH3l0vI7gdACBXa7MEyEpFfGRy2CrchwBo/deleteWebhook "HTTP/1.1 200 OK"
+2026-03-04 11:09:39,620 [INFO] services.telegram_bot:414 - start_bot: Telegram bot started (polling mode)
+2026-03-04 11:09:39,705 [INFO] httpx:1740 - _send_single_request: HTTP Request: POST https://api.telegram.org/bot8524632357:AAH3l0vI7gdACBXa7MEyEpFfGRy2CrchwBo/sendMessage "HTTP/1.1 200 OK"
+2026-03-04 11:09:39,707 [INFO] uvicorn.error:62 - startup: Application startup complete.
+2026-03-04 11:11:52,424 [INFO] services.logger_setup:115 - setup_logging: Logging initialisiert | Environment: Environment.DEVELOPMENT
+2026-03-04 11:11:54,076 [INFO] __main__:248 - <module>: Registering routers...
+2026-03-04 11:11:54,141 [INFO] __main__:381 - <module>: Starting uvicorn server...
+2026-03-04 11:11:54,142 [INFO] __main__:382 - <module>:   Host: 0.0.0.0
+2026-03-04 11:11:54,142 [INFO] __main__:383 - <module>:   Port: 8000
+2026-03-04 11:11:54,142 [INFO] __main__:384 - <module>:   Reload: True
+2026-03-04 11:11:54,142 [INFO] __main__:385 - <module>:   Workers: auto (reload mode)
+2026-03-04 11:11:54,292 [INFO] services.logger_setup:115 - setup_logging: Logging initialisiert | Environment: Environment.DEVELOPMENT
+2026-03-04 11:11:55,810 [INFO] __mp_main__:248 - <module>: Registering routers...
+2026-03-04 11:11:55,945 [INFO] services.logger_setup:115 - setup_logging: Logging initialisiert | Environment: Environment.DEVELOPMENT
+2026-03-04 11:11:55,946 [INFO] main:248 - <module>: Registering routers...
+2026-03-04 11:11:55,959 [INFO] uvicorn.error:82 - _serve: Started server process [22688]
+2026-03-04 11:11:55,959 [INFO] uvicorn.error:48 - startup: Waiting for application startup.
+2026-03-04 11:11:55,960 [INFO] main:43 - lifespan: [START] Starting Frank Tueren AG Backend | Environment: development
+2026-03-04 11:11:59,396 [INFO] services.catalog_index:388 - _load_catalog_df: Loaded FTAG catalog: 884 products, 318 columns
+2026-03-04 11:11:59,574 [INFO] services.catalog_index:442 - get_catalog_index: Catalog index built: 553 main products, 331 accessories, 14 categories
+2026-03-04 11:11:59,575 [INFO] services.catalog_index:448 - get_catalog_index:   Rahmentüre: 236 products
+2026-03-04 11:11:59,575 [INFO] services.catalog_index:448 - get_catalog_index:   ZZ (Schloss): 224 products
+2026-03-04 11:11:59,575 [INFO] services.catalog_index:448 - get_catalog_index:   Zargentüre: 148 products
+2026-03-04 11:11:59,575 [INFO] services.catalog_index:448 - get_catalog_index:   ZZ (Glas): 68 products
+2026-03-04 11:11:59,575 [INFO] services.catalog_index:448 - get_catalog_index:   Futtertüre: 62 products
+2026-03-04 11:11:59,576 [INFO] services.catalog_index:448 - get_catalog_index:   ZZ (Schliessblech): 39 products
+2026-03-04 11:11:59,576 [INFO] services.catalog_index:448 - get_catalog_index:   Brandschutzvorhang: 34 products
+2026-03-04 11:11:59,576 [INFO] services.catalog_index:448 - get_catalog_index:   Schiebetüre: 21 products
+2026-03-04 11:11:59,576 [INFO] services.catalog_index:448 - get_catalog_index:   Festverglasung: 17 products
+2026-03-04 11:11:59,576 [INFO] services.catalog_index:448 - get_catalog_index:   Vollwand: 11 products
+2026-03-04 11:11:59,577 [INFO] services.catalog_index:448 - get_catalog_index:   Brandschutztor: 8 products
+2026-03-04 11:11:59,577 [INFO] services.catalog_index:448 - get_catalog_index:   Steigzonen/Elektrofronten: 8 products
+2026-03-04 11:11:59,577 [INFO] services.catalog_index:448 - get_catalog_index:   Ganzglas Tür: 4 products
+2026-03-04 11:11:59,577 [INFO] services.catalog_index:448 - get_catalog_index:   Pendeltüre: 4 products
+2026-03-04 11:11:59,577 [INFO] main:52 - lifespan: [OK] Catalog loaded | Main products: 553, Total items: 884
+2026-03-04 11:12:25,202 [INFO] services.logger_setup:115 - setup_logging: Logging initialisiert | Environment: Environment.DEVELOPMENT
+2026-03-04 11:12:26,764 [INFO] __main__:248 - <module>: Registering routers...
+2026-03-04 11:12:26,821 [INFO] __main__:381 - <module>: Starting uvicorn server...
+2026-03-04 11:12:26,821 [INFO] __main__:382 - <module>:   Host: 0.0.0.0
+2026-03-04 11:12:26,821 [INFO] __main__:383 - <module>:   Port: 8000
+2026-03-04 11:12:26,822 [INFO] __main__:384 - <module>:   Reload: True
+2026-03-04 11:12:26,822 [INFO] __main__:385 - <module>:   Workers: auto (reload mode)
+2026-03-04 11:12:26,972 [INFO] services.logger_setup:115 - setup_logging: Logging initialisiert | Environment: Environment.DEVELOPMENT
+2026-03-04 11:12:28,448 [INFO] __mp_main__:248 - <module>: Registering routers...
+2026-03-04 11:12:28,565 [INFO] services.logger_setup:115 - setup_logging: Logging initialisiert | Environment: Environment.DEVELOPMENT
+2026-03-04 11:12:28,565 [INFO] main:248 - <module>: Registering routers...
+2026-03-04 11:12:28,579 [INFO] uvicorn.error:82 - _serve: Started server process [29448]
+2026-03-04 11:12:28,579 [INFO] uvicorn.error:48 - startup: Waiting for application startup.
+2026-03-04 11:12:28,579 [INFO] main:43 - lifespan: [START] Starting Frank Tueren AG Backend | Environment: development
+2026-03-04 11:12:32,013 [INFO] services.catalog_index:388 - _load_catalog_df: Loaded FTAG catalog: 884 products, 318 columns
+2026-03-04 11:12:32,199 [INFO] services.catalog_index:442 - get_catalog_index: Catalog index built: 553 main products, 331 accessories, 14 categories
+2026-03-04 11:12:32,199 [INFO] services.catalog_index:448 - get_catalog_index:   Rahmentüre: 236 products
+2026-03-04 11:12:32,199 [INFO] services.catalog_index:448 - get_catalog_index:   ZZ (Schloss): 224 products
+2026-03-04 11:12:32,199 [INFO] services.catalog_index:448 - get_catalog_index:   Zargentüre: 148 products
+2026-03-04 11:12:32,199 [INFO] services.catalog_index:448 - get_catalog_index:   ZZ (Glas): 68 products
+2026-03-04 11:12:32,200 [INFO] services.catalog_index:448 - get_catalog_index:   Futtertüre: 62 products
+2026-03-04 11:12:32,200 [INFO] services.catalog_index:448 - get_catalog_index:   ZZ (Schliessblech): 39 products
+2026-03-04 11:12:32,200 [INFO] services.catalog_index:448 - get_catalog_index:   Brandschutzvorhang: 34 products
+2026-03-04 11:12:32,200 [INFO] services.catalog_index:448 - get_catalog_index:   Schiebetüre: 21 products
+2026-03-04 11:12:32,200 [INFO] services.catalog_index:448 - get_catalog_index:   Festverglasung: 17 products
+2026-03-04 11:12:32,200 [INFO] services.catalog_index:448 - get_catalog_index:   Vollwand: 11 products
+2026-03-04 11:12:32,201 [INFO] services.catalog_index:448 - get_catalog_index:   Brandschutztor: 8 products
+2026-03-04 11:12:32,201 [INFO] services.catalog_index:448 - get_catalog_index:   Steigzonen/Elektrofronten: 8 products
+2026-03-04 11:12:32,201 [INFO] services.catalog_index:448 - get_catalog_index:   Ganzglas Tür: 4 products
+2026-03-04 11:12:32,201 [INFO] services.catalog_index:448 - get_catalog_index:   Pendeltüre: 4 products
+2026-03-04 11:12:32,201 [INFO] main:52 - lifespan: [OK] Catalog loaded | Main products: 553, Total items: 884

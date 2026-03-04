@@ -309,6 +309,16 @@ erp_cache = MemoryCache(
 )
 
 
+def get_memory_cache(name: str = "general") -> MemoryCache:
+    """Factory function to get or create a memory cache"""
+    return MemoryCache(
+        max_items=100,
+        default_ttl=3600,
+        max_bytes=50 * 1024 * 1024,
+        name=name
+    )
+
+
 def log_all_cache_stats():
     """Gibt Statistiken aller Caches aus"""
     logger.info("═══ CACHE STATISTICS ═══")

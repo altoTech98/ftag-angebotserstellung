@@ -12,3 +12,219 @@
 {"timestamp": "2026-03-04 06:15:28,605", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'project' initialisiert | max_items=20, ttl=1800s, max_bytes=500.0MB", "module": "memory_cache"}
 {"timestamp": "2026-03-04 06:15:28,605", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'catalog' initialisiert | max_items=10, ttl=86400s, max_bytes=200.0MB", "module": "memory_cache"}
 {"timestamp": "2026-03-04 06:15:28,605", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'erp' initialisiert | max_items=1000, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:07:08,666", "level": "INFO", "logger": "services.logger_setup", "message": "Logging initialisiert | Environment: Environment.DEVELOPMENT", "module": "logger_setup"}
+{"timestamp": "2026-03-04 11:07:10,957", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'text' initialisiert | max_items=100, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:07:10,957", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'offer' initialisiert | max_items=50, ttl=1800s, max_bytes=100.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:07:10,957", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'project' initialisiert | max_items=20, ttl=1800s, max_bytes=500.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:07:10,958", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'catalog' initialisiert | max_items=10, ttl=86400s, max_bytes=200.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:07:10,958", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'erp' initialisiert | max_items=1000, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:07:41,605", "level": "INFO", "logger": "services.logger_setup", "message": "Logging initialisiert | Environment: Environment.DEVELOPMENT", "module": "logger_setup"}
+{"timestamp": "2026-03-04 11:07:42,957", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'text' initialisiert | max_items=100, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:07:42,957", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'offer' initialisiert | max_items=50, ttl=1800s, max_bytes=100.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:07:42,957", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'project' initialisiert | max_items=20, ttl=1800s, max_bytes=500.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:07:42,957", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'catalog' initialisiert | max_items=10, ttl=86400s, max_bytes=200.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:07:42,957", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'erp' initialisiert | max_items=1000, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:09:25,478", "level": "INFO", "logger": "services.logger_setup", "message": "Logging initialisiert | Environment: Environment.DEVELOPMENT", "module": "logger_setup"}
+{"timestamp": "2026-03-04 11:09:26,824", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'text' initialisiert | max_items=100, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:09:26,825", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'offer' initialisiert | max_items=50, ttl=1800s, max_bytes=100.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:09:26,825", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'project' initialisiert | max_items=20, ttl=1800s, max_bytes=500.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:09:26,825", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'catalog' initialisiert | max_items=10, ttl=86400s, max_bytes=200.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:09:26,825", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'erp' initialisiert | max_items=1000, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:09:27,092", "level": "INFO", "logger": "__main__", "message": "Registering routers...", "module": "main"}
+{"timestamp": "2026-03-04 11:09:27,220", "level": "INFO", "logger": "__main__", "message": "Starting uvicorn server...", "module": "main"}
+{"timestamp": "2026-03-04 11:09:27,220", "level": "INFO", "logger": "__main__", "message": "  Host: 0.0.0.0", "module": "main"}
+{"timestamp": "2026-03-04 11:09:27,220", "level": "INFO", "logger": "__main__", "message": "  Port: 8000", "module": "main"}
+{"timestamp": "2026-03-04 11:09:27,220", "level": "INFO", "logger": "__main__", "message": "  Reload: True", "module": "main"}
+{"timestamp": "2026-03-04 11:09:27,220", "level": "INFO", "logger": "__main__", "message": "  Workers: auto (reload mode)", "module": "main"}
+{"timestamp": "2026-03-04 11:09:27,386", "level": "INFO", "logger": "services.logger_setup", "message": "Logging initialisiert | Environment: Environment.DEVELOPMENT", "module": "logger_setup"}
+{"timestamp": "2026-03-04 11:09:28,763", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'text' initialisiert | max_items=100, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:09:28,763", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'offer' initialisiert | max_items=50, ttl=1800s, max_bytes=100.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:09:28,763", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'project' initialisiert | max_items=20, ttl=1800s, max_bytes=500.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:09:28,763", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'catalog' initialisiert | max_items=10, ttl=86400s, max_bytes=200.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:09:28,763", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'erp' initialisiert | max_items=1000, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:09:29,036", "level": "INFO", "logger": "__mp_main__", "message": "Registering routers...", "module": "main"}
+{"timestamp": "2026-03-04 11:09:29,108", "level": "DEBUG", "logger": "asyncio", "message": "Using selector: SelectSelector", "module": "selector_events"}
+{"timestamp": "2026-03-04 11:09:29,193", "level": "DEBUG", "logger": "watchfiles.main", "message": "2 changes detected: {(<Change.modified: 2>, 'C:\\\\Users\\\\ALI\\\\Desktop\\\\ClaudeCodeTest\\\\logs\\\\structured.log'), (<Change.modified: 2>, 'C:\\\\Users\\\\ALI\\\\Desktop\\\\ClaudeCodeTest\\\\logs\\\\app.log')}", "module": "main"}
+{"timestamp": "2026-03-04 11:09:29,450", "level": "INFO", "logger": "services.logger_setup", "message": "Logging initialisiert | Environment: Environment.DEVELOPMENT", "module": "logger_setup"}
+{"timestamp": "2026-03-04 11:09:29,451", "level": "INFO", "logger": "main", "message": "Registering routers...", "module": "main"}
+{"timestamp": "2026-03-04 11:09:29,549", "level": "DEBUG", "logger": "watchfiles.main", "message": "1 change detected: {(<Change.modified: 2>, 'C:\\\\Users\\\\ALI\\\\Desktop\\\\ClaudeCodeTest\\\\logs\\\\structured.log')}", "module": "main"}
+{"timestamp": "2026-03-04 11:09:33,910", "level": "INFO", "logger": "services.catalog_index", "message": "Loaded FTAG catalog: 884 products, 318 columns", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,093", "level": "INFO", "logger": "services.catalog_index", "message": "Catalog index built: 553 main products, 331 accessories, 14 categories", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,094", "level": "INFO", "logger": "services.catalog_index", "message": "  Rahmentüre: 236 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,094", "level": "INFO", "logger": "services.catalog_index", "message": "  ZZ (Schloss): 224 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,094", "level": "INFO", "logger": "services.catalog_index", "message": "  Zargentüre: 148 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,094", "level": "INFO", "logger": "services.catalog_index", "message": "  ZZ (Glas): 68 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,094", "level": "INFO", "logger": "services.catalog_index", "message": "  Futtertüre: 62 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,094", "level": "INFO", "logger": "services.catalog_index", "message": "  ZZ (Schliessblech): 39 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,095", "level": "INFO", "logger": "services.catalog_index", "message": "  Brandschutzvorhang: 34 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,095", "level": "INFO", "logger": "services.catalog_index", "message": "  Schiebetüre: 21 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,095", "level": "INFO", "logger": "services.catalog_index", "message": "  Festverglasung: 17 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,095", "level": "INFO", "logger": "services.catalog_index", "message": "  Vollwand: 11 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,095", "level": "INFO", "logger": "services.catalog_index", "message": "  Brandschutztor: 8 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,096", "level": "INFO", "logger": "services.catalog_index", "message": "  Steigzonen/Elektrofronten: 8 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,096", "level": "INFO", "logger": "services.catalog_index", "message": "  Ganzglas Tür: 4 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:34,096", "level": "INFO", "logger": "services.catalog_index", "message": "  Pendeltüre: 4 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:09:35,013", "level": "DEBUG", "logger": "httpcore.connection", "message": "connect_tcp.started host='localhost' port=11434 local_address=None timeout=5.0 socket_options=None", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:37,039", "level": "DEBUG", "logger": "httpcore.connection", "message": "connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x0000021EE9502CF0>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:37,040", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_headers.started request=<Request [b'GET']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:37,040", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_headers.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:37,040", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_body.started request=<Request [b'GET']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:37,040", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_body.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:37,041", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_headers.started request=<Request [b'GET']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:37,066", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Wed, 04 Mar 2026 10:09:37 GMT'), (b'Content-Length', b'347')])", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:37,067", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://localhost:11434/api/tags \"HTTP/1.1 200 OK\"", "module": "_client"}
+{"timestamp": "2026-03-04 11:09:37,067", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_body.started request=<Request [b'GET']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:37,067", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_body.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:37,067", "level": "DEBUG", "logger": "httpcore.http11", "message": "response_closed.started", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:37,068", "level": "DEBUG", "logger": "httpcore.http11", "message": "response_closed.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:37,068", "level": "DEBUG", "logger": "httpcore.connection", "message": "close.started", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:37,068", "level": "DEBUG", "logger": "httpcore.connection", "message": "close.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,474", "level": "DEBUG", "logger": "telegram.ext.ExtBot", "message": "Calling Bot API endpoint `getMe` with parameters `{}`", "module": "_bot"}
+{"timestamp": "2026-03-04 11:09:39,482", "level": "DEBUG", "logger": "httpcore.connection", "message": "connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=5.0 socket_options=None", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,513", "level": "DEBUG", "logger": "httpcore.connection", "message": "connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000021EE9F5C9B0>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,513", "level": "DEBUG", "logger": "httpcore.connection", "message": "start_tls.started ssl_context=<ssl.SSLContext object at 0x0000021EE9F0A3D0> server_hostname='api.telegram.org' timeout=5.0", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,546", "level": "DEBUG", "logger": "httpcore.connection", "message": "start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000021EE9EDAAE0>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,546", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_headers.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,546", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_headers.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,547", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_body.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,547", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_body.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,547", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_headers.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,583", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.18.0'), (b'Date', b'Wed, 04 Mar 2026 10:09:39 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'313'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,584", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST https://api.telegram.org/bot8524632357:AAH3l0vI7gdACBXa7MEyEpFfGRy2CrchwBo/getMe \"HTTP/1.1 200 OK\"", "module": "_client"}
+{"timestamp": "2026-03-04 11:09:39,584", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_body.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,584", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_body.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,584", "level": "DEBUG", "logger": "httpcore.http11", "message": "response_closed.started", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,584", "level": "DEBUG", "logger": "httpcore.http11", "message": "response_closed.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,585", "level": "DEBUG", "logger": "telegram.ext.ExtBot", "message": "Call to Bot API endpoint `getMe` finished with return value `{'id': 8524632357, 'is_bot': True, 'first_name': 'tomson', 'username': 'altoTech_BOT', 'can_join_groups': True, 'can_read_all_group_messages': False, 'supports_inline_queries': False, 'can_connect_to_business': False, 'has_main_web_app': False, 'has_topics_enabled': False, 'allows_users_to_create_topics': False}`", "module": "_bot"}
+{"timestamp": "2026-03-04 11:09:39,585", "level": "DEBUG", "logger": "telegram.ext.ExtBot", "message": "This Bot is already initialized.", "module": "_bot"}
+{"timestamp": "2026-03-04 11:09:39,585", "level": "INFO", "logger": "telegram.ext.Application", "message": "Application started", "module": "_application"}
+{"timestamp": "2026-03-04 11:09:39,585", "level": "DEBUG", "logger": "telegram.ext.Updater", "message": "Updater started (polling)", "module": "_updater"}
+{"timestamp": "2026-03-04 11:09:39,586", "level": "DEBUG", "logger": "telegram.ext.Updater", "message": "Start network loop retry bootstrap del webhook", "module": "_updater"}
+{"timestamp": "2026-03-04 11:09:39,586", "level": "DEBUG", "logger": "telegram.ext.Updater", "message": "Deleting webhook", "module": "_updater"}
+{"timestamp": "2026-03-04 11:09:39,586", "level": "DEBUG", "logger": "telegram.ext.Updater", "message": "Dropping pending updates from Telegram server", "module": "_updater"}
+{"timestamp": "2026-03-04 11:09:39,586", "level": "DEBUG", "logger": "telegram.ext.ExtBot", "message": "Calling Bot API endpoint `deleteWebhook` with parameters `{'drop_pending_updates': True}`", "module": "_bot"}
+{"timestamp": "2026-03-04 11:09:39,587", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_headers.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,587", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_headers.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,587", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_body.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,588", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_body.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,588", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_headers.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,618", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.18.0'), (b'Date', b'Wed, 04 Mar 2026 10:09:39 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'68'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,618", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST https://api.telegram.org/bot8524632357:AAH3l0vI7gdACBXa7MEyEpFfGRy2CrchwBo/deleteWebhook \"HTTP/1.1 200 OK\"", "module": "_client"}
+{"timestamp": "2026-03-04 11:09:39,618", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_body.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,618", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_body.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,619", "level": "DEBUG", "logger": "httpcore.http11", "message": "response_closed.started", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,619", "level": "DEBUG", "logger": "httpcore.http11", "message": "response_closed.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,619", "level": "DEBUG", "logger": "telegram.ext.ExtBot", "message": "Call to Bot API endpoint `deleteWebhook` finished with return value `True`", "module": "_bot"}
+{"timestamp": "2026-03-04 11:09:39,619", "level": "DEBUG", "logger": "telegram.ext.Updater", "message": "Bootstrap done", "module": "_updater"}
+{"timestamp": "2026-03-04 11:09:39,619", "level": "DEBUG", "logger": "telegram.ext.Updater", "message": "Waiting for polling to start", "module": "_updater"}
+{"timestamp": "2026-03-04 11:09:39,620", "level": "DEBUG", "logger": "telegram.ext.Updater", "message": "Polling updates from Telegram started", "module": "_updater"}
+{"timestamp": "2026-03-04 11:09:39,620", "level": "INFO", "logger": "services.telegram_bot", "message": "Telegram bot started (polling mode)", "module": "telegram_bot"}
+{"timestamp": "2026-03-04 11:09:39,620", "level": "DEBUG", "logger": "telegram.ext.ExtBot", "message": "Calling Bot API endpoint `sendMessage` with parameters `{'chat_id': 8458317986, 'text': 'FTAG Agent gestartet.\\nVoller Zugriff: Shell, Dateien, Git.\\nSchreib einfach was du brauchst.\\n/clear - Konversation zuruecksetzen'}`", "module": "_bot"}
+{"timestamp": "2026-03-04 11:09:39,620", "level": "DEBUG", "logger": "telegram.ext.Updater", "message": "Start network loop retry getting Updates", "module": "_updater"}
+{"timestamp": "2026-03-04 11:09:39,621", "level": "DEBUG", "logger": "telegram.ext.ExtBot", "message": "Calling Bot API endpoint `getUpdates` with parameters `{'timeout': 10, 'offset': 0}`", "module": "_bot"}
+{"timestamp": "2026-03-04 11:09:39,621", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_headers.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,621", "level": "DEBUG", "logger": "httpcore.connection", "message": "connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=5.0 socket_options=None", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,622", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_headers.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,622", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_body.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,622", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_body.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,623", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_headers.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,652", "level": "DEBUG", "logger": "httpcore.connection", "message": "connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000021EE9FA3FE0>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,652", "level": "DEBUG", "logger": "httpcore.connection", "message": "start_tls.started ssl_context=<ssl.SSLContext object at 0x0000021EE9F0A550> server_hostname='api.telegram.org' timeout=5.0", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,682", "level": "DEBUG", "logger": "httpcore.connection", "message": "start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000021EE9FA3D10>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,682", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_headers.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,683", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_headers.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,683", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_body.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,683", "level": "DEBUG", "logger": "httpcore.http11", "message": "send_request_body.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,683", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_headers.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,704", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.18.0'), (b'Date', b'Wed, 04 Mar 2026 10:09:39 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'423'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,705", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST https://api.telegram.org/bot8524632357:AAH3l0vI7gdACBXa7MEyEpFfGRy2CrchwBo/sendMessage \"HTTP/1.1 200 OK\"", "module": "_client"}
+{"timestamp": "2026-03-04 11:09:39,705", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_body.started request=<Request [b'POST']>", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,705", "level": "DEBUG", "logger": "httpcore.http11", "message": "receive_response_body.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,705", "level": "DEBUG", "logger": "httpcore.http11", "message": "response_closed.started", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,706", "level": "DEBUG", "logger": "httpcore.http11", "message": "response_closed.complete", "module": "_trace"}
+{"timestamp": "2026-03-04 11:09:39,706", "level": "DEBUG", "logger": "telegram.ext.ExtBot", "message": "Call to Bot API endpoint `sendMessage` finished with return value `{'message_id': 94, 'from': {'id': 8524632357, 'is_bot': True, 'first_name': 'tomson', 'username': 'altoTech_BOT'}, 'chat': {'id': 8458317986, 'first_name': 'Ali', 'last_name': 'Torun', 'type': 'private'}, 'date': 1772618979, 'text': 'FTAG Agent gestartet.\\nVoller Zugriff: Shell, Dateien, Git.\\nSchreib einfach was du brauchst.\\n/clear - Konversation zuruecksetzen', 'entities': [{'offset': 92, 'length': 6, 'type': 'bot_command'}]}`", "module": "_bot"}
+{"timestamp": "2026-03-04 11:11:52,424", "level": "INFO", "logger": "services.logger_setup", "message": "Logging initialisiert | Environment: Environment.DEVELOPMENT", "module": "logger_setup"}
+{"timestamp": "2026-03-04 11:11:53,857", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'text' initialisiert | max_items=100, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:11:53,857", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'offer' initialisiert | max_items=50, ttl=1800s, max_bytes=100.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:11:53,857", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'project' initialisiert | max_items=20, ttl=1800s, max_bytes=500.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:11:53,857", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'catalog' initialisiert | max_items=10, ttl=86400s, max_bytes=200.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:11:53,857", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'erp' initialisiert | max_items=1000, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:11:54,076", "level": "INFO", "logger": "__main__", "message": "Registering routers...", "module": "main"}
+{"timestamp": "2026-03-04 11:11:54,141", "level": "INFO", "logger": "__main__", "message": "Starting uvicorn server...", "module": "main"}
+{"timestamp": "2026-03-04 11:11:54,142", "level": "INFO", "logger": "__main__", "message": "  Host: 0.0.0.0", "module": "main"}
+{"timestamp": "2026-03-04 11:11:54,142", "level": "INFO", "logger": "__main__", "message": "  Port: 8000", "module": "main"}
+{"timestamp": "2026-03-04 11:11:54,142", "level": "INFO", "logger": "__main__", "message": "  Reload: True", "module": "main"}
+{"timestamp": "2026-03-04 11:11:54,142", "level": "INFO", "logger": "__main__", "message": "  Workers: auto (reload mode)", "module": "main"}
+{"timestamp": "2026-03-04 11:11:54,292", "level": "INFO", "logger": "services.logger_setup", "message": "Logging initialisiert | Environment: Environment.DEVELOPMENT", "module": "logger_setup"}
+{"timestamp": "2026-03-04 11:11:55,603", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'text' initialisiert | max_items=100, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:11:55,603", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'offer' initialisiert | max_items=50, ttl=1800s, max_bytes=100.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:11:55,603", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'project' initialisiert | max_items=20, ttl=1800s, max_bytes=500.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:11:55,603", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'catalog' initialisiert | max_items=10, ttl=86400s, max_bytes=200.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:11:55,603", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'erp' initialisiert | max_items=1000, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:11:55,810", "level": "INFO", "logger": "__mp_main__", "message": "Registering routers...", "module": "main"}
+{"timestamp": "2026-03-04 11:11:55,869", "level": "DEBUG", "logger": "asyncio", "message": "Using selector: SelectSelector", "module": "selector_events"}
+{"timestamp": "2026-03-04 11:11:55,945", "level": "INFO", "logger": "services.logger_setup", "message": "Logging initialisiert | Environment: Environment.DEVELOPMENT", "module": "logger_setup"}
+{"timestamp": "2026-03-04 11:11:55,946", "level": "INFO", "logger": "main", "message": "Registering routers...", "module": "main"}
+{"timestamp": "2026-03-04 11:11:55,960", "level": "INFO", "logger": "main", "message": "[START] Starting Frank Tueren AG Backend | Environment: development", "module": "main"}
+{"timestamp": "2026-03-04 11:11:56,009", "level": "DEBUG", "logger": "watchfiles.main", "message": "7 changes detected: {(<Change.deleted: 3>, 'C:\\\\Users\\\\ALI\\\\Desktop\\\\ClaudeCodeTest\\\\backend\\\\__pycache__\\\\main.cpython-312.pyc.2359024480176'), (<Change.modified: 2>, 'C:\\\\Users\\\\ALI\\\\Desktop\\\\ClaudeCodeTest\\\\logs\\\\structured.log'), (<Change.added: 1>, 'C:\\\\Users\\\\ALI\\\\Desktop\\\\ClaudeCodeTest\\\\backend\\\\__pycache__\\\\main.cpython-312.pyc'), (<Change.added: 1>, 'C:\\\\Users\\\\ALI\\\\Desktop\\\\ClaudeCodeTest\\\\backend\\\\__pycache__\\\\main.cpython-312.pyc.2359024480176'), (<Change.modified: 2>, 'C:\\\\Users\\\\ALI\\\\Desktop\\\\ClaudeCodeTest\\\\backend\\\\__pycache__'), (<Change.modified: 2>, 'C:\\\\Users\\\\ALI\\\\Desktop\\\\ClaudeCodeTest\\\\logs\\\\app.log'), (<Change.deleted: 3>, 'C:\\\\Users\\\\ALI\\\\Desktop\\\\ClaudeCodeTest\\\\backend\\\\__pycache__\\\\main.cpython-312.pyc')}", "module": "main"}
+{"timestamp": "2026-03-04 11:11:59,396", "level": "INFO", "logger": "services.catalog_index", "message": "Loaded FTAG catalog: 884 products, 318 columns", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,574", "level": "INFO", "logger": "services.catalog_index", "message": "Catalog index built: 553 main products, 331 accessories, 14 categories", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,575", "level": "INFO", "logger": "services.catalog_index", "message": "  Rahmentüre: 236 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,575", "level": "INFO", "logger": "services.catalog_index", "message": "  ZZ (Schloss): 224 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,575", "level": "INFO", "logger": "services.catalog_index", "message": "  Zargentüre: 148 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,575", "level": "INFO", "logger": "services.catalog_index", "message": "  ZZ (Glas): 68 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,575", "level": "INFO", "logger": "services.catalog_index", "message": "  Futtertüre: 62 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,576", "level": "INFO", "logger": "services.catalog_index", "message": "  ZZ (Schliessblech): 39 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,576", "level": "INFO", "logger": "services.catalog_index", "message": "  Brandschutzvorhang: 34 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,576", "level": "INFO", "logger": "services.catalog_index", "message": "  Schiebetüre: 21 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,576", "level": "INFO", "logger": "services.catalog_index", "message": "  Festverglasung: 17 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,576", "level": "INFO", "logger": "services.catalog_index", "message": "  Vollwand: 11 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,577", "level": "INFO", "logger": "services.catalog_index", "message": "  Brandschutztor: 8 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,577", "level": "INFO", "logger": "services.catalog_index", "message": "  Steigzonen/Elektrofronten: 8 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,577", "level": "INFO", "logger": "services.catalog_index", "message": "  Ganzglas Tür: 4 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,577", "level": "INFO", "logger": "services.catalog_index", "message": "  Pendeltüre: 4 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:11:59,577", "level": "INFO", "logger": "main", "message": "[OK] Catalog loaded | Main products: 553, Total items: 884", "module": "main"}
+{"timestamp": "2026-03-04 11:12:00,390", "level": "DEBUG", "logger": "httpcore.connection", "message": "connect_tcp.started host='localhost' port=11434 local_address=None timeout=5.0 socket_options=None", "module": "_trace"}
+{"timestamp": "2026-03-04 11:12:25,202", "level": "INFO", "logger": "services.logger_setup", "message": "Logging initialisiert | Environment: Environment.DEVELOPMENT", "module": "logger_setup"}
+{"timestamp": "2026-03-04 11:12:26,550", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'text' initialisiert | max_items=100, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:12:26,550", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'offer' initialisiert | max_items=50, ttl=1800s, max_bytes=100.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:12:26,550", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'project' initialisiert | max_items=20, ttl=1800s, max_bytes=500.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:12:26,551", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'catalog' initialisiert | max_items=10, ttl=86400s, max_bytes=200.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:12:26,551", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'erp' initialisiert | max_items=1000, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:12:26,764", "level": "INFO", "logger": "__main__", "message": "Registering routers...", "module": "main"}
+{"timestamp": "2026-03-04 11:12:26,821", "level": "INFO", "logger": "__main__", "message": "Starting uvicorn server...", "module": "main"}
+{"timestamp": "2026-03-04 11:12:26,821", "level": "INFO", "logger": "__main__", "message": "  Host: 0.0.0.0", "module": "main"}
+{"timestamp": "2026-03-04 11:12:26,821", "level": "INFO", "logger": "__main__", "message": "  Port: 8000", "module": "main"}
+{"timestamp": "2026-03-04 11:12:26,822", "level": "INFO", "logger": "__main__", "message": "  Reload: True", "module": "main"}
+{"timestamp": "2026-03-04 11:12:26,822", "level": "INFO", "logger": "__main__", "message": "  Workers: auto (reload mode)", "module": "main"}
+{"timestamp": "2026-03-04 11:12:26,972", "level": "INFO", "logger": "services.logger_setup", "message": "Logging initialisiert | Environment: Environment.DEVELOPMENT", "module": "logger_setup"}
+{"timestamp": "2026-03-04 11:12:28,239", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'text' initialisiert | max_items=100, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:12:28,239", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'offer' initialisiert | max_items=50, ttl=1800s, max_bytes=100.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:12:28,240", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'project' initialisiert | max_items=20, ttl=1800s, max_bytes=500.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:12:28,240", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'catalog' initialisiert | max_items=10, ttl=86400s, max_bytes=200.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:12:28,240", "level": "DEBUG", "logger": "services.memory_cache", "message": "Cache 'erp' initialisiert | max_items=1000, ttl=3600s, max_bytes=50.0MB", "module": "memory_cache"}
+{"timestamp": "2026-03-04 11:12:28,448", "level": "INFO", "logger": "__mp_main__", "message": "Registering routers...", "module": "main"}
+{"timestamp": "2026-03-04 11:12:28,510", "level": "DEBUG", "logger": "asyncio", "message": "Using selector: SelectSelector", "module": "selector_events"}
+{"timestamp": "2026-03-04 11:12:28,565", "level": "DEBUG", "logger": "watchfiles.main", "message": "2 changes detected: {(<Change.modified: 2>, 'C:\\\\Users\\\\ALI\\\\Desktop\\\\ClaudeCodeTest\\\\logs\\\\structured.log'), (<Change.modified: 2>, 'C:\\\\Users\\\\ALI\\\\Desktop\\\\ClaudeCodeTest\\\\logs\\\\app.log')}", "module": "main"}
+{"timestamp": "2026-03-04 11:12:28,565", "level": "INFO", "logger": "services.logger_setup", "message": "Logging initialisiert | Environment: Environment.DEVELOPMENT", "module": "logger_setup"}
+{"timestamp": "2026-03-04 11:12:28,565", "level": "INFO", "logger": "main", "message": "Registering routers...", "module": "main"}
+{"timestamp": "2026-03-04 11:12:28,579", "level": "INFO", "logger": "main", "message": "[START] Starting Frank Tueren AG Backend | Environment: development", "module": "main"}
+{"timestamp": "2026-03-04 11:12:28,921", "level": "DEBUG", "logger": "watchfiles.main", "message": "1 change detected: {(<Change.modified: 2>, 'C:\\\\Users\\\\ALI\\\\Desktop\\\\ClaudeCodeTest\\\\logs\\\\structured.log')}", "module": "main"}
+{"timestamp": "2026-03-04 11:12:32,013", "level": "INFO", "logger": "services.catalog_index", "message": "Loaded FTAG catalog: 884 products, 318 columns", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,199", "level": "INFO", "logger": "services.catalog_index", "message": "Catalog index built: 553 main products, 331 accessories, 14 categories", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,199", "level": "INFO", "logger": "services.catalog_index", "message": "  Rahmentüre: 236 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,199", "level": "INFO", "logger": "services.catalog_index", "message": "  ZZ (Schloss): 224 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,199", "level": "INFO", "logger": "services.catalog_index", "message": "  Zargentüre: 148 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,199", "level": "INFO", "logger": "services.catalog_index", "message": "  ZZ (Glas): 68 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,200", "level": "INFO", "logger": "services.catalog_index", "message": "  Futtertüre: 62 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,200", "level": "INFO", "logger": "services.catalog_index", "message": "  ZZ (Schliessblech): 39 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,200", "level": "INFO", "logger": "services.catalog_index", "message": "  Brandschutzvorhang: 34 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,200", "level": "INFO", "logger": "services.catalog_index", "message": "  Schiebetüre: 21 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,200", "level": "INFO", "logger": "services.catalog_index", "message": "  Festverglasung: 17 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,200", "level": "INFO", "logger": "services.catalog_index", "message": "  Vollwand: 11 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,201", "level": "INFO", "logger": "services.catalog_index", "message": "  Brandschutztor: 8 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,201", "level": "INFO", "logger": "services.catalog_index", "message": "  Steigzonen/Elektrofronten: 8 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,201", "level": "INFO", "logger": "services.catalog_index", "message": "  Ganzglas Tür: 4 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,201", "level": "INFO", "logger": "services.catalog_index", "message": "  Pendeltüre: 4 products", "module": "catalog_index"}
+{"timestamp": "2026-03-04 11:12:32,201", "level": "INFO", "logger": "main", "message": "[OK] Catalog loaded | Main products: 553, Total items: 884", "module": "main"}
+{"timestamp": "2026-03-04 11:12:32,992", "level": "DEBUG", "logger": "httpcore.connection", "message": "connect_tcp.started host='localhost' port=11434 local_address=None timeout=5.0 socket_options=None", "module": "_trace"}

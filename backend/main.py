@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
     Application lifespan: startup and shutdown hooks.
     Pre-loads critical resources und säuberung beim Shutdown.
     """
-    logger.info(f"🚀 Starting Frank Türen AG Backend | Environment: {settings.ENVIRONMENT.value}")
+    logger.info(f"[START] Starting Frank Tueren AG Backend | Environment: {settings.ENVIRONMENT.value}")
     
     # ─────── STARTUP ────────────
     startup_errors = []
@@ -50,11 +50,11 @@ async def lifespan(app: FastAPI):
         from services.catalog_index import get_catalog_index
         index = get_catalog_index()
         logger.info(
-            f"✅ Catalog loaded | Main products: {len(index.main_products)}, "
+            f"[OK] Catalog loaded | Main products: {len(index.main_products)}, "
             f"Total items: {len(index.all_profiles)}"
         )
     except Exception as e:
-        msg = f"⚠️ Catalog pre-load failed: {e}"
+        msg = f"[WARN] Catalog pre-load failed: {e}"
         logger.warning(msg)
         startup_errors.append(msg)
     
@@ -63,29 +63,29 @@ async def lifespan(app: FastAPI):
         from services.local_llm import check_ollama_status
         status_result = check_ollama_status()
         if status_result:
-            logger.info(f"✅ Ollama connected | Model: {settings.OLLAMA_MODEL}")
+            logger.info(f"[OK] Ollama connected | Model: {settings.OLLAMA_MODEL}")
         else:
-            logger.warning("⚠️ Ollama not available | Using fallback mode")
+            logger.warning("[WARN] Ollama not available | Using fallback mode")
             if not settings.OLLAMA_FALLBACK_ENABLED:
                 startup_errors.append("Ollama required but not available")
     except Exception as e:
-        logger.warning(f"⚠️ Ollama check failed: {e}")
+        logger.warning(f"[WARN] Ollama check failed: {e}")
     
     # 3. Test Telegram Bot (optional)
     if settings.TELEGRAM_ENABLED:
         try:
             from services.telegram_bot import start_bot
             await start_bot()
-            logger.info("✅ Telegram bot started")
+            logger.info("[OK] Telegram bot started")
         except Exception as e:
-            logger.warning(f"⚠️ Telegram bot start failed: {e}")
+            logger.warning(f"[WARN] Telegram bot start failed: {e}")
     
     # 4. Initialize Cache
     try:
         from services.memory_cache import text_cache, offer_cache, project_cache
-        logger.info(f"✅ Caching system initialized | Max size: {settings.CACHE_MAX_SIZE_MB}MB")
+        logger.info(f"[OK] Caching system initialized | Max size: {settings.CACHE_MAX_SIZE_MB}MB")
     except Exception as e:
-        logger.error(f"❌ Cache initialization failed: {e}")
+        logger.error(f"[ERROR] Cache initialization failed: {e}")
         startup_errors.append(f"Cache init failed: {e}")
     
     # 5. Initialize ERP Connector (if enabled)
@@ -96,32 +96,32 @@ async def lifespan(app: FastAPI):
             # Test connection
             is_healthy = erp_connector.health_check()
             if is_healthy:
-                logger.info(f"✅ ERP (Bohr) connected | URL: {settings.ERP_BOHR_URL}")
+                logger.info(f"[OK] ERP (Bohr) connected | URL: {settings.ERP_BOHR_URL}")
             else:
-                logger.warning(f"⚠️ ERP (Bohr) not available | Fallback to estimates: {settings.ERP_FALLBACK_TO_ESTIMATE}")
+                logger.warning(f"[WARN] ERP (Bohr) not available | Fallback to estimates: {settings.ERP_FALLBACK_TO_ESTIMATE}")
         except Exception as e:
-            logger.warning(f"⚠️ ERP initialization failed: {e}")
+            logger.warning(f"[WARN] ERP initialization failed: {e}")
             if not settings.ERP_FALLBACK_TO_ESTIMATE:
                 startup_errors.append(f"ERP init failed: {e}")
     else:
-        logger.info("ℹ️ ERP integration disabled | Using estimated prices")
+        logger.info("[INFO] ERP integration disabled | Using estimated prices")
     
     # Log startup result
     if startup_errors:
-        logger.warning(f"⚠️ Startup warnings:\n" + "\n".join(startup_errors))
+        logger.warning(f"[WARN] Startup warnings:\n" + "\n".join(startup_errors))
     else:
-        logger.info("✅ All startup checks passed")
+        logger.info("[OK] All startup checks passed")
     
     yield
     
     # ─────── SHUTDOWN ──────────
-    logger.info("🛑 Shutting down...")
+    logger.info("[STOP] Shutting down...")
     
     try:
         if settings.TELEGRAM_ENABLED:
             from services.telegram_bot import stop_bot
             await stop_bot()
-            logger.info("✅ Telegram bot stopped")
+            logger.info("[OK] Telegram bot stopped")
     except Exception as e:
         logger.warning(f"Telegram bot shutdown error: {e}")
     
@@ -129,11 +129,11 @@ async def lifespan(app: FastAPI):
     try:
         from services.file_cleanup import cleanup_old_files
         deleted = cleanup_old_files()
-        logger.info(f"✅ Cleanup: deleted {deleted} old files")
+        logger.info(f"[OK] Cleanup: deleted {deleted} old files")
     except Exception as e:
         logger.warning(f"File cleanup failed: {e}")
     
-    logger.info("✅ Shutdown complete")
+    logger.info("[OK] Shutdown complete")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -11,16 +11,10 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 from config import settings
-from services.memory_cache import get_memory_cache
+from services.memory_cache import erp_cache
 from services.exceptions import FrankTuerenError
 
 logger = logging.getLogger(__name__)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Cache-Instanz
-# ─────────────────────────────────────────────────────────────────────────────
-
-erp_cache = get_memory_cache()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
