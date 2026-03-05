@@ -1,8 +1,10 @@
 """
 Simple in-memory job store for background processing.
 Solves Render/Railway timeout issues by running long tasks in background threads.
+Supports SSE event subscriptions for real-time progress streaming.
 """
 
+import asyncio
 import threading
 import time
 import uuid
@@ -57,6 +59,38 @@ def get_job(job_id: str) -> Job | None:
         return _jobs.get(job_id)
 
 
+_job_event_queues: dict[str, list[asyncio.Queue]] = {}
+_event_lock = threading.Lock()
+
+
+def subscribe_job(job_id: str) -> asyncio.Queue:
+    """Subscribe to real-time events for a job. Returns an asyncio.Queue."""
+    queue = asyncio.Queue(maxsize=100)
+    with _event_lock:
+        _job_event_queues.setdefault(job_id, []).append(queue)
+    return queue
+
+
+def unsubscribe_job(job_id: str, queue: asyncio.Queue):
+    """Unsubscribe from job events."""
+    with _event_lock:
+        if job_id in _job_event_queues:
+            _job_event_queues[job_id] = [q for q in _job_event_queues[job_id] if q is not queue]
+            if not _job_event_queues[job_id]:
+                del _job_event_queues[job_id]
+
+
+def _notify_subscribers(job_id: str, event: dict):
+    """Send event to all subscribers of a job."""
+    with _event_lock:
+        queues = _job_event_queues.get(job_id, [])
+    for queue in queues:
+        try:
+            queue.put_nowait(event)
+        except asyncio.QueueFull:
+            pass
+
+
 def update_job(job_id: str, *, status: str = None, progress: str = None, result=None, error: str = None):
     with _lock:
         job = _jobs.get(job_id)
@@ -71,6 +105,15 @@ def update_job(job_id: str, *, status: str = None, progress: str = None, result=
         if error is not None:
             job.error = error
         job.updated_at = time.time()
+
+    # Notify SSE subscribers
+    _notify_subscribers(job_id, {
+        "job_id": job_id,
+        "status": job.status,
+        "progress": job.progress,
+        "error": job.error,
+        "result": job.result if job.status == "completed" else None,
+    })
 
 
 _active_count = 0

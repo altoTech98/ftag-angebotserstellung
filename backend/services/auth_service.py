@@ -1,0 +1,136 @@
+"""
+Authentication Service – JWT + bcrypt
+Admin-User Management für Frank Türen AG
+"""
+
+import json
+import logging
+import secrets
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+
+logger = logging.getLogger(__name__)
+
+DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+USERS_FILE = DATA_DIR / "users.json"
+JWT_SECRET_FILE = DATA_DIR / ".jwt_secret"
+
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_HOURS = 24
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer(auto_error=False)
+
+# Default admin credentials (user should change password after first login)
+DEFAULT_ADMIN_EMAIL = "admin@franktüren.ch"
+DEFAULT_ADMIN_PASSWORD = "Frank2024!"
+
+
+def _get_jwt_secret() -> str:
+    """Load or generate JWT secret key."""
+    if JWT_SECRET_FILE.exists():
+        return JWT_SECRET_FILE.read_text().strip()
+    secret = secrets.token_hex(32)
+    JWT_SECRET_FILE.write_text(secret)
+    logger.info("[AUTH] JWT secret generated and saved")
+    return secret
+
+
+JWT_SECRET = _get_jwt_secret()
+
+
+def _load_users() -> list[dict]:
+    """Load users from JSON file."""
+    if not USERS_FILE.exists():
+        return []
+    try:
+        return json.loads(USERS_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _save_users(users: list[dict]) -> None:
+    """Save users to JSON file."""
+    USERS_FILE.write_text(json.dumps(users, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def init_admin_user() -> None:
+    """Create default admin user if no users exist."""
+    users = _load_users()
+    if users:
+        logger.info(f"[AUTH] {len(users)} user(s) found in {USERS_FILE}")
+        return
+
+    admin = {
+        "email": DEFAULT_ADMIN_EMAIL,
+        "password_hash": pwd_context.hash(DEFAULT_ADMIN_PASSWORD),
+        "role": "admin",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _save_users([admin])
+    logger.info(f"[AUTH] Admin user created: {DEFAULT_ADMIN_EMAIL}")
+
+
+def authenticate_user(email: str, password: str) -> dict | None:
+    """Verify email + password, return user dict or None."""
+    users = _load_users()
+    for user in users:
+        if user["email"].lower() == email.lower():
+            if pwd_context.verify(password, user["password_hash"]):
+                return user
+            return None
+    return None
+
+
+def create_access_token(email: str) -> str:
+    """Create JWT token with expiration."""
+    expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+    payload = {
+        "sub": email,
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=ALGORITHM)
+
+
+def verify_token(token: str) -> dict | None:
+    """Verify JWT token, return payload or None."""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        if not email:
+            return None
+        # Check user still exists
+        users = _load_users()
+        for user in users:
+            if user["email"].lower() == email.lower():
+                return {"email": user["email"], "role": user["role"]}
+        return None
+    except JWTError:
+        return None
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict:
+    """FastAPI dependency: extract and verify user from Bearer token."""
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Nicht authentifiziert",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    user = verify_token(credentials.credentials)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token ungueltig oder abgelaufen",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user

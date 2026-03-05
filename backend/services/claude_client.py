@@ -774,6 +774,55 @@ Matche jede Anforderung."""
                 for i in range(len(requirements))]
 
 
+def _format_structured_comparison(pos_data: dict) -> str:
+    """Format candidates as a structured comparison table for Claude."""
+    candidates_text = pos_data.get("candidates_text", "")
+    req_fields = pos_data.get("req_fields", {})
+    if not candidates_text or not req_fields:
+        return ""
+
+    lines = []
+    req_fire = str(req_fields.get("brandschutz") or "").upper()
+    req_rc = str(req_fields.get("einbruchschutz") or "").upper()
+    req_b = req_fields.get("breite")
+    req_h = req_fields.get("hoehe")
+    req_sound = req_fields.get("schallschutz")
+
+    for cand_line in candidates_text.split("\n"):
+        if not cand_line.strip():
+            continue
+        cand_lower = cand_line.lower()
+        checks = []
+        if req_fire:
+            fire_ok = req_fire.lower() in cand_lower or _fire_class_met(req_fire, cand_line)
+            checks.append(f"  Brandschutz: {req_fire} -> {'MATCH' if fire_ok else 'FEHLT'}")
+        if req_rc:
+            rc_ok = req_rc.lower() in cand_lower or req_rc.replace("RC", "WK").lower() in cand_lower
+            checks.append(f"  Einbruchschutz: {req_rc} -> {'MATCH' if rc_ok else 'FEHLT'}")
+        if req_b and req_h:
+            checks.append(f"  Masse: {req_b}x{req_h}mm -> (pruefen)")
+        if req_sound:
+            checks.append(f"  Schallschutz: {req_sound} -> (pruefen)")
+        lines.append(cand_line)
+        lines.extend(checks)
+
+    return "\n".join(lines) if lines else ""
+
+
+def _fire_class_met(required: str, candidate_text: str) -> bool:
+    """Check if the candidate text contains a fire class >= required."""
+    fire_rank = {"ei30": 1, "t30": 1, "ei60": 2, "t60": 2, "ei90": 3, "t90": 3, "ei120": 4, "t120": 4}
+    req_key = required.lower().replace(" ", "")
+    req_level = fire_rank.get(req_key, 0)
+    if req_level == 0:
+        return False
+    cand_lower = candidate_text.lower()
+    for key, level in fire_rank.items():
+        if key in cand_lower and level >= req_level:
+            return True
+    return False
+
+
 def ai_match_products_batch(
     positions_data: list[dict],
     feedback_examples: list[dict],
@@ -806,12 +855,17 @@ def ai_match_products_batch(
                     feedback_block += f" (Bemerkung: {fb['user_note']})"
                 feedback_block += "\n"
 
-    # Build positions block
+    # Build positions block with structured comparison
     positions_block = ""
     for i, pos_data in enumerate(positions_data):
         positions_block += f"\n### POSITION {i+1}: {pos_data['req_text']}\n"
         positions_block += f"Felder: {json.dumps(pos_data['req_fields'], ensure_ascii=False)}\n"
-        positions_block += f"Kandidaten:\n{pos_data['candidates_text']}\n"
+        # Add structured comparison if candidates available
+        structured = _format_structured_comparison(pos_data)
+        if structured:
+            positions_block += f"Vergleich:\n{structured}\n"
+        else:
+            positions_block += f"Kandidaten:\n{pos_data['candidates_text']}\n"
 
     system_prompt = f"""Du bist ein erfahrener Türen-Fachberater der Frank Türen AG in Buochs NW, Schweiz.
 
@@ -880,18 +934,38 @@ Antworte NUR mit einem JSON-Array. Pro Position ein Objekt:
             results = [results]
     except json.JSONDecodeError:
         logger.warning(f"Batch AI match returned invalid JSON (after repair): {response_text[:300]}")
-        # Return fallback for all positions
-        return [
-            {
-                "best_match_index": pd["candidate_indices"][0] if pd["candidate_indices"] else None,
-                "confidence": 0.3,
+        # Fallback: use fast_matcher scoring on candidates instead of blind first pick
+        fallback_results = []
+        for pd_item in positions_data:
+            best_idx = None
+            best_conf = 0.3
+            if pd_item["candidate_indices"]:
+                try:
+                    from services.fast_matcher import _score_product
+                    from services.catalog_index import get_catalog_index
+                    catalog = get_catalog_index()
+                    best_score = -1
+                    for cidx in pd_item["candidate_indices"]:
+                        for prof in catalog.all_profiles:
+                            if prof.row_index == cidx:
+                                sc, _ = _score_product(pd_item["req_fields"], prof)
+                                if sc > best_score:
+                                    best_score = sc
+                                    best_idx = cidx
+                                break
+                    if best_score > 0:
+                        best_conf = round(best_score / 100, 2)
+                except Exception:
+                    best_idx = pd_item["candidate_indices"][0]
+            fallback_results.append({
+                "best_match_index": best_idx,
+                "confidence": best_conf,
                 "status": "partial",
-                "reason": "KI-Batch-Antwort konnte nicht verarbeitet werden",
+                "reason": "KI-Batch-Antwort konnte nicht verarbeitet werden - Regelbasierter Fallback",
                 "match_criteria": [],
                 "alternative_indices": [],
-            }
-            for pd in positions_data
-        ]
+            })
+        return fallback_results
 
     # Map ranks back to DataFrame indices
     mapped_results = []
@@ -1029,12 +1103,32 @@ Welcher Kandidat passt am besten zur Anforderung?"""
         result = _repair_json(response_text)
     except json.JSONDecodeError:
         logger.warning(f"AI match returned invalid JSON (after repair): {response_text[:200]}")
+        # Use fast_matcher scoring instead of blind first candidate
+        best_idx = candidate_indices[0] if candidate_indices else None
+        best_conf = 0.3
+        try:
+            from services.fast_matcher import _score_product
+            from services.catalog_index import get_catalog_index
+            catalog = get_catalog_index()
+            best_sc = -1
+            for cidx in candidate_indices:
+                for prof in catalog.all_profiles:
+                    if prof.row_index == cidx:
+                        sc, _ = _score_product(requirement_fields, prof)
+                        if sc > best_sc:
+                            best_sc = sc
+                            best_idx = cidx
+                        break
+            if best_sc > 0:
+                best_conf = round(best_sc / 100, 2)
+        except Exception:
+            pass
         return {
-            "best_match_index": candidate_indices[0] if candidate_indices else None,
-            "best_match_rank": 1 if candidate_indices else None,
-            "confidence": 0.3,
+            "best_match_index": best_idx,
+            "best_match_rank": None,
+            "confidence": best_conf,
             "status": "partial",
-            "reason": "KI-Antwort konnte nicht verarbeitet werden – Vorfilter-Ergebnis verwendet",
+            "reason": "KI-Antwort konnte nicht verarbeitet werden - Regelbasierter Fallback",
             "alternative_indices": [],
         }
 

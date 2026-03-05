@@ -356,9 +356,31 @@ def _find_tuerliste_sheet(xl: pd.ExcelFile) -> str | None:
         r"t[üu]r[_\-\s]?matrix|door|t[üu]ren)",
         re.IGNORECASE,
     )
-    for name in sheet_names:
-        if door_name_patterns.search(name):
-            return name
+    name_matches = [name for name in sheet_names if door_name_patterns.search(name)]
+    if len(name_matches) == 1:
+        # Verify it has enough columns to be a real data sheet
+        try:
+            df = pd.read_excel(xl, sheet_name=name_matches[0], header=None, nrows=1, dtype=str)
+            if df.shape[1] >= 10:
+                return name_matches[0]
+            logger.info(f"Sheet '{name_matches[0]}' matches by name but has only {df.shape[1]} columns, checking other sheets")
+        except Exception:
+            return name_matches[0]
+    if len(name_matches) > 1:
+        # Multiple sheets match by name — pick the one with the most columns
+        best_name = name_matches[0]
+        best_cols = 0
+        for name in name_matches:
+            try:
+                df = pd.read_excel(xl, sheet_name=name, header=None, nrows=1, dtype=str)
+                if df.shape[1] > best_cols:
+                    best_cols = df.shape[1]
+                    best_name = name
+            except Exception:
+                continue
+        if best_cols >= 10:
+            return best_name
+        logger.info(f"Name-matched sheets have few columns (max {best_cols}), checking other sheets")
 
     # Fallback: check which sheet has the most door-related columns
     best_sheet = None

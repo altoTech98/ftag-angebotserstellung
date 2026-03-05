@@ -24,6 +24,7 @@ from services.validators import Validator
 from services.document_parser import parse_document_bytes
 from services.file_classifier import classify_file
 from services.memory_cache import text_cache, project_cache
+from services.project_store import create_project
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Upload"])
@@ -226,6 +227,7 @@ async def upload_folder(files: List[UploadFile] = File(...)) -> dict:
         
         # Process files
         file_entries = []
+        file_bytes_dict = {}  # file_id -> raw bytes for analysis
         stats = {
             "parseable": 0,
             "images": 0,
@@ -282,6 +284,9 @@ async def upload_folder(files: List[UploadFile] = File(...)) -> dict:
                 else:
                     stats["unsupported"] += 1
                 
+                # Cache file bytes for later analysis
+                file_bytes_dict[file_id] = content
+
                 # Add entry
                 file_entries.append(FileMetadata(
                     file_id=file_id,
@@ -293,7 +298,7 @@ async def upload_folder(files: List[UploadFile] = File(...)) -> dict:
                     parseable=classification.get("parseable", False),
                     reason=classification.get("reason", ""),
                 ))
-                
+
                 logger.debug(f"File {file_id}: {safe_name} ({size} bytes)")
             
             except FrankTuerenError as e:
@@ -307,20 +312,31 @@ async def upload_folder(files: List[UploadFile] = File(...)) -> dict:
         
         if not file_entries:
             raise ValidationError("Keine unterstützten Dateien im Upload")
-        
-        # Cache project files
-        project_cache.set(f"project_{project_id}", {
-            "files": [f.dict() for f in file_entries],
-            "stats": stats,
-        }, ttl_seconds=1800)
-        
-        logger.info(f"✅ Project created: {project_id} | {len(file_entries)} files")
-        
+
+        # Persist project metadata via project_store (so get_project() works)
+        file_dicts = [f.dict() for f in file_entries]
+        project = create_project(file_dicts, project_id=project_id)
+
+        # Cache raw file bytes for analysis (keyed by file_id)
+        project_cache.set(f"project_{project_id}", file_bytes_dict, ttl_seconds=1800)
+
+        logger.info(f"Project created: {project_id} | {len(file_entries)} files")
+
+        # Build summary with category counts (frontend expects tuerliste_count etc.)
+        summary = project["summary"]
+        summary.update({
+            "parseable": stats["parseable"],
+            "images": stats["images"],
+            "unsupported": stats["unsupported"],
+            "errors": stats["errors"],
+            "total_size": stats["total_size"],
+        })
+
         return {
             "project_id": project_id,
             "total_files": len(file_entries),
             "files": file_entries,
-            "summary": stats,
+            "summary": summary,
         }
     
     except FrankTuerenError as e:

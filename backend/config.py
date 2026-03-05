@@ -106,8 +106,10 @@ class Settings:
     # AI Engine Selection
     AI_PREFERRED_ENGINE: str = os.environ.get("AI_PREFERRED_ENGINE", "auto")  # "auto" | "claude" | "ollama"
 
-    # Claude API (optional, backward compatibility)
+    # Claude API Configuration
     ANTHROPIC_API_KEY: Optional[str] = os.environ.get("ANTHROPIC_API_KEY")
+    CLAUDE_MODEL: str = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
+    CLAUDE_THINKING_ENABLED: bool = os.environ.get("CLAUDE_THINKING", "true").lower() == "true"
     
     # Telegram Bot
     TELEGRAM_TOKEN: Optional[str] = os.environ.get("TELEGRAM_BOT_TOKEN")

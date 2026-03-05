@@ -17,6 +17,7 @@ import logging
 from typing import Optional, Callable
 
 from services.catalog_index import get_catalog_index, ProductProfile
+from services.feedback_store import find_relevant_feedback
 
 logger = logging.getLogger(__name__)
 
@@ -117,15 +118,31 @@ def _parse_max_dimensions(light_opening: str) -> tuple[Optional[int], Optional[i
 
 
 def _normalize_dimension(val, unit_hint: str = "") -> Optional[int]:
-    """Normalize dimension to mm. Values < 20 assumed m, 20-400 assumed cm, >400 assumed mm."""
+    """Normalize dimension to mm. Parses unit from string if present, else uses heuristics."""
     if val is None:
         return None
+    val_str = str(val).strip()
+    if not val_str:
+        return None
+    # Check for explicit unit in string
+    if "mm" in val_str.lower():
+        m = re.search(r'(\d+)', val_str)
+        return int(m.group(1)) if m else None
+    if "cm" in val_str.lower():
+        m = re.search(r'[\d.]+', val_str)
+        return int(float(m.group()) * 10) if m else None
+    if re.search(r'\d\s*m\b', val_str.lower()) and "mm" not in val_str.lower():
+        m = re.search(r'[\d.]+', val_str)
+        return int(float(m.group()) * 1000) if m else None
     try:
         n = float(val)
     except (ValueError, TypeError):
         return None
     if n <= 0:
         return None
+    # Plausible mm value for doors (400-3500mm)
+    if 400 < n < 3500:
+        return int(n)
     if n < 20:
         return int(n * 1000)  # meters -> mm
     if n <= 400:
@@ -242,14 +259,14 @@ def _score_product(door: dict, product: ProductProfile) -> tuple[float, list[str
     gaps = []
     kf = product.key_fields
 
-    # ── 1. Fire class (30 points) ──
+    # ── 1. Fire class (35 points) ──
     door_fire = _normalize_fire_class(str(door.get("brandschutz") or ""))
     prod_fire = _normalize_fire_class(kf.get("fire_class", ""))
 
     if door_fire > 0:
-        max_score += 30
+        max_score += 35
         if prod_fire >= door_fire:
-            score += 30  # Product fulfills or exceeds requirement
+            score += 35  # Product fulfills or exceeds requirement
             # Bonus for exact fire class match (prefer EI30 for EI30, not EI60)
             if prod_fire == door_fire:
                 score += 5
@@ -270,19 +287,19 @@ def _score_product(door: dict, product: ProductProfile) -> tuple[float, list[str
         else:
             score += 5  # Over-specified: works but costs more
 
-    # ── 2. Sound class (20 points) ──
+    # ── 2. Sound class (15 points) ──
     door_db = _extract_db(str(door.get("schallschutz") or ""))
     prod_db = _extract_db(kf.get("sound_db", ""))
 
     if door_db is not None:
-        max_score += 20
+        max_score += 15
         if prod_db is not None:
             if prod_db >= door_db:
-                score += 20
+                score += 15
             elif prod_db >= door_db - 3:
-                score += 15  # Close enough (tolerance)
+                score += 11  # Close enough (tolerance)
             else:
-                score += 5
+                score += 4
                 gaps.append(f"Schallschutz: braucht {door_db}dB, Produkt hat {prod_db}dB")
         else:
             gaps.append(f"Schallschutz: braucht {door_db}dB, Produkt ohne Angabe")
@@ -290,14 +307,14 @@ def _score_product(door: dict, product: ProductProfile) -> tuple[float, list[str
         max_score += 5
         score += 5  # No requirement = always fine
 
-    # ── 3. Resistance class (15 points) ──
+    # ── 3. Resistance class (20 points) ──
     door_rc = _normalize_resistance(str(door.get("einbruchschutz") or ""))
     prod_rc = _normalize_resistance(kf.get("resistance", ""))
 
     if door_rc > 0:
-        max_score += 15
+        max_score += 20
         if prod_rc >= door_rc:
-            score += 15
+            score += 20
         else:
             gaps.append(f"Einbruchschutz: braucht RC{door_rc}, Produkt hat {kf.get('resistance', 'ohne')}")
     else:
@@ -342,24 +359,37 @@ def _score_product(door: dict, product: ProductProfile) -> tuple[float, list[str
         max_score += 5
         score += 5
 
-    # ── 6. Glass cutout bonus (5 points) ──
+    # ── 6. Glass cutout bonus (3 points) ──
     door_glass = bool(door.get("verglasung") or door.get("glas_typ"))
     prod_glass = kf.get("glass_cutout", "").lower() == "ja"
 
     if door_glass:
-        max_score += 5
+        max_score += 3
         if prod_glass:
-            score += 5
+            score += 3
         else:
             gaps.append("Verglasung gewuenscht, Produkt ohne Glasausschnitt")
     else:
         max_score += 2
         score += 2
 
-    # ── 7. Product preference (tiebreaker) ──
+    # ── 7. Smoke protection (8 points) ──
+    door_smoke = str(door.get("rauchschutz") or door.get("besonderheiten") or "").lower()
+    prod_smoke = kf.get("smoke_class", "").lower()
+    if "s200" in door_smoke or "rauch" in door_smoke:
+        max_score += 8
+        if prod_smoke and ("s200" in prod_smoke or "rauch" in prod_smoke):
+            score += 8
+        else:
+            gaps.append("Rauchschutz S200 gefordert, Produkt ohne")
+    else:
+        max_score += 2
+        score += 2  # No requirement = fine
+
+    # ── 8. Product preference (tiebreaker) ──
     # Penalize Alu/Light/BAT variants, prefer standard products
-    max_score += 10
-    score += 10  # Base: all products start equal
+    max_score += 7
+    score += 7  # Base: all products start equal
     preference = _product_preference(product, door_fire)
     score += preference  # Can go negative (penalty) or positive (bonus)
 
@@ -367,6 +397,71 @@ def _score_product(door: dict, product: ProductProfile) -> tuple[float, list[str
     final_score = (score / max(max_score, 1)) * 100
     final_score = max(0.0, min(100.0, final_score))  # Clamp
     return round(final_score, 1), gaps
+
+
+def _build_req_text(door: dict) -> str:
+    """Build a compact requirement text for feedback lookup."""
+    parts = []
+    for key in ("tuertyp", "brandschutz", "einbruchschutz", "schallschutz",
+                 "beschreibung", "besonderheiten"):
+        val = door.get(key)
+        if val:
+            parts.append(str(val))
+    return " ".join(parts) if parts else "Tuer"
+
+
+def _enrich_position(pos: dict) -> dict:
+    """Fill missing fields from beschreibung text when AI extraction left gaps."""
+    desc = str(pos.get("beschreibung") or "").lower()
+    if not pos.get("tuertyp"):
+        if "stahl" in desc:
+            pos["tuertyp"] = "Stahltür"
+        elif "holz" in desc:
+            pos["tuertyp"] = "Holztür"
+        elif "alu" in desc:
+            pos["tuertyp"] = "Alutür"
+    if not pos.get("brandschutz"):
+        m = re.search(r'(ei|t|f)\s*(\d+)', desc)
+        if m:
+            pos["brandschutz"] = f"EI{m.group(2)}"
+    if not pos.get("einbruchschutz"):
+        m = re.search(r'(rc|wk)\s*(\d)', desc)
+        if m:
+            pos["einbruchschutz"] = f"RC{m.group(2)}"
+    if not pos.get("rauchschutz"):
+        if "s200" in desc or "rauchschutz" in desc:
+            pos["rauchschutz"] = "S200"
+    return pos
+
+
+def _verify_critical_fields(
+    door: dict, product: ProductProfile, score: float, status: str
+) -> tuple[float, str, list[str]]:
+    """Verify that critical safety fields are met. Downgrade status if not."""
+    violations = []
+    door_fire = _normalize_fire_class(str(door.get("brandschutz") or ""))
+    prod_fire = _normalize_fire_class(product.key_fields.get("fire_class", ""))
+    if door_fire > 0 and prod_fire < door_fire:
+        violations.append(
+            f"KRITISCH: Brandschutz nicht erfuellt "
+            f"(braucht EI{door_fire * 30}, Produkt hat {product.key_fields.get('fire_class', 'ohne')})"
+        )
+        if status == "matched":
+            status = "partial"
+            score = min(score, 55)
+
+    door_rc = _normalize_resistance(str(door.get("einbruchschutz") or ""))
+    prod_rc = _normalize_resistance(product.key_fields.get("resistance", ""))
+    if door_rc > 0 and prod_rc < door_rc:
+        violations.append(
+            f"KRITISCH: Einbruchschutz nicht erfuellt "
+            f"(braucht RC{door_rc}, Produkt hat {product.key_fields.get('resistance', 'ohne')})"
+        )
+        if status == "matched":
+            status = "partial"
+            score = min(score, 55)
+
+    return score, status, violations
 
 
 def match_all(
@@ -399,6 +494,7 @@ def match_all(
     sig_groups = {}  # signature -> [indices]
 
     for i, pos in enumerate(positions):
+        _enrich_position(pos)
         sig = _door_signature(pos)
         sig_groups.setdefault(sig, []).append(i)
 
@@ -437,6 +533,40 @@ def match_all(
                 best_score = score
                 best_product = product
                 best_gaps = gaps
+
+        # Check feedback corrections for this door
+        try:
+            req_text = _build_req_text(door)
+            feedback = find_relevant_feedback(req_text, door, limit=3)
+            for fb in feedback:
+                if fb.get("type") == "correction":
+                    correct_idx = (fb.get("correct_product") or {}).get("row_index")
+                    if correct_idx is not None:
+                        for prod in cat_products:
+                            if prod.row_index == correct_idx:
+                                best_product = prod
+                                best_score = max(best_score, 85)
+                                best_gaps = ["Aus Korrektur-Feedback uebernommen"]
+                                viable_products.append((prod, best_score, best_gaps))
+                                break
+        except Exception as e:
+            logger.debug(f"Feedback lookup failed: {e}")
+
+        # Cross-category search if best score is below threshold
+        if best_score < MATCH_THRESHOLD:
+            for alt_cat in catalog.main_category_names:
+                if alt_cat == category:
+                    continue
+                alt_products = catalog.get_main_by_category(alt_cat)
+                for product in alt_products:
+                    alt_score, alt_gaps = _score_product(door, product)
+                    if alt_score > best_score:
+                        best_score = alt_score
+                        best_product = product
+                        best_gaps = alt_gaps
+                        category = alt_cat
+                    if alt_score >= MATCH_THRESHOLD:
+                        viable_products.append((product, alt_score, alt_gaps))
 
         # Sort viable products by score descending (best first)
         viable_products.sort(key=lambda x: x[1], reverse=True)
@@ -479,6 +609,14 @@ def match_all(
             status = "partial"
         else:
             status = "unmatched"
+
+        # Post-match verification of critical fields
+        if best_product and status == "matched":
+            score, status, violations = _verify_critical_fields(
+                pos, best_product, score, status
+            )
+            if violations:
+                gaps = list(gaps) + violations
 
         result_entry = {
             "status": status,
@@ -536,7 +674,9 @@ def _door_signature(door: dict) -> str:
         str(door.get("hoehe") or ""),
         str(door.get("verglasung") or ""),
         str(door.get("fluegel_anzahl") or ""),
-        str(door.get("zargentyp") or ""),  # Frame type affects category
+        str(door.get("zargentyp") or ""),
+        str(door.get("besonderheiten") or ""),
+        str(door.get("rauchschutz") or ""),
     ]
     return "|".join(parts).lower()
 

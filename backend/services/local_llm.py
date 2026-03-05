@@ -230,13 +230,44 @@ def _extract_metadata_regex(text: str) -> dict:
 def extract_project_metadata(text: str) -> dict:
     """
     Extract project metadata from document text.
-    Tries Ollama first, falls back to regex patterns.
+    Tries structured output (Claude) first, then text-based AI, falls back to regex.
     """
     if not text or not text.strip():
         return _empty_metadata()
 
-    # Try Ollama
     truncated = text[:6000]
+
+    # 1. Try structured output (Claude only)
+    from services.ai_service import get_ai_service
+    ai = get_ai_service()
+    result_structured = ai.call_structured(
+        prompt=METADATA_PROMPT.format(text=truncated),
+        tool_name="submit_metadata",
+        tool_description="Submit extracted project metadata",
+        result_schema={
+            "type": "object",
+            "properties": {
+                "bauherr": {"type": ["string", "null"]},
+                "bauort": {"type": ["string", "null"]},
+                "architekt": {"type": ["string", "null"]},
+                "projekt_name": {"type": ["string", "null"]},
+                "datum": {"type": ["string", "null"]},
+                "adresse": {"type": ["string", "null"]},
+            },
+            "required": ["bauherr", "bauort", "architekt", "projekt_name", "datum", "adresse"],
+        },
+        timeout=30.0,
+    )
+    if result_structured and isinstance(result_structured, dict):
+        meta = _empty_metadata("ai-structured")
+        for key in ("bauherr", "bauort", "architekt", "projekt_name", "datum", "adresse"):
+            val = result_structured.get(key)
+            if val and str(val).strip().lower() not in ("null", "none", "n/a", ""):
+                meta[key] = str(val).strip()
+        if any(meta[k] for k in meta if k != "source"):
+            return meta
+
+    # 2. Fallback: text-based AI (Ollama or Claude without schema)
     prompt = METADATA_PROMPT.format(text=truncated)
     raw = _call_ai(prompt, timeout=OLLAMA_TIMEOUT_SHORT)
 
@@ -405,7 +436,7 @@ def _extract_requirements_regex(text: str) -> dict:
 def extract_requirements_from_text(document_text: str) -> dict:
     """
     Extract structured door requirements from tender document text.
-    Tries Ollama first, falls back to regex patterns.
+    Tries structured output (Claude) first, then text-based AI, falls back to regex.
     Replaces claude_client.extract_requirements_from_text().
     """
     if not document_text or not document_text.strip():
@@ -420,6 +451,53 @@ def extract_requirements_from_text(document_text: str) -> dict:
 
 Extrahiere alle Tuerpositionen als strukturiertes JSON."""
 
+    # 1. Try structured output (Claude only)
+    from services.ai_service import get_ai_service
+    ai = get_ai_service()
+    _position_schema = {
+        "type": "object",
+        "properties": {
+            "position": {"type": "string"},
+            "beschreibung": {"type": "string"},
+            "menge": {"type": "integer"},
+            "einheit": {"type": "string"},
+            "tuertyp": {"type": ["string", "null"]},
+            "breite": {"type": ["integer", "null"]},
+            "hoehe": {"type": ["integer", "null"]},
+            "brandschutz": {"type": ["string", "null"]},
+            "schallschutz": {"type": ["string", "null"]},
+            "einbruchschutz": {"type": ["string", "null"]},
+            "verglasung": {"type": ["string", "null"]},
+            "oberflaechenbehandlung": {"type": ["string", "null"]},
+            "zubehoer": {"type": ["string", "null"]},
+            "besonderheiten": {"type": ["string", "null"]},
+        },
+        "required": ["position", "beschreibung", "menge"],
+    }
+    result_structured = ai.call_structured(
+        prompt=prompt,
+        system=_REQ_SYSTEM,
+        tool_name="submit_requirements",
+        tool_description="Submit extracted door requirements from tender document",
+        result_schema={
+            "type": "object",
+            "properties": {
+                "projekt": {"type": "string"},
+                "auftraggeber": {"type": "string"},
+                "positionen": {"type": "array", "items": _position_schema},
+                "gesamtanzahl_tueren": {"type": "integer"},
+                "hinweise": {"type": "string"},
+            },
+            "required": ["positionen"],
+        },
+        timeout=90.0,
+        max_tokens=8192,
+    )
+    if result_structured and isinstance(result_structured, dict) and result_structured.get("positionen"):
+        logger.info(f"Requirements extracted via structured output: {len(result_structured['positionen'])} positions")
+        return result_structured
+
+    # 2. Fallback: text-based AI (Ollama or Claude without schema)
     raw = _call_ai(prompt, system=_REQ_SYSTEM, timeout=OLLAMA_TIMEOUT_MEDIUM)
 
     if raw:

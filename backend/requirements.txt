@@ -23,7 +23,7 @@ Pillow==10.2.0  # Image processing for OCR
 # ─── External APIs ───
 httpx==0.28.1
 requests==2.32.3  # For ERP API integration
-anthropic>=0.42.0
+anthropic>=0.45.0
 python-telegram-bot==21.10
 
 # ─── Database & Storage ───
@@ -38,6 +38,7 @@ cryptography==41.0.7
 python-jose[cryptography]==3.3.0  # For JWT auth
 passlib[bcrypt]==1.7.4  # Password hashing
 python-multipart==0.0.20
+slowapi>=0.1.9  # Rate limiting middleware
 
 # ─── Validation ───
 pydantic==2.5.3

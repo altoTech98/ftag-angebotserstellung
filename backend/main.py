@@ -17,7 +17,7 @@ from fastapi.exceptions import RequestValidationError
 
 from config import settings, BASE_DIR
 from services.logger_setup import setup_logging
-from routers import upload, analyze, offer, feedback, history, catalog, erp
+from routers import upload, analyze, offer, feedback, history, catalog, erp, auth
 from services.exceptions import FrankTuerenError
 from services.erp_connector import get_erp_connector
 
@@ -50,6 +50,14 @@ async def lifespan(app: FastAPI):
     # ─────── STARTUP ────────────
     startup_errors = []
     
+    # 0. Initialize Auth (Admin-User erstellen falls nötig)
+    try:
+        from services.auth_service import init_admin_user
+        init_admin_user()
+    except Exception as e:
+        logger.error(f"[ERROR] Auth initialization failed: {e}")
+        startup_errors.append(f"Auth init failed: {e}")
+
     # 0a. START OLLAMA WATCHDOG (GARANTIERT 24/7)
     try:
         from services.ollama_watchdog import get_ollama_watchdog
@@ -231,7 +239,54 @@ app.add_middleware(
 if settings.ENABLE_COMPRESSION:
     app.add_middleware(GZIPMiddleware, minimum_size=settings.COMPRESSION_MIN_SIZE_BYTES)
 
-# 3. Custom Middleware für Error-Handling & Caching Headers
+# 3. Auth Middleware – schützt alle /api/* Routen (außer Whitelist)
+AUTH_WHITELIST = {
+    "/api/auth/login",
+    "/api/auth/logout",
+    "/health",
+    "/info",
+    "/",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+}
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    """Check Bearer token for protected /api/* routes."""
+    path = request.url.path
+    method = request.method
+
+    # Skip auth for whitelisted paths, OPTIONS, static files, and downloads
+    if (
+        method == "OPTIONS"
+        or path in AUTH_WHITELIST
+        or path.startswith("/static/")
+        or not path.startswith("/api/")
+        or "/download" in path
+    ):
+        return await call_next(request)
+
+    # Extract Bearer token
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Nicht authentifiziert"},
+        )
+
+    from services.auth_service import verify_token
+    token = auth_header[7:]  # Remove "Bearer " prefix
+    user = verify_token(token)
+    if not user:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Token ungueltig oder abgelaufen"},
+        )
+
+    return await call_next(request)
+
+# 4. Custom Middleware für Error-Handling & Caching Headers
 @app.middleware("http")
 async def error_and_cache_middleware(request: Request, call_next):
     """
@@ -310,6 +365,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 # ─────────────────────────────────────────────────────────────────────────────
 
 logger.info("Registering routers...")
+app.include_router(auth.router, prefix="/api", tags=["Auth"])
 app.include_router(upload.router, prefix="/api", tags=["Upload"])
 app.include_router(analyze.router, prefix="/api", tags=["Analysis"])
 app.include_router(offer.router, prefix="/api", tags=["Offer"])
@@ -388,6 +444,9 @@ async def health_check() -> dict:
             logger.warning(f"Catalog health check failed: {e}")
             catalog_ok = False
             catalog_count = 0
+
+        # Add context usage to AI status
+        ai_status["context"] = ai_service.get_context_usage()
 
         # Health info with AI engine status for frontend
         ollama_available = ollama_status.get("available", False)
@@ -524,21 +583,6 @@ async def app_info() -> dict:
         "environment": settings.ENVIRONMENT.value,
         "debug": settings.DEBUG,
         "settings": settings.to_dict(),
-    }
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ROOT ENDPOINT
-# ─────────────────────────────────────────────────────────────────────────────
-
-@app.get("/", include_in_schema=False)
-async def root():
-    """Root endpoint - redirects to frontend"""
-    return {
-        "message": "Frank Türen AG – KI-gestützte Angebotserstellung",
-        "version": settings.API_VERSION,
-        "docs": "/docs" if settings.DEBUG else None,
-        "health": "/health",
     }
 
 

@@ -1,20 +1,48 @@
-__pycache__
+# Dependencies
+.venv/
+venv/
+__pycache__/
 *.pyc
-.git
+*.pyo
+
+# Git
+.git/
 .gitignore
+
+# Runtime data
+uploads/*
+outputs/*
+logs/*
+!uploads/.gitkeep
+!outputs/.gitkeep
+!logs/.gitkeep
+
+# Environment & secrets
+.env
+
+# Documentation & non-essential
 *.md
+docs/
 *.bat
 *.ps1
 *.pptx
 *.pdf
-nul
-uploads/*
-outputs/*
-docs/
-analyze_kunde2.py
+
+# Dev/test files
 test_*.json
 test_*.txt
+analyze_kunde2.py
 tictactoe.html
 screenshot*
-venv/
-.env
+nul
+debug.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store

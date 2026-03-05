@@ -3,12 +3,16 @@ Analyze Router – Document analysis with Ollama AI and product listing.
 POST /api/analyze          – Single-file analysis (background job)
 POST /api/analyze/project  – Multi-file project analysis (background job)
 GET  /api/analyze/status/{job_id} – Poll job status
+GET  /api/analyze/stream/{job_id} – SSE real-time streaming
 GET  /api/products
 """
 
+import asyncio
+import json
 import os
 import logging
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from config import settings
@@ -22,7 +26,7 @@ from services.catalog_index import get_catalog_index
 from services.fast_matcher import match_all as fast_match_all
 from services.history_store import save_analysis
 from services.memory_cache import text_cache, project_cache
-from services.job_store import create_job, get_job, update_job, run_in_background
+from services.job_store import create_job, get_job, update_job, run_in_background, subscribe_job, unsubscribe_job
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +44,42 @@ async def get_analyze_status(job_id: str):
     if not job:
         raise HTTPException(status_code=404, detail="Job nicht gefunden")
     return job.to_dict()
+
+
+@router.get("/analyze/stream/{job_id}")
+async def stream_analyze_status(job_id: str):
+    """SSE endpoint for real-time job progress streaming."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job nicht gefunden")
+
+    queue = subscribe_job(job_id)
+
+    async def event_generator():
+        try:
+            # Send initial status
+            yield f"data: {json.dumps(job.to_dict())}\n\n"
+
+            # If already terminal, stop
+            if job.status in ("completed", "failed"):
+                return
+
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {json.dumps(event)}\n\n"
+                    if event.get("status") in ("completed", "failed"):
+                        break
+                except asyncio.TimeoutError:
+                    yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
+        finally:
+            unsubscribe_job(job_id, queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ─────────────────────────────────────────────

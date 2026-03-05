@@ -65,14 +65,17 @@ def save_feedback_entry(entry: dict) -> dict:
 
 def find_relevant_feedback(
     requirement_text: str,
-    requirement_fields: dict,
+    requirement_fields: dict = None,
     limit: int = 8,
 ) -> list[dict]:
     """
     Find past corrections AND confirmations most relevant to the current requirement.
-    Uses keyword overlap scoring to find similar past requirements.
+    Uses keyword overlap scoring with synonym expansion and field matching.
     Returns both corrections (negative) and confirmations (positive) examples.
     """
+    if requirement_fields is None:
+        requirement_fields = {}
+
     entries = load_feedback()
     if not entries:
         return []
@@ -81,20 +84,42 @@ def find_relevant_feedback(
     if not current_keywords:
         return []
 
+    # Expand keywords with synonyms
+    expanded = set(current_keywords)
+    try:
+        from services.product_matcher import expand_synonyms
+        for kw in list(current_keywords):
+            expanded.update(s.lower() for s in expand_synonyms(kw))
+    except ImportError:
+        pass
+
     scored = []
     for entry in entries:
         past_keywords = _extract_keywords(
             entry.get("requirement_text", ""),
             entry.get("requirement_fields", {}),
         )
-        overlap = len(current_keywords & past_keywords)
+        overlap = len(expanded & past_keywords)
         if overlap > 0:
             # Corrections get a slight boost (more actionable)
             weight = overlap * 1.2 if entry.get("type") != "confirmation" else overlap
+
+            # Exact field match bonus
+            past_fields = entry.get("requirement_fields", {})
+            for f in ("brandschutz", "einbruchschutz", "tuertyp"):
+                if (requirement_fields.get(f) and past_fields.get(f)
+                        and _normalize_field(requirement_fields[f]) == _normalize_field(past_fields[f])):
+                    weight += 3
+
             scored.append((weight, entry))
 
     scored.sort(key=lambda x: x[0], reverse=True)
     return [entry for _, entry in scored[:limit]]
+
+
+def _normalize_field(val: str) -> str:
+    """Normalize a field value for comparison."""
+    return str(val).lower().strip().replace(" ", "").replace("-", "")
 
 
 def save_confirmation(

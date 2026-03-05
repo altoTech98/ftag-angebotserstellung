@@ -5,6 +5,76 @@
 
 const API = `${window.location.origin}/api`;
 
+// ─────────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────────
+
+function getToken() { return localStorage.getItem('auth_token'); }
+function setToken(t) { localStorage.setItem('auth_token', t); }
+function clearToken() { localStorage.removeItem('auth_token'); }
+
+function showApp() {
+  document.getElementById('login-screen').classList.add('hidden');
+}
+
+function showLogin() {
+  document.getElementById('login-screen').classList.remove('hidden');
+  const errEl = document.getElementById('login-error');
+  if (errEl) errEl.classList.add('hidden');
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  errEl.classList.add('hidden');
+  btn.disabled = true;
+  btn.textContent = 'Anmelden...';
+  try {
+    const res = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || 'Login fehlgeschlagen');
+    }
+    const data = await res.json();
+    setToken(data.token);
+    showApp();
+    checkServerHealth();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Anmelden';
+  }
+}
+
+function handleLogout() {
+  clearToken();
+  showLogin();
+}
+
+async function checkAuth() {
+  const token = getToken();
+  if (!token) { showLogin(); return; }
+  try {
+    const res = await fetch(`${API}/auth/me`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Token invalid');
+    showApp();
+  } catch {
+    clearToken();
+    showLogin();
+  }
+}
+
 let state = {
   file: null,
   files: [],
@@ -385,6 +455,40 @@ async function runFolderWorkflow() {
 // ─────────────────────────────────────────────
 
 async function pollJob(jobId, onProgress, statusPath = '/analyze/status/') {
+  // Try SSE first for real-time updates (only for analyze jobs)
+  if (statusPath === '/analyze/status/') {
+    try {
+      return await pollJobSSE(jobId, onProgress);
+    } catch (e) {
+      console.warn('SSE fallback to polling:', e.message);
+    }
+  }
+  // Fallback: traditional polling
+  return await pollJobFallback(jobId, onProgress, statusPath);
+}
+
+async function pollJobSSE(jobId, onProgress) {
+  return new Promise((resolve, reject) => {
+    const es = new EventSource(`${API}/analyze/stream/${jobId}`);
+    let settled = false;
+    const settle = (fn, val) => { if (!settled) { settled = true; es.close(); fn(val); } };
+
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === 'keepalive') return;
+        if (data.progress && onProgress) onProgress(data.progress);
+        if (data.status === 'completed') settle(resolve, data.result);
+        if (data.status === 'failed') settle(reject, new Error(data.error || 'Analyse fehlgeschlagen'));
+      } catch (err) {
+        console.warn('SSE parse error:', err);
+      }
+    };
+    es.onerror = () => { settle(reject, new Error('SSE connection error')); };
+  });
+}
+
+async function pollJobFallback(jobId, onProgress, statusPath = '/analyze/status/') {
   const POLL_INTERVAL = 2000;
   const MAX_POLLS = 450;
 
@@ -1181,12 +1285,27 @@ async function saveCorrection() {
 
 async function api(path, opts = {}) {
   const url = path.startsWith('http') ? path : `${API}${path}`;
+  // Inject auth token
+  const token = getToken();
+  if (token) {
+    opts.headers = opts.headers || {};
+    if (opts.headers instanceof Headers) {
+      opts.headers.set('Authorization', `Bearer ${token}`);
+    } else {
+      opts.headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
   let res;
   try {
     res = await fetch(url, opts);
   } catch (networkErr) {
     console.error(`[API] Network error for ${path}:`, networkErr);
     throw new Error('Server nicht erreichbar. Ist der Server gestartet?');
+  }
+  if (res.status === 401) {
+    clearToken();
+    showLogin();
+    throw new Error('Sitzung abgelaufen – bitte erneut anmelden.');
   }
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
@@ -1247,11 +1366,27 @@ async function checkServerHealth() {
         aiText.textContent = 'KI';
       }
     }
+
+    // Context window usage
+    const ctxBar = document.getElementById('ctx-bar');
+    const ctxText = document.getElementById('ctx-text');
+    if (ctxBar && ctxText && data.ai && data.ai.context) {
+      const ctx = data.ai.context;
+      const pct = ctx.usage_pct || 0;
+      ctxBar.style.width = Math.min(pct, 100) + '%';
+      const fmt = (n) => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'k' : n;
+      ctxText.textContent = `Ctx ${fmt(ctx.total_tokens)}`;
+      ctxBar.style.background = pct > 80 ? '#dc2626' : pct > 50 ? '#d97706' : '#16a34a';
+    }
   } catch (err) {
     serverDot.style.background = '#dc2626';
     serverText.textContent = 'Offline';
     if (aiDot) { aiDot.style.background = '#6b7280'; }
     if (aiText) { aiText.textContent = 'KI'; }
+    const ctxText = document.getElementById('ctx-text');
+    if (ctxText) { ctxText.textContent = 'Ctx --'; }
+    const ctxBar = document.getElementById('ctx-bar');
+    if (ctxBar) { ctxBar.style.width = '0%'; }
     console.warn('[Health Check] Server offline:', err.message);
   }
 }
@@ -1270,6 +1405,8 @@ window.addEventListener('scroll', () => {
   if (header) header.classList.toggle('scrolled', window.scrollY > 0);
 }, { passive: true });
 
-// Run health check on load and periodically
-checkServerHealth();
-setInterval(checkServerHealth, 15000); // Check every 15 seconds
+// Check auth on load, then run health check
+checkAuth().then(() => {
+  checkServerHealth();
+  setInterval(checkServerHealth, 15000);
+});

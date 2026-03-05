@@ -164,7 +164,7 @@ class Validator:
         filename = filename.replace("/", "_").replace("\\", "_")
         
         # Keep only safe characters
-        filename = re.sub(r'[^\w\s\-\.]', '', filename)
+        filename = re.sub(r'[^\w\s\-\.\(\),]', '', filename)
         filename = re.sub(r'[\s]+', '_', filename)
         
         # Prevent empty filenames

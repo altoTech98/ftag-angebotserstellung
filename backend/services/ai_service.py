@@ -37,7 +37,7 @@ class AIService:
 
         # Claude config
         self._anthropic_key = settings.ANTHROPIC_API_KEY
-        self._claude_model = "claude-sonnet-4-6"
+        self._claude_model = settings.CLAUDE_MODEL
         self._claude_client = None
 
         # Ollama config
@@ -63,6 +63,12 @@ class AIService:
 
         # Active engine (set after first probe)
         self._active_engine = None
+
+        # Cumulative token tracking
+        self._total_input_tokens = 0
+        self._total_output_tokens = 0
+        self._call_count = 0
+        self._context_limit = 200_000  # Claude sonnet default
 
         logger.info(
             f"[AIService] Initialized | preferred={self._preferred_engine} | "
@@ -142,6 +148,7 @@ class AIService:
             return None
 
         try:
+            from config import settings as _cfg
             kwargs = {
                 "model": self._claude_model,
                 "max_tokens": max_tokens,
@@ -151,11 +158,27 @@ class AIService:
             if system:
                 kwargs["system"] = system
 
+            # Adaptive Thinking
+            if _cfg.CLAUDE_THINKING_ENABLED:
+                kwargs["thinking"] = {"type": "adaptive"}
+
             message = client.messages.create(**kwargs)
-            text = message.content[0].text.strip()
+
+            # Track token usage
+            if hasattr(message, 'usage') and message.usage:
+                self._total_input_tokens += getattr(message.usage, 'input_tokens', 0)
+                self._total_output_tokens += getattr(message.usage, 'output_tokens', 0)
+                self._call_count += 1
+
+            # Skip thinking blocks, find first text block
+            text = None
+            for block in message.content:
+                if block.type == "text":
+                    text = block.text.strip()
+                    break
 
             if not text:
-                logger.warning("[AIService] Claude returned empty response")
+                logger.warning("[AIService] Claude returned no text block")
                 return None
 
             return text
@@ -163,6 +186,61 @@ class AIService:
         except Exception as e:
             logger.warning(f"[AIService] Claude call failed: {e}")
             self._claude_available = False
+            return None
+
+    def call_structured(self, prompt: str, system: str = "",
+                        tool_name: str = "submit_result",
+                        tool_description: str = "Submit structured result",
+                        result_schema: dict = None,
+                        timeout: float = 120.0,
+                        max_tokens: int = 4096) -> dict | None:
+        """Call Claude with structured output via tool use. Returns dict or None."""
+        self._probe_engines()
+        if self._active_engine != ENGINE_CLAUDE:
+            return None  # Structured outputs only with Claude
+
+        client = self._get_claude_client()
+        if not client:
+            return None
+
+        tool = {
+            "name": tool_name,
+            "description": tool_description,
+            "input_schema": result_schema,
+        }
+
+        try:
+            from config import settings as _cfg
+            kwargs = {
+                "model": self._claude_model,
+                "max_tokens": max_tokens,
+                "messages": [{"role": "user", "content": prompt}],
+                "tools": [tool],
+                "tool_choice": {"type": "tool", "name": tool_name},
+                "timeout": timeout,
+            }
+            if system:
+                kwargs["system"] = system
+
+            # Adaptive Thinking for structured calls too
+            if _cfg.CLAUDE_THINKING_ENABLED:
+                kwargs["thinking"] = {"type": "adaptive"}
+
+            message = client.messages.create(**kwargs)
+
+            # Track tokens
+            if hasattr(message, 'usage') and message.usage:
+                self._total_input_tokens += getattr(message.usage, 'input_tokens', 0)
+                self._total_output_tokens += getattr(message.usage, 'output_tokens', 0)
+                self._call_count += 1
+
+            # Extract tool_use result (skip thinking blocks)
+            for block in message.content:
+                if block.type == "tool_use":
+                    return block.input  # Already a dict, guaranteed valid
+            return None
+        except Exception as e:
+            logger.warning(f"[AIService] Claude structured call failed: {e}")
             return None
 
     def _call_ollama(self, prompt: str, system: str = "", timeout: float = 90.0) -> str | None:
@@ -180,7 +258,15 @@ class AIService:
             response = httpx.post(self._ollama_generate_url, json=payload, timeout=timeout)
             response.raise_for_status()
 
-            raw = response.json().get("response", "")
+            resp_json = response.json()
+
+            # Track token usage from Ollama
+            self._total_input_tokens += resp_json.get("prompt_eval_count", 0)
+            self._total_output_tokens += resp_json.get("eval_count", 0)
+            self._call_count += 1
+            self._context_limit = 8192  # Ollama default
+
+            raw = resp_json.get("response", "")
             if not raw.strip():
                 logger.warning("[AIService] Ollama returned empty response")
                 return None
@@ -267,6 +353,18 @@ class AIService:
                 "available": True,  # regex always works
                 "model": "regex-fallback",
             }
+
+    def get_context_usage(self) -> dict:
+        """Get cumulative token usage across all API calls since server start."""
+        total = self._total_input_tokens + self._total_output_tokens
+        return {
+            "total_tokens": total,
+            "input_tokens": self._total_input_tokens,
+            "output_tokens": self._total_output_tokens,
+            "context_limit": self._context_limit,
+            "usage_pct": round((total / self._context_limit) * 100, 1) if self._context_limit else 0,
+            "call_count": self._call_count,
+        }
 
     def invalidate_cache(self):
         """Force re-probe on next call."""
