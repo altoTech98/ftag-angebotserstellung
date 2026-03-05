@@ -92,18 +92,21 @@ async def lifespan(app: FastAPI):
         logger.warning(msg)
         startup_errors.append(msg)
     
-    # 2. Test Ollama Verbindung
+    # 2. Initialize AI Service (Claude -> Ollama -> Regex failover)
     try:
-        from services.local_llm import check_ollama_status
-        status_result = check_ollama_status()
-        if status_result and status_result.get("available"):
-            logger.info(f"[OK] Ollama connected | Model: {settings.OLLAMA_MODEL}")
+        from services.ai_service import get_ai_service
+        ai_service = get_ai_service()
+        ai_status = ai_service.get_status()
+        engine = ai_status["engine"]
+        model = ai_status["model"]
+        if engine == "claude":
+            logger.info(f"[OK] AI Service: Claude API | Model: {model}")
+        elif engine == "ollama":
+            logger.info(f"[OK] AI Service: Ollama (lokal) | Model: {model}")
         else:
-            logger.warning("[WARN] Ollama not available | Using fallback mode")
-            if not settings.OLLAMA_FALLBACK_ENABLED:
-                startup_errors.append("Ollama required but not available")
+            logger.warning("[WARN] AI Service: Regex-Fallback (keine KI-Engine verfuegbar)")
     except Exception as e:
-        logger.warning(f"[WARN] Ollama check failed: {e}")
+        logger.warning(f"[WARN] AI Service init failed: {e}")
     
     # 3. Test Telegram Bot (optional)
     if settings.TELEGRAM_ENABLED:
@@ -366,17 +369,22 @@ async def health_check() -> dict:
     """
     try:
         from services.availability_manager import get_availability_manager
+        from services.ai_service import get_ai_service
         from services.local_llm import check_ollama_status_live
         from services.memory_cache import text_cache, offer_cache, project_cache
         from services.catalog_index import get_catalog_index
-        
+
         # Get Availability Manager Status
         availability_mgr = get_availability_manager()
         am_status = availability_mgr.get_status()
-        
-        # Check Ollama (live check without cache)
+
+        # Get AI Service status (unified engine status)
+        ai_service = get_ai_service()
+        ai_status = ai_service.get_status()
+
+        # Check Ollama (live check without cache, for backward compat)
         ollama_status = check_ollama_status_live()
-        
+
         # Check Catalog
         try:
             catalog = get_catalog_index()
@@ -386,13 +394,14 @@ async def health_check() -> dict:
             logger.warning(f"Catalog health check failed: {e}")
             catalog_ok = False
             catalog_count = 0
-        
-        # Health info (always includes ollama status for frontend)
+
+        # Health info with AI engine status for frontend
         ollama_available = ollama_status.get("available", False)
         health_response = {
             "status": "healthy" if availability_mgr.is_system_available() else "degraded",
             "service": "Frank Türen AG – Angebotserstellung",
             "version": settings.API_VERSION,
+            "ai": ai_status,
             "ollama": {
                 "available": ollama_available,
                 "fallback_enabled": settings.OLLAMA_FALLBACK_ENABLED,

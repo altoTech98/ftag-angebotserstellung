@@ -103,6 +103,9 @@ class Settings:
     OLLAMA_TIMEOUT_LONG: float = 120.0
     OLLAMA_FALLBACK_ENABLED: bool = True  # Regex-Fallback wenn Ollama nicht verfügbar
     
+    # AI Engine Selection
+    AI_PREFERRED_ENGINE: str = os.environ.get("AI_PREFERRED_ENGINE", "auto")  # "auto" | "claude" | "ollama"
+
     # Claude API (optional, backward compatibility)
     ANTHROPIC_API_KEY: Optional[str] = os.environ.get("ANTHROPIC_API_KEY")
     

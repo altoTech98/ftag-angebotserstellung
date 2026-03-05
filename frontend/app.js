@@ -1232,21 +1232,29 @@ async function checkServerHealth() {
     if (serverText) serverText.textContent = 'Server (online)';
     serverDot.title = 'Server verbunden';
 
-    // Ollama status
+    // AI engine status (unified: Claude / Ollama / Regex)
     if (ollamaDot && ollamaText) {
-      if (data.ollama && data.ollama.available) {
+      if (data.ai && data.ai.engine === 'claude') {
         ollamaDot.style.background = '#16a34a';
-        const model = data.ollama.models && data.ollama.models[0] ? data.ollama.models[0].split(':')[0] : 'verbunden';
-        ollamaText.textContent = `Ollama (${model})`;
+        ollamaText.textContent = 'Claude AI (Online)';
+        ollamaDot.title = 'Claude API verbunden – hoechste Qualitaet';
+      } else if (data.ai && data.ai.engine === 'ollama') {
+        ollamaDot.style.background = '#16a34a';
+        ollamaText.textContent = 'Ollama (Lokal)';
+        ollamaDot.title = 'Ollama lokal verbunden';
+      } else if (data.ai && data.ai.engine === 'regex') {
+        ollamaDot.style.background = '#d97706';
+        ollamaText.textContent = 'KI (Basis-Modus)';
+        ollamaDot.title = 'Keine KI-Engine verfuegbar – Regex-Fallback aktiv';
+      } else if (data.ollama && data.ollama.available) {
+        // Backward compatibility: old health format
+        ollamaDot.style.background = '#16a34a';
+        ollamaText.textContent = 'Ollama (Lokal)';
         ollamaDot.title = 'Ollama verbunden';
-      } else if (data.ollama && data.ollama.fallback_enabled) {
-        ollamaDot.style.background = '#16a34a';
-        ollamaText.textContent = 'KI (Fallback aktiv)';
-        ollamaDot.title = 'Ollama nicht verfuegbar - Fallback-Matching aktiv';
       } else {
         ollamaDot.style.background = '#d97706';
-        ollamaText.textContent = 'Ollama (offline)';
-        ollamaDot.title = 'Ollama nicht erreichbar';
+        ollamaText.textContent = 'KI (Basis-Modus)';
+        ollamaDot.title = 'Keine KI-Engine verfuegbar';
       }
     }
   } catch (err) {
@@ -1254,8 +1262,8 @@ async function checkServerHealth() {
     if (serverText) serverText.textContent = 'Server (offline)';
     serverDot.title = 'Server nicht erreichbar';
     if (ollamaDot) {
-      ollamaDot.style.background = '#6b7280';
-      if (ollamaText) ollamaText.textContent = 'Ollama (?)';
+      ollamaDot.style.background = '#dc2626';
+      if (ollamaText) ollamaText.textContent = 'Server offline';
     }
     console.warn('[Health Check] Server offline:', err.message);
   }

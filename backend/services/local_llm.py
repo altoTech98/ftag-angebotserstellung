@@ -1,5 +1,10 @@
 """
-Local LLM Service – Ollama-based AI functions replacing Claude API.
+Local LLM Service – AI functions with automatic failover.
+
+Uses AIService for intelligent engine selection:
+1. Claude API (highest quality, cloud-ready)
+2. Ollama (local, fast, free)
+3. Regex/template fallback (always works)
 
 Provides:
 - Project metadata extraction (Bauherr, Baustelle, etc.)
@@ -7,9 +12,7 @@ Provides:
 - Offer text generation
 - Gap report text generation
 - Document scanning for door data enrichment
-- Ollama health check
-
-All functions fall back to regex/template if Ollama is unavailable.
+- Ollama health check (for backward compatibility)
 """
 
 import os
@@ -23,7 +26,6 @@ logger = logging.getLogger(__name__)
 
 # ─── Configuration ───────────────────────────────────────────
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_GENERATE_URL = f"{OLLAMA_BASE_URL}/api/generate"
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2")
 
 from config import settings as _settings
@@ -36,41 +38,13 @@ _status_cache = {"result": None, "timestamp": 0}
 _STATUS_CACHE_TTL = 5  # seconds - reduced from 30s for faster status updates
 
 
-# ─── Core Ollama Helper ─────────────────────────────────────
-
-def _call_ollama(prompt: str, system: str = "", timeout: float = OLLAMA_TIMEOUT_SHORT) -> str | None:
+def _call_ai(prompt: str, system: str = "", timeout: float = OLLAMA_TIMEOUT_SHORT) -> str | None:
     """
-    Call Ollama generate API. Returns response text or None on failure.
+    Call AI via unified AIService (Claude -> Ollama -> None).
+    Returns response text or None (caller handles regex fallback).
     """
-    try:
-        payload = {
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0.1, "num_predict": 4096},
-        }
-        if system:
-            payload["system"] = system
-
-        response = httpx.post(OLLAMA_GENERATE_URL, json=payload, timeout=timeout)
-        response.raise_for_status()
-
-        raw = response.json().get("response", "")
-        if not raw.strip():
-            logger.warning("Ollama returned empty response")
-            return None
-
-        return raw
-
-    except httpx.ConnectError:
-        logger.info("Ollama not reachable")
-        return None
-    except httpx.TimeoutException:
-        logger.warning(f"Ollama timeout after {timeout}s")
-        return None
-    except Exception as e:
-        logger.warning(f"Ollama call failed: {e}")
-        return None
+    from services.ai_service import get_ai_service
+    return get_ai_service().call(prompt, system=system, timeout=timeout)
 
 
 # ─── JSON Repair ─────────────────────────────────────────────
@@ -264,12 +238,12 @@ def extract_project_metadata(text: str) -> dict:
     # Try Ollama
     truncated = text[:6000]
     prompt = METADATA_PROMPT.format(text=truncated)
-    raw = _call_ollama(prompt, timeout=OLLAMA_TIMEOUT_SHORT)
+    raw = _call_ai(prompt, timeout=OLLAMA_TIMEOUT_SHORT)
 
     if raw:
         parsed = _extract_json_from_response(raw)
         if parsed and isinstance(parsed, dict):
-            result = _empty_metadata("ollama")
+            result = _empty_metadata("ai")
             for key in ("bauherr", "bauort", "architekt", "projekt_name", "datum", "adresse"):
                 val = parsed.get(key)
                 if val and str(val).strip().lower() not in ("null", "none", "n/a", ""):
@@ -424,7 +398,7 @@ def _extract_requirements_regex(text: str) -> dict:
         "auftraggeber": "",
         "positionen": positions,
         "gesamtanzahl_tueren": sum(p.get("menge", 1) for p in positions),
-        "hinweise": "Regex-basierte Extraktion (Ollama nicht verfuegbar)",
+        "hinweise": "Regex-basierte Extraktion (KI nicht verfuegbar)",
     }
 
 
@@ -446,12 +420,12 @@ def extract_requirements_from_text(document_text: str) -> dict:
 
 Extrahiere alle Tuerpositionen als strukturiertes JSON."""
 
-    raw = _call_ollama(prompt, system=_REQ_SYSTEM, timeout=OLLAMA_TIMEOUT_MEDIUM)
+    raw = _call_ai(prompt, system=_REQ_SYSTEM, timeout=OLLAMA_TIMEOUT_MEDIUM)
 
     if raw:
         parsed = _extract_json_from_response(raw)
         if parsed and isinstance(parsed, dict) and "positionen" in parsed:
-            logger.info(f"Requirements extracted via Ollama: {len(parsed.get('positionen', []))} positions")
+            logger.info(f"Requirements extracted via AI: {len(parsed.get('positionen', []))} positions")
             return parsed
 
     logger.info("Requirements extraction: falling back to regex")
@@ -557,10 +531,10 @@ Erstelle ein professionelles Angebot mit:
 Verwende realistische Preisangaben fuer Stahl/Metalltueren (Richtwerte: einfache Stahltuer CHF 800-1500, Brandschutztuer CHF 1200-3000, Sicherheitstuer RC2 CHF 1500-4000 je nach Groesse).
 Markiere Preise als "Richtpreise exkl. Montage" wenn keine exakten Daten vorliegen."""
 
-    raw = _call_ollama(prompt, system=_OFFER_SYSTEM, timeout=OLLAMA_TIMEOUT_LONG)
+    raw = _call_ai(prompt, system=_OFFER_SYSTEM, timeout=OLLAMA_TIMEOUT_LONG)
 
     if raw and len(raw.strip()) > 100:
-        logger.info(f"Offer text generated via Ollama ({len(raw)} chars)")
+        logger.info(f"Offer text generated via AI ({len(raw)} chars)")
         return raw
 
     logger.info("Offer text generation: falling back to template")
@@ -644,10 +618,10 @@ Erstelle einen detaillierten Gap-Report mit:
 3. Handlungsempfehlungen
 4. Naechste Schritte"""
 
-    raw = _call_ollama(prompt, system=_GAP_SYSTEM, timeout=OLLAMA_TIMEOUT_LONG)
+    raw = _call_ai(prompt, system=_GAP_SYSTEM, timeout=OLLAMA_TIMEOUT_LONG)
 
     if raw and len(raw.strip()) > 50:
-        logger.info(f"Gap report generated via Ollama ({len(raw)} chars)")
+        logger.info(f"Gap report generated via AI ({len(raw)} chars)")
         return raw
 
     logger.info("Gap report generation: falling back to template")
@@ -799,12 +773,12 @@ def scan_document_for_door_data(text: str, filename: str = "") -> dict:
 
 Extrahiere alle tuerbezogenen Daten als JSON."""
 
-    raw = _call_ollama(prompt, system=_SCAN_SYSTEM, timeout=OLLAMA_TIMEOUT_MEDIUM)
+    raw = _call_ai(prompt, system=_SCAN_SYSTEM, timeout=OLLAMA_TIMEOUT_MEDIUM)
 
     if raw:
         parsed = _extract_json_from_response(raw)
         if parsed and isinstance(parsed, dict):
-            logger.info(f"Document scan via Ollama ({filename}): "
+            logger.info(f"Document scan via AI ({filename}): "
                         f"relevant={parsed.get('is_relevant')}, "
                         f"properties={len(parsed.get('door_properties', []))}")
             return {
