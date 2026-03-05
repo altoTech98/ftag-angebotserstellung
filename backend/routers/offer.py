@@ -18,7 +18,7 @@ from services.offer_generator import (
     generate_offer_word, generate_gap_report_word,
 )
 from services.memory_cache import offer_cache
-from services.job_store import create_job, get_job, update_job, run_in_background
+from services.job_store import create_job, get_job, run_in_background
 from services.price_calculator import get_price_calculator
 
 logger = logging.getLogger(__name__)

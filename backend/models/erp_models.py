@@ -6,7 +6,7 @@ Type-safe Datenvalidierung und Dokumentation
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
 
 class AvailabilityStatusModel(str, Enum):

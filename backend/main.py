@@ -127,8 +127,8 @@ async def lifespan(app: FastAPI):
 
     # 4. Initialize Cache
     try:
-        from services.memory_cache import text_cache, offer_cache, project_cache
-        logger.info(f"[OK] Caching system initialized | Max size: {settings.CACHE_MAX_SIZE_MB}MB")
+        import services.memory_cache  # noqa: F401 — triggers cache initialization
+        logger.info("[OK] Caching system initialized | Max size: %sMB", settings.CACHE_MAX_SIZE_MB)
     except Exception as e:
         logger.error(f"[ERROR] Cache initialization failed: {e}")
         startup_errors.append(f"Cache init failed: {e}")
@@ -153,7 +153,7 @@ async def lifespan(app: FastAPI):
     
     # Log startup result
     if startup_errors:
-        logger.warning(f"[WARN] Startup warnings:\n" + "\n".join(startup_errors))
+        logger.warning("[WARN] Startup warnings:\n" + "\n".join(startup_errors))
     else:
         logger.info("[OK] All startup checks passed")
     
@@ -549,7 +549,7 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
     
-    logger.info(f"Starting uvicorn server...")
+    logger.info("Starting uvicorn server...")
     logger.info(f"  Host: {settings.HOST}")
     logger.info(f"  Port: {settings.PORT}")
     logger.info(f"  Reload: {settings.RELOAD}")

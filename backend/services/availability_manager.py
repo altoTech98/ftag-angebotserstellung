@@ -6,8 +6,8 @@ Automatische Überprüfung aller kritischen Services mit Self-Healing
 import logging
 import asyncio
 import threading
-from typing import Dict, List, Optional
-from datetime import datetime, timedelta
+from typing import Dict, Optional
+from datetime import datetime
 from enum import Enum
 import json
 

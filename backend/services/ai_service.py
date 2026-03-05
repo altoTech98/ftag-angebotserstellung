@@ -101,11 +101,11 @@ class AIService:
         # Probe Claude
         self._claude_available = False
         if self._anthropic_key:
-            try:
-                import anthropic
+            import importlib.util
+            if importlib.util.find_spec("anthropic") is not None:
                 self._claude_available = True
                 logger.debug("[AIService] Claude API available (key present, SDK installed)")
-            except ImportError:
+            else:
                 logger.info("[AIService] Claude API unavailable (SDK not installed)")
 
         # Probe Ollama
