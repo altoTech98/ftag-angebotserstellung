@@ -1210,9 +1210,11 @@ async function api(path, opts = {}) {
 // ─────────────────────────────────────────────
 
 async function checkServerHealth() {
-  const dot = document.getElementById('server-dot');
-  const text = document.getElementById('server-text');
-  if (!dot) return;
+  const serverDot = document.getElementById('server-dot');
+  const serverText = document.getElementById('server-text');
+  const aiDot = document.getElementById('ai-dot');
+  const aiText = document.getElementById('ai-text');
+  if (!serverDot) return;
 
   try {
     const healthUrl = `${API.replace('/api', '')}/health`;
@@ -1225,23 +1227,31 @@ async function checkServerHealth() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    // Single unified status: show active AI engine
-    if (data.ai && data.ai.engine === 'claude') {
-      dot.style.background = '#16a34a';
-      text.textContent = 'Claude AI';
-    } else if (data.ai && data.ai.engine === 'ollama') {
-      dot.style.background = '#16a34a';
-      text.textContent = 'Ollama';
-    } else if (data.ai && data.ai.engine === 'regex') {
-      dot.style.background = '#d97706';
-      text.textContent = 'Basis-Modus';
-    } else {
-      dot.style.background = '#16a34a';
-      text.textContent = 'Online';
+    // Server online
+    serverDot.style.background = '#16a34a';
+    serverText.textContent = 'Server';
+
+    // AI engine
+    if (aiDot && aiText) {
+      if (data.ai && data.ai.engine === 'claude') {
+        aiDot.style.background = '#16a34a';
+        aiText.textContent = 'Claude AI';
+      } else if (data.ai && data.ai.engine === 'ollama') {
+        aiDot.style.background = '#16a34a';
+        aiText.textContent = 'Ollama';
+      } else if (data.ai && data.ai.engine === 'regex') {
+        aiDot.style.background = '#d97706';
+        aiText.textContent = 'Basis-Modus';
+      } else {
+        aiDot.style.background = '#16a34a';
+        aiText.textContent = 'KI';
+      }
     }
   } catch (err) {
-    dot.style.background = '#dc2626';
-    text.textContent = 'Offline';
+    serverDot.style.background = '#dc2626';
+    serverText.textContent = 'Offline';
+    if (aiDot) { aiDot.style.background = '#6b7280'; }
+    if (aiText) { aiText.textContent = 'KI'; }
     console.warn('[Health Check] Server offline:', err.message);
   }
 }
