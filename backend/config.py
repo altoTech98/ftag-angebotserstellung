@@ -176,7 +176,7 @@ class Settings:
             pass
         
         if issues:
-            raise RuntimeError(f"Settings-Validierung fehlgeschlagen:\n" + "\n".join(issues))
+            raise RuntimeError("Settings-Validierung fehlgeschlagen:\n" + "\n".join(issues))
         
         return True
     

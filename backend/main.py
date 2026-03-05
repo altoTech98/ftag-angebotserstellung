@@ -3,21 +3,10 @@ Frank Türen AG – KI-gestützte Angebotserstellung
 Production-Grade FastAPI Backend mit vollständigem Error-Handling
 """
 
-import os
-import sys
 import logging
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Optional
 from datetime import datetime
-
-# Konfiguration laden BEVOR FastAPI initialisiert wird
-from config import settings, BASE_DIR
-from services.logger_setup import setup_logging
-
-# Logger initialisieren
-setup_logging()
-logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,19 +15,24 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 
-# Rate Limiting
-try:
-    from slowapi import Limiter, _rate_limit_exceeded_handler
-    from slowapi.util import get_remote_address
-    from slowapi.errors import RateLimitExceeded
-    SLOWAPI_AVAILABLE = True
-except ImportError:
-    SLOWAPI_AVAILABLE = False
-
-# Router
+from config import settings, BASE_DIR
+from services.logger_setup import setup_logging
 from routers import upload, analyze, offer, feedback, history, catalog, erp
 from services.exceptions import FrankTuerenError
 from services.erp_connector import get_erp_connector
+
+# Logger initialisieren (nach allen Imports)
+setup_logging()
+logger = logging.getLogger(__name__)
+
+# Rate Limiting (optional dependency)
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler  # noqa: E402
+    from slowapi.util import get_remote_address  # noqa: E402
+    from slowapi.errors import RateLimitExceeded  # noqa: E402
+    SLOWAPI_AVAILABLE = True
+except ImportError:
+    SLOWAPI_AVAILABLE = False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
