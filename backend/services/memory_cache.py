@@ -75,21 +75,19 @@ class MemoryCache(Generic[T]):
         )
 
     def set(
-        self, 
-        key: str, 
-        value: Any, 
+        self,
+        key: str,
+        value: Any,
         ttl_seconds: Optional[int] = None,
-        **metadata
     ) -> bool:
         """
         Speichert einen Wert mit TTL.
-        
+
         Args:
             key: Cache-Key
             value: Zu speichernder Wert
             ttl_seconds: Time-to-live in Sekunden
-            **metadata: Zusätzliche Metadaten
-            
+
         Returns:
             True wenn erfolgreich, False wenn zu groß
         """

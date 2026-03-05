@@ -54,11 +54,11 @@ class Settings:
     HOST: str = os.environ.get("HOST", "0.0.0.0")
     PORT: int = int(os.environ.get("PORT", 8000))
     RELOAD: bool = ENVIRONMENT == Environment.DEVELOPMENT
-    WORKERS: int = int(os.environ.get("WORKERS", 4))
+    WORKERS: int = int(os.environ.get("WORKERS", 1))
     
     # Logging
     LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO" if not DEBUG else "DEBUG")
-    LOG_FORMAT: str = "json"  # "json" oder "standard"
+    # LOG_FORMAT removed: was defined but never read
     
     # File Upload
     ALLOWED_EXTENSIONS: set = {
@@ -119,12 +119,10 @@ class Settings:
     MAX_CONCURRENT_JOBS: int = int(os.environ.get("MAX_CONCURRENT_JOBS", 10))
     
     # Performance
-    ENABLE_CACHING: bool = True
     ENABLE_COMPRESSION: bool = True
     COMPRESSION_MIN_SIZE_BYTES: int = 1000
     
     # Security
-    CSRF_PROTECTION_ENABLED: bool = not DEBUG
     RATE_LIMIT_ENABLED: bool = ENVIRONMENT == Environment.PRODUCTION
     RATE_LIMIT_REQUESTS: int = 100  # Requests
     RATE_LIMIT_PERIOD_SECONDS: int = 60  # Pro Minute
@@ -148,6 +146,14 @@ class Settings:
     MIN_TEXT_LENGTH_FOR_ANALYSIS: int = 50  # Minimum Characters für Analysis
     MIN_PRODUCTS_FOR_MATCHING: int = 3  # Minimum gefundene Produkte
     
+    # Pricing
+    VAT_RATE: float = 0.081  # 8.1% MwSt Schweiz
+
+    # Company Info
+    COMPANY_NAME: str = "Frank Türen AG"
+    COMPANY_ADDRESS: str = "Industriestrasse 12 · 6374 Buochs NW · Tel. 041 620 76 76 · www.franktueren.ch"
+    COMPANY_LOCATION: str = "Buochs NW"
+
     # Matching
     MATCH_SCORE_THRESHOLD: int = 60  # Score >= 60 = machbar
     PARTIAL_MATCH_THRESHOLD: int = 35  # 35-59 = teilweise machbar
@@ -179,7 +185,7 @@ class Settings:
             "debug": cls.DEBUG,
             "api_version": cls.API_VERSION,
             "max_file_size_mb": cls.MAX_FILE_SIZE_MB,
-            "cache_enabled": cls.ENABLE_CACHING,
+            "cache_max_size_mb": cls.CACHE_MAX_SIZE_MB,
             "ollama_model": cls.OLLAMA_MODEL,
             "log_level": cls.LOG_LEVEL,
         }

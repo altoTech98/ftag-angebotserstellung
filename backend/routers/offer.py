@@ -108,9 +108,9 @@ def _run_offer_generation(requirements: dict, matching: dict) -> dict:
         xlsx_bytes = generate_offer_excel(offer_text, offer_positions, requirements, offer_id)
         docx_bytes = generate_offer_word(offer_text, offer_positions, requirements, offer_id)
 
-        offer_cache.store(f"offer_{offer_id}_xlsx", xlsx_bytes, ttl_seconds=1800)
-        offer_cache.store(f"offer_{offer_id}_docx", docx_bytes, ttl_seconds=1800)
-        offer_cache.store(f"offer_{offer_id}_totals", offer_totals, ttl_seconds=1800)
+        offer_cache.set(f"offer_{offer_id}_xlsx", xlsx_bytes, ttl_seconds=1800)
+        offer_cache.set(f"offer_{offer_id}_docx", docx_bytes, ttl_seconds=1800)
+        offer_cache.set(f"offer_{offer_id}_totals", offer_totals, ttl_seconds=1800)
 
         results["offer_id"] = offer_id
         results["has_offer"] = True
@@ -125,8 +125,8 @@ def _run_offer_generation(requirements: dict, matching: dict) -> dict:
         xlsx_bytes = generate_gap_report_excel(gap_text, unmatched, partial, requirements, report_id)
         docx_bytes = generate_gap_report_word(gap_text, unmatched, partial, requirements, report_id)
 
-        offer_cache.store(f"report_{report_id}_xlsx", xlsx_bytes, ttl_seconds=1800)
-        offer_cache.store(f"report_{report_id}_docx", docx_bytes, ttl_seconds=1800)
+        offer_cache.set(f"report_{report_id}_xlsx", xlsx_bytes, ttl_seconds=1800)
+        offer_cache.set(f"report_{report_id}_docx", docx_bytes, ttl_seconds=1800)
 
         results["report_id"] = report_id
         results["has_gap_report"] = True
@@ -181,7 +181,7 @@ def _run_result_generation(requirements: dict, matching: dict) -> dict:
     result_id = str(uuid.uuid4())[:8]
 
     xlsx_bytes = generate_result_excel(matching, requirements, result_id)
-    offer_cache.store(f"result_{result_id}_xlsx", xlsx_bytes, ttl_seconds=1800)
+    offer_cache.set(f"result_{result_id}_xlsx", xlsx_bytes, ttl_seconds=1800)
 
     summary = matching.get("summary", {})
     return {
@@ -217,6 +217,8 @@ async def download_result(result_id: str):
 @router.get("/offer/{offer_id}/download")
 async def download_offer(offer_id: str, format: str = "xlsx"):
     """Download offer as Excel (format=xlsx) or Word (format=docx) from memory cache."""
+    if format not in ("xlsx", "docx"):
+        raise HTTPException(status_code=400, detail="Format muss 'xlsx' oder 'docx' sein")
     key = f"offer_{offer_id}_{format}"
     data = offer_cache.get(key)
     if data is None:
@@ -242,6 +244,8 @@ async def download_offer(offer_id: str, format: str = "xlsx"):
 @router.get("/report/{report_id}/download")
 async def download_gap_report(report_id: str, format: str = "xlsx"):
     """Download gap report as Excel (format=xlsx) or Word (format=docx) from memory cache."""
+    if format not in ("xlsx", "docx"):
+        raise HTTPException(status_code=400, detail="Format muss 'xlsx' oder 'docx' sein")
     key = f"report_{report_id}_{format}"
     data = offer_cache.get(key)
     if data is None:

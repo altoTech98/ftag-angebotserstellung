@@ -11,6 +11,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from config import settings
 from services.document_parser import parse_document_bytes, parse_pdf_specs_bytes
 from services.local_llm import extract_requirements_from_text, extract_project_metadata
 from services.document_scanner import scan_and_enrich
@@ -369,10 +370,11 @@ async def get_products(limit: int = 100, search: str = ""):
     """Return the FTAG product catalog (summary)."""
     try:
         products = get_products_summary()
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    except FileNotFoundError:
+        raise HTTPException(status_code=503, detail="Produktkatalog nicht gefunden")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Produktliste konnte nicht geladen werden: {str(e)}")
+        logger.error(f"Products load error: {e}")
+        raise HTTPException(status_code=500, detail=str(e) if settings.DEBUG else "Produktliste konnte nicht geladen werden")
 
     if search:
         search_lower = search.lower()

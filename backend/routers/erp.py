@@ -10,6 +10,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from config import settings
 from services.erp_connector import get_erp_connector
 
 logger = logging.getLogger(__name__)
@@ -62,7 +63,7 @@ async def get_erp_price(
         logger.error(f"Error fetching price for {product_id}: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch price: {str(e)}"
+            detail=str(e) if settings.DEBUG else "Interner Fehler"
         )
 
 
@@ -71,20 +72,20 @@ async def get_erp_availability(product_id: str):
     """Get availability/stock info for a product"""
     try:
         availability_info = erp.get_availability(product_id)
-        
+
         if not availability_info:
             raise HTTPException(
                 status_code=404,
                 detail=f"Availability not found for product {product_id}"
             )
-        
+
         return availability_info
-    
+
     except Exception as e:
         logger.error(f"Error fetching availability for {product_id}: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch availability: {str(e)}"
+            detail=str(e) if settings.DEBUG else "Interner Fehler"
         )
 
 
@@ -93,15 +94,15 @@ async def get_erp_prices_bulk(request: BulkPriceRequest):
     """Get prices for multiple products in one request"""
     try:
         prices = erp.get_bulk_prices(request.product_ids)
-        
+
         return {
             "count": len(prices),
             "prices": prices
         }
-    
+
     except Exception as e:
         logger.error(f"Error fetching bulk prices: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch prices: {str(e)}"
+            detail=str(e) if settings.DEBUG else "Interner Fehler"
         )

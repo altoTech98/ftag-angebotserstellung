@@ -26,6 +26,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 
+# Rate Limiting
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    SLOWAPI_AVAILABLE = True
+except ImportError:
+    SLOWAPI_AVAILABLE = False
+
 # Router
 from routers import upload, analyze, offer, feedback, history, catalog, erp
 from services.exceptions import FrankTuerenError
@@ -87,7 +96,7 @@ async def lifespan(app: FastAPI):
     try:
         from services.local_llm import check_ollama_status
         status_result = check_ollama_status()
-        if status_result:
+        if status_result and status_result.get("available"):
             logger.info(f"[OK] Ollama connected | Model: {settings.OLLAMA_MODEL}")
         else:
             logger.warning("[WARN] Ollama not available | Using fallback mode")
@@ -105,6 +114,20 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"[WARN] Telegram bot start failed: {e}")
     
+    # 3b. Start periodic file cleanup (every 6 hours)
+    async def _periodic_cleanup():
+        while True:
+            await asyncio.sleep(6 * 3600)  # 6 hours
+            try:
+                from services.file_cleanup import cleanup_old_files
+                deleted = cleanup_old_files()
+                if deleted:
+                    logger.info(f"[Cleanup] Periodic cleanup: deleted {deleted} old files")
+            except Exception as e:
+                logger.warning(f"Periodic cleanup failed: {e}")
+
+    asyncio.create_task(_periodic_cleanup())
+
     # 4. Initialize Cache
     try:
         from services.memory_cache import text_cache, offer_cache, project_cache
@@ -142,9 +165,14 @@ async def lifespan(app: FastAPI):
     # ─────── SHUTDOWN ──────────
     logger.info("[STOP] Shutting down...")
     
-    # WICHTIG: Stoppe Ollama Watchdog NICHT! Er läuft weiter für 24/7 Verfügbarkeit
-    # Der Watchdog wird durch den OS/Service-Manager verwaltet
-    logger.info("[INFO] Ollama Watchdog continues running for 24/7 availability")
+    # Stop Ollama Watchdog gracefully
+    try:
+        from services.ollama_watchdog import get_ollama_watchdog
+        ollama_watchdog = get_ollama_watchdog()
+        ollama_watchdog.stop()
+        logger.info("[OK] Ollama Watchdog stopped")
+    except Exception as e:
+        logger.warning(f"Ollama Watchdog shutdown error: {e}")
     
     try:
         if settings.TELEGRAM_ENABLED:
@@ -182,11 +210,21 @@ app = FastAPI(
 # MIDDLEWARE
 # ─────────────────────────────────────────────────────────────────────────────
 
+# 0. Rate Limiting (if enabled and slowapi available)
+if settings.RATE_LIMIT_ENABLED and SLOWAPI_AVAILABLE:
+    limiter = Limiter(key_func=get_remote_address, default_limits=[f"{settings.RATE_LIMIT_REQUESTS}/minute"])
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    logger.info(f"[OK] Rate limiting enabled: {settings.RATE_LIMIT_REQUESTS} req/min")
+elif settings.RATE_LIMIT_ENABLED and not SLOWAPI_AVAILABLE:
+    logger.warning("[WARN] Rate limiting enabled in config but slowapi not installed. Run: pip install slowapi")
+
 # 1. CORS Middleware
+_cors_origins = settings.CORS_ORIGINS if settings.ENVIRONMENT == "production" else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS if settings.ENVIRONMENT != "production" else ["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=("*" not in _cors_origins),  # credentials requires explicit origins
     allow_methods=["*"],
     allow_headers=["*"],
     max_age=3600,
@@ -349,35 +387,42 @@ async def health_check() -> dict:
             catalog_ok = False
             catalog_count = 0
         
-        return {
+        # Basic health info (always public)
+        health_response = {
             "status": "healthy" if availability_mgr.is_system_available() else "degraded",
             "service": "Frank Türen AG – Angebotserstellung",
             "version": settings.API_VERSION,
-            "environment": settings.ENVIRONMENT.value,
-            "availability_manager": {
-                "status": am_status["overall_status"],
-                "last_check": am_status["last_check"],
-                "auto_healing": True,
-                "recovery_enabled": True,
-            },
-            "catalog": {
-                "status": "ok" if catalog_ok else "error",
-                "products": catalog_count,
-            },
-            "ollama": {
-                "status": "ok" if ollama_status.get("available") else "unavailable",
-                "available": ollama_status.get("available", False),
-                "models": ollama_status.get("models", []),
-                "model": settings.OLLAMA_MODEL,
-                "fallback_enabled": settings.OLLAMA_FALLBACK_ENABLED,
-            },
-            "cache": {
-                "text": text_cache.stats(),
-                "offer": offer_cache.stats(),
-                "project": project_cache.stats(),
-            },
-            "24_7_guarantee": "System is monitored 24/7 with automatic recovery",
         }
+
+        # Detailed info only in development/debug mode
+        if settings.DEBUG:
+            health_response.update({
+                "environment": settings.ENVIRONMENT.value,
+                "availability_manager": {
+                    "status": am_status["overall_status"],
+                    "last_check": am_status["last_check"],
+                    "auto_healing": True,
+                    "recovery_enabled": True,
+                },
+                "catalog": {
+                    "status": "ok" if catalog_ok else "error",
+                    "products": catalog_count,
+                },
+                "ollama": {
+                    "status": "ok" if ollama_status.get("available") else "unavailable",
+                    "available": ollama_status.get("available", False),
+                    "models": ollama_status.get("models", []),
+                    "model": settings.OLLAMA_MODEL,
+                    "fallback_enabled": settings.OLLAMA_FALLBACK_ENABLED,
+                },
+                "cache": {
+                    "text": text_cache.stats(),
+                    "offer": offer_cache.stats(),
+                    "project": project_cache.stats(),
+                },
+            })
+
+        return health_response
     except Exception as e:
         logger.exception(f"Health check error: {e}")
         return {
@@ -461,7 +506,12 @@ async def get_ollama_watchdog_status() -> dict:
 
 @app.get("/info", name="Application Info")
 async def app_info() -> dict:
-    """Get application information and settings"""
+    """Get application information and settings (only in debug mode)"""
+    if not settings.DEBUG:
+        return {
+            "name": settings.API_TITLE,
+            "version": settings.API_VERSION,
+        }
     return {
         "name": settings.API_TITLE,
         "version": settings.API_VERSION,

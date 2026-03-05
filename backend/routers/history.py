@@ -9,6 +9,7 @@ DELETE /api/history/{id}    - delete entry
 import logging
 from fastapi import APIRouter, HTTPException
 
+from config import settings
 from services.history_store import (
     get_history_list,
     get_history_detail,
@@ -58,7 +59,7 @@ async def rematch_history(history_id: str):
         try:
             match_result = match_requirements(requirements)
         except Exception as e2:
-            raise HTTPException(status_code=500, detail=f"Rematch fehlgeschlagen: {str(e2)}")
+            raise HTTPException(status_code=500, detail=str(e2) if settings.DEBUG else "Rematch fehlgeschlagen")
 
     # Save as new history entry
     new_entry = save_analysis(

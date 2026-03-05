@@ -6,12 +6,16 @@ Stores user feedback in a JSON file so Claude can learn from past corrections.
 import os
 import json
 import uuid
+import tempfile
+import threading
 from datetime import datetime
 from typing import Optional
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data")
 FEEDBACK_FILE = os.path.join(DATA_DIR, "matching_feedback.json")
 MAX_FEEDBACK_ENTRIES = 500
+
+_feedback_lock = threading.Lock()
 
 
 def load_feedback() -> list[dict]:
@@ -25,20 +29,37 @@ def load_feedback() -> list[dict]:
         return []
 
 
+def _atomic_write_json(filepath: str, data):
+    """Write JSON atomically via temp file + os.replace to prevent corruption."""
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(
+        dir=os.path.dirname(filepath), suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, filepath)
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
 def save_feedback_entry(entry: dict) -> dict:
     """Add a new feedback entry and persist to disk."""
-    entries = load_feedback()
-    entry["id"] = f"fb_{uuid.uuid4().hex[:8]}"
-    entry["timestamp"] = datetime.now().isoformat()
-    entries.append(entry)
+    with _feedback_lock:
+        entries = load_feedback()
+        entry["id"] = f"fb_{uuid.uuid4().hex[:8]}"
+        entry["timestamp"] = datetime.now().isoformat()
+        entries.append(entry)
 
-    # Enforce maximum entries
-    if len(entries) > MAX_FEEDBACK_ENTRIES:
-        entries = entries[-MAX_FEEDBACK_ENTRIES:]
+        # Enforce maximum entries
+        if len(entries) > MAX_FEEDBACK_ENTRIES:
+            entries = entries[-MAX_FEEDBACK_ENTRIES:]
 
-    os.makedirs(os.path.dirname(FEEDBACK_FILE), exist_ok=True)
-    with open(FEEDBACK_FILE, "w", encoding="utf-8") as f:
-        json.dump(entries, f, ensure_ascii=False, indent=2)
+        _atomic_write_json(FEEDBACK_FILE, entries)
     return entry
 
 

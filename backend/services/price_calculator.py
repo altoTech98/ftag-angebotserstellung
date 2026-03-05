@@ -18,7 +18,7 @@ class PriceCalculator:
     
     def __init__(self):
         self.erp = get_erp_connector()
-        self.vat_rate = 0.081  # 8.1% VAT für Schweiz
+        self.vat_rate = settings.VAT_RATE
     
     def calculate_position_price(
         self,

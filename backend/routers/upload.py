@@ -77,8 +77,9 @@ def _get_file_extension(filename: str) -> str:
     
     _, ext = os.path.splitext(filename)
     ext = ext.lower()
-    
-    if ext not in settings.ALLOWED_EXTENSIONS:
+
+    # ALLOWED_EXTENSIONS stores without dot (e.g. "pdf"), ext has dot (e.g. ".pdf")
+    if ext.lstrip(".") not in settings.ALLOWED_EXTENSIONS:
         raise ValidationError(
             f"Dateityp '{ext}' nicht unterstützt",
             details={"extension": ext},
@@ -165,7 +166,7 @@ async def upload_single_file(file: UploadFile = File(...)) -> dict:
             )
         
         # Cache parsed text
-        text_cache.set(file_id, text, metadata={"filename": safe_filename})
+        text_cache.set(file_id, text)
         
         # For Excel: also cache raw bytes for structured parsing
         if ext in ('.xlsx', '.xls', '.xlsm'):
@@ -339,5 +340,5 @@ async def upload_health():
         "status": "ok",
         "max_file_size_mb": settings.MAX_FILE_SIZE_MB,
         "max_files_per_upload": settings.MAX_FILES_PER_UPLOAD,
-        "cache_available": text_cache.size() < settings.CACHE_MAX_SIZE_MB * 1024 * 1024,
+        "cache_available": True,
     }

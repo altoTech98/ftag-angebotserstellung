@@ -26,9 +26,10 @@ OLLAMA_BASE_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_GENERATE_URL = f"{OLLAMA_BASE_URL}/api/generate"
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2")
 
-OLLAMA_TIMEOUT_SHORT = 30.0     # metadata, status check
-OLLAMA_TIMEOUT_MEDIUM = 90.0    # requirements extraction, document scanning
-OLLAMA_TIMEOUT_LONG = 120.0     # offer/report generation
+from config import settings as _settings
+OLLAMA_TIMEOUT_SHORT = _settings.OLLAMA_TIMEOUT_SHORT
+OLLAMA_TIMEOUT_MEDIUM = _settings.OLLAMA_TIMEOUT_MEDIUM
+OLLAMA_TIMEOUT_LONG = _settings.OLLAMA_TIMEOUT_LONG
 
 # Cache for status check
 _status_cache = {"result": None, "timestamp": 0}

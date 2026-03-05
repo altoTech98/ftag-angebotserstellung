@@ -121,6 +121,11 @@ def apply_changes(changes: list[dict]) -> str:
         action = c.get("action", "edit")
         abs_path = os.path.join(PROJECT_ROOT, file_path)
 
+        # Security: prevent path traversal (e.g. ../../etc/passwd)
+        if not os.path.realpath(abs_path).startswith(os.path.realpath(PROJECT_ROOT)):
+            errors.append(f"Sicherheitsfehler: Pfad ausserhalb des Projekts: {file_path}")
+            continue
+
         try:
             if action == "create":
                 os.makedirs(os.path.dirname(abs_path), exist_ok=True)

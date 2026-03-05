@@ -265,29 +265,31 @@ def _parse_excel_bytes(content: bytes) -> str:
     try:
         buf = io.BytesIO(content)
         xl = pd.ExcelFile(buf)
-        
-        if not xl.sheet_names:
-            raise FileError(
-                ErrorCode.FILE_PARSE_ERROR,
-                "Excel hat keine Tabellenblätter",
-                filename=".xlsx"
-            )
-        
-        for sheet_name in xl.sheet_names:
-            try:
-                df = pd.read_excel(xl, sheet_name=sheet_name, dtype=str)
-                df = df.fillna("")
-                
-                if df.empty:
+        try:
+            if not xl.sheet_names:
+                raise FileError(
+                    ErrorCode.FILE_PARSE_ERROR,
+                    "Excel hat keine Tabellenblätter",
+                    filename=".xlsx"
+                )
+
+            for sheet_name in xl.sheet_names:
+                try:
+                    df = pd.read_excel(xl, sheet_name=sheet_name, dtype=str)
+                    df = df.fillna("")
+
+                    if df.empty:
+                        continue
+
+                    text_parts.append(f"=== {sheet_name} ===")
+                    text_parts.append(df.to_string(index=False))
+
+                except Exception as e:
+                    logger.warning(f"Sheet '{sheet_name}' Parsing fehlgeschlagen: {e}")
                     continue
-                
-                text_parts.append(f"=== {sheet_name} ===")
-                text_parts.append(df.to_string(index=False))
-            
-            except Exception as e:
-                logger.warning(f"Sheet '{sheet_name}' Parsing fehlgeschlagen: {e}")
-                continue
-        
+        finally:
+            xl.close()
+
         result = "\n\n".join(text_parts)
         if not result.strip():
             raise FileError(
@@ -295,9 +297,9 @@ def _parse_excel_bytes(content: bytes) -> str:
                 "Excel ist leer",
                 filename=".xlsx"
             )
-        
+
         return result[:DocumentParser.MAX_TEXT_LENGTH]
-    
+
     except FileError:
         raise
     except Exception as e:

@@ -6,6 +6,8 @@ All functions return bytes (no disk writes).
 import io
 from datetime import datetime, timedelta
 
+from config import settings
+
 
 def generate_offer_excel(
     offer_text: str,
@@ -53,13 +55,13 @@ def generate_offer_excel(
 
     # Header: Company
     ws.merge_cells(f"A{row}:F{row}")
-    ws[f"A{row}"] = "Frank Türen AG"
+    ws[f"A{row}"] = settings.COMPANY_NAME
     ws[f"A{row}"].font = title_font
     ws[f"A{row}"].alignment = Alignment(horizontal="left")
     row += 1
 
     ws.merge_cells(f"A{row}:F{row}")
-    ws[f"A{row}"] = "Industriestrasse 12 · 6374 Buochs NW · Tel. 041 620 76 76 · www.franktueren.ch"
+    ws[f"A{row}"] = settings.COMPANY_ADDRESS
     ws[f"A{row}"].font = small_font
     row += 1
 
@@ -170,7 +172,7 @@ def generate_offer_excel(
 
     # Totals
     row += 1
-    mwst = total_sum * 0.081
+    mwst = total_sum * settings.VAT_RATE
     grand_total = total_sum + mwst
 
     for label, value in [
@@ -231,12 +233,12 @@ def generate_offer_excel(
     row += 2
 
     ws.merge_cells(f"A{row}:F{row}")
-    ws[f"A{row}"] = "Frank Türen AG"
+    ws[f"A{row}"] = settings.COMPANY_NAME
     ws[f"A{row}"].font = bold_font
     row += 1
 
     ws.merge_cells(f"A{row}:F{row}")
-    ws[f"A{row}"] = "Buochs NW"
+    ws[f"A{row}"] = settings.COMPANY_LOCATION
     ws[f"A{row}"].font = normal_font
 
     buf = io.BytesIO()
@@ -288,7 +290,7 @@ def generate_gap_report_excel(
     row = 1
 
     ws.merge_cells(f"A{row}:E{row}")
-    ws[f"A{row}"] = "GAP-REPORT – Frank Türen AG"
+    ws[f"A{row}"] = f"GAP-REPORT – {settings.COMPANY_NAME}"
     ws[f"A{row}"].font = title_font
     row += 1
 
@@ -469,9 +471,9 @@ def generate_offer_word(
         tcPr.append(shd)
 
     # Header
-    h = doc.add_heading("Frank Türen AG", 0)
+    h = doc.add_heading(settings.COMPANY_NAME, 0)
     h.runs[0].font.color.rgb = RGBColor(0x1F, 0x3A, 0x5F)
-    sub = doc.add_paragraph("Industriestrasse 12 · 6374 Buochs NW · Tel. 041 620 76 76 · www.franktueren.ch")
+    sub = doc.add_paragraph(settings.COMPANY_ADDRESS)
     sub.runs[0].font.size = Pt(9)
     sub.runs[0].font.color.rgb = RGBColor(0x6B, 0x72, 0x80)
 
@@ -561,7 +563,7 @@ def generate_offer_word(
             set_cell_bg(cell, fill)
 
     # Totals
-    mwst = total_sum * 0.081
+    mwst = total_sum * settings.VAT_RATE
     grand_total = total_sum + mwst
     for label, value in [("Zwischensumme CHF", total_sum), ("MwSt 8.1% CHF", mwst), ("GESAMTBETRAG CHF (inkl. MwSt)", grand_total)]:
         row = pos_table.add_row()
@@ -594,10 +596,10 @@ def generate_offer_word(
     doc.add_paragraph()
     doc.add_paragraph("Freundliche Grüsse").runs[0].font.size = Pt(10)
     doc.add_paragraph()
-    p = doc.add_paragraph("Frank Türen AG")
+    p = doc.add_paragraph(settings.COMPANY_NAME)
     p.runs[0].bold = True
     p.runs[0].font.size = Pt(10)
-    doc.add_paragraph("Buochs NW").runs[0].font.size = Pt(10)
+    doc.add_paragraph(settings.COMPANY_LOCATION).runs[0].font.size = Pt(10)
 
     buf = io.BytesIO()
     doc.save(buf)
@@ -636,7 +638,7 @@ def generate_gap_report_word(
         tcPr.append(shd)
 
     # Title
-    h = doc.add_heading("GAP-REPORT – Frank Türen AG", 0)
+    h = doc.add_heading(f"GAP-REPORT – {settings.COMPANY_NAME}", 0)
     h.runs[0].font.color.rgb = RGBColor(0xB9, 0x1C, 0x1C)
     sub = doc.add_paragraph(
         f"Projekt: {requirements.get('projekt', 'Ausschreibung')} · Erstellt: {datetime.now().strftime('%d.%m.%Y')}"
@@ -758,9 +760,9 @@ def _estimate_price(position: dict) -> float:
             break
 
     area = (breite * hoehe) / (900 * 2100)
-    if area > 1.3:
-        base_price *= 1.2
-    elif area > 1.6:
+    if area > 1.6:
         base_price *= 1.4
+    elif area > 1.3:
+        base_price *= 1.2
 
     return round(base_price, 2)

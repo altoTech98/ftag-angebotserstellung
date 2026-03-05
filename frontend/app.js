@@ -3,9 +3,7 @@
  * Simplified Frontend (single file upload, detail modal, catalog management)
  */
 
-const API = window.location.hostname === 'localhost'
-  ? 'http://localhost:8000/api'
-  : `${window.location.origin}/api`;
+const API = `${window.location.origin}/api`;
 
 let state = {
   file: null,
@@ -78,7 +76,7 @@ function handleDrop(e) {
     if (folderPromises.length > 0) {
       Promise.all(folderPromises).then(results => {
         processDroppedFiles(directFiles.concat(results.flat()));
-      });
+      }).catch(err => showToast('Fehler beim Lesen: ' + err.message));
       return;
     }
   }
@@ -205,10 +203,21 @@ function fmtSize(b) {
 // MAIN WORKFLOW (upload → analyze → generate)
 // ─────────────────────────────────────────────
 
+const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
+
 function startUpload() {
   if (state.files.length > 0) {
+    const tooBig = state.files.find(f => f.size > MAX_FILE_SIZE_BYTES);
+    if (tooBig) {
+      showToast(`Datei "${tooBig.name}" ist zu gross (max. 100 MB)`);
+      return;
+    }
     runFolderWorkflow();
   } else if (state.file) {
+    if (state.file.size > MAX_FILE_SIZE_BYTES) {
+      showToast(`Datei ist zu gross (max. 100 MB)`);
+      return;
+    }
     runAnalysisWorkflow();
   }
 }
@@ -837,7 +846,8 @@ function setStep(id, dotState, statusText) {
 
 function esc(str) {
   return String(str ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
 }
 
 function showToast(message) {
@@ -1183,7 +1193,7 @@ async function api(path, opts = {}) {
     let detail = null;
     try {
       const body = await res.json();
-      detail = body.detail;
+      detail = body.detail || body.message;
       msg = detail || msg;
     } catch {}
     if (res.status === 410) {
@@ -1263,4 +1273,4 @@ window.addEventListener('scroll', () => {
 
 // Run health check on load and periodically
 checkServerHealth();
-setInterval(checkServerHealth, 3000); // Check every 3 seconds
+setInterval(checkServerHealth, 15000); // Check every 15 seconds

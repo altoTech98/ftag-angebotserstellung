@@ -73,9 +73,23 @@ def update_job(job_id: str, *, status: str = None, progress: str = None, result=
         job.updated_at = time.time()
 
 
+_active_count = 0
+_active_lock = threading.Lock()
+
+
 def run_in_background(job: Job, fn, *args, **kwargs):
     """Run fn in a background thread, updating the job with results."""
+    from config import settings
+
+    global _active_count
+    with _active_lock:
+        if _active_count >= settings.MAX_CONCURRENT_JOBS:
+            update_job(job.id, status="failed", error="Zu viele gleichzeitige Jobs. Bitte warten.")
+            raise RuntimeError("Too many concurrent jobs")
+        _active_count += 1
+
     def wrapper():
+        global _active_count
         update_job(job.id, status="running")
         try:
             result = fn(*args, **kwargs)
@@ -83,8 +97,11 @@ def run_in_background(job: Job, fn, *args, **kwargs):
         except Exception as e:
             logger.error(f"Job {job.id} failed: {e}", exc_info=True)
             update_job(job.id, status="failed", error=str(e))
+        finally:
+            with _active_lock:
+                _active_count -= 1
 
-    t = threading.Thread(target=wrapper, daemon=True)
+    t = threading.Thread(target=wrapper, daemon=False)
     t.start()
 
 

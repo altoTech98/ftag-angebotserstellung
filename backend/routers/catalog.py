@@ -10,6 +10,7 @@ import logging
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
+from config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -30,7 +31,7 @@ async def catalog_info():
     try:
         idx = get_catalog_index()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Katalog konnte nicht geladen werden: {e}")
+        raise HTTPException(status_code=500, detail=str(e) if settings.DEBUG else "Katalog konnte nicht geladen werden")
 
     mod_time = os.path.getmtime(pf)
     mod_str = datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y %H:%M")
@@ -68,7 +69,7 @@ async def upload_catalog(file: UploadFile = File(...)):
         if len(df.columns) < 5:
             raise ValueError("Zu wenig Spalten")
     except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Ungueltige Excel-Datei: {e}")
+        raise HTTPException(status_code=422, detail=str(e) if settings.DEBUG else "Ungueltige Excel-Datei")
 
     # Backup existing catalog
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -94,7 +95,7 @@ async def upload_catalog(file: UploadFile = File(...)):
         with open(PRODUCT_FILE, "wb") as f:
             f.write(content)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Datei konnte nicht gespeichert werden: {e}")
+        raise HTTPException(status_code=500, detail=str(e) if settings.DEBUG else "Datei konnte nicht gespeichert werden")
 
     # Invalidate cache and rebuild
     from services.catalog_index import invalidate_catalog_cache, get_catalog_index
@@ -114,7 +115,7 @@ async def upload_catalog(file: UploadFile = File(...)):
                 pass
         raise HTTPException(
             status_code=422,
-            detail=f"Katalog konnte nicht geladen werden (altes Backup wiederhergestellt): {e}",
+            detail=str(e) if settings.DEBUG else "Katalog konnte nicht geladen werden (altes Backup wiederhergestellt)",
         )
 
     logger.info(f"New catalog loaded: {len(idx.all_profiles)} products")

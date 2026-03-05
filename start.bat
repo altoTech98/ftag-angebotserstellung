@@ -33,9 +33,14 @@ echo Installiere Abhängigkeiten...
 call backend\.venv\Scripts\activate.bat
 pip install -r backend\requirements.txt -q
 
-REM Telegram Bot (Token von @BotFather, Chat-ID vom User)
-set TELEGRAM_BOT_TOKEN=8524632357:AAH3l0vI7gdACBXa7MEyEpFfGRy2CrchwBo
-set TELEGRAM_CHAT_ID=8458317986
+REM Telegram Bot – Tokens aus .env laden (NICHT hier hardcoden!)
+REM set TELEGRAM_BOT_TOKEN=...   (in .env Datei setzen)
+REM set TELEGRAM_CHAT_ID=...     (in .env Datei setzen)
+if exist ".env" (
+    for /f "usebackq tokens=1,* delims==" %%a in (".env") do (
+        if not "%%a"=="" if not "%%a:~0,1%"=="#" set "%%a=%%b"
+    )
+)
 
 REM Start server
 echo.
@@ -48,4 +53,4 @@ if defined TELEGRAM_BOT_TOKEN (
 echo Druecken Sie CTRL+C zum Beenden
 echo.
 cd backend
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn main:app --host 0.0.0.0 --port 8000

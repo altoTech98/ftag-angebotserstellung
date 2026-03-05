@@ -246,7 +246,7 @@ class OllamaWatchdog:
         self.running = True
         self.monitor_thread = threading.Thread(
             target=self.monitor_loop,
-            daemon=False,
+            daemon=True,
             name="OllamaWatchdog"
         )
         self.monitor_thread.start()
