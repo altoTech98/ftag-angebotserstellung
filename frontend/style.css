@@ -147,17 +147,6 @@ body {
 .status-badge .status-text {
   white-space: nowrap;
 }
-#server-status {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--success);
-  border: none;
-  padding: 0;
-}
-#server-status.offline {
-  background: var(--danger);
-}
 
 /* ============ MAIN ============ */
 .main-content {

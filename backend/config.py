@@ -70,7 +70,7 @@ class Settings:
         "dwg", "dxf",
     }
     MAX_FILE_SIZE_MB: int = int(os.environ.get("MAX_FILE_SIZE_MB", 100))
-    MAX_FILES_PER_UPLOAD: int = int(os.environ.get("MAX_FILES_PER_UPLOAD", 20))
+    MAX_FILES_PER_UPLOAD: int = int(os.environ.get("MAX_FILES_PER_UPLOAD", 40))
     UPLOAD_CLEANUP_HOURS: int = 24  # Alte Uploads nach X Stunden löschen
     
     # Caching

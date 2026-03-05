@@ -1210,11 +1210,9 @@ async function api(path, opts = {}) {
 // ─────────────────────────────────────────────
 
 async function checkServerHealth() {
-  const serverDot = document.getElementById('server-dot');
-  const serverText = document.getElementById('server-text');
-  const ollamaDot = document.getElementById('ollama-dot');
-  const ollamaText = document.getElementById('ollama-text');
-  if (!serverDot) return;
+  const dot = document.getElementById('server-dot');
+  const text = document.getElementById('server-text');
+  if (!dot) return;
 
   try {
     const healthUrl = `${API.replace('/api', '')}/health`;
@@ -1223,48 +1221,27 @@ async function checkServerHealth() {
       credentials: 'omit',
       headers: { 'Accept': 'application/json' }
     });
-    
+
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    // Server is online
-    serverDot.style.background = '#16a34a';
-    if (serverText) serverText.textContent = 'Server (online)';
-    serverDot.title = 'Server verbunden';
-
-    // AI engine status (unified: Claude / Ollama / Regex)
-    if (ollamaDot && ollamaText) {
-      if (data.ai && data.ai.engine === 'claude') {
-        ollamaDot.style.background = '#16a34a';
-        ollamaText.textContent = 'Claude AI (Online)';
-        ollamaDot.title = 'Claude API verbunden – hoechste Qualitaet';
-      } else if (data.ai && data.ai.engine === 'ollama') {
-        ollamaDot.style.background = '#16a34a';
-        ollamaText.textContent = 'Ollama (Lokal)';
-        ollamaDot.title = 'Ollama lokal verbunden';
-      } else if (data.ai && data.ai.engine === 'regex') {
-        ollamaDot.style.background = '#d97706';
-        ollamaText.textContent = 'KI (Basis-Modus)';
-        ollamaDot.title = 'Keine KI-Engine verfuegbar – Regex-Fallback aktiv';
-      } else if (data.ollama && data.ollama.available) {
-        // Backward compatibility: old health format
-        ollamaDot.style.background = '#16a34a';
-        ollamaText.textContent = 'Ollama (Lokal)';
-        ollamaDot.title = 'Ollama verbunden';
-      } else {
-        ollamaDot.style.background = '#d97706';
-        ollamaText.textContent = 'KI (Basis-Modus)';
-        ollamaDot.title = 'Keine KI-Engine verfuegbar';
-      }
+    // Single unified status: show active AI engine
+    if (data.ai && data.ai.engine === 'claude') {
+      dot.style.background = '#16a34a';
+      text.textContent = 'Claude AI';
+    } else if (data.ai && data.ai.engine === 'ollama') {
+      dot.style.background = '#16a34a';
+      text.textContent = 'Ollama';
+    } else if (data.ai && data.ai.engine === 'regex') {
+      dot.style.background = '#d97706';
+      text.textContent = 'Basis-Modus';
+    } else {
+      dot.style.background = '#16a34a';
+      text.textContent = 'Online';
     }
   } catch (err) {
-    serverDot.style.background = '#dc2626';
-    if (serverText) serverText.textContent = 'Server (offline)';
-    serverDot.title = 'Server nicht erreichbar';
-    if (ollamaDot) {
-      ollamaDot.style.background = '#dc2626';
-      if (ollamaText) ollamaText.textContent = 'Server offline';
-    }
+    dot.style.background = '#dc2626';
+    text.textContent = 'Offline';
     console.warn('[Health Check] Server offline:', err.message);
   }
 }
