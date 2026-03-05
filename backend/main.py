@@ -387,15 +387,25 @@ async def health_check() -> dict:
             catalog_ok = False
             catalog_count = 0
         
-        # Basic health info (always public)
+        # Health info (always includes ollama status for frontend)
+        ollama_available = ollama_status.get("available", False)
         health_response = {
             "status": "healthy" if availability_mgr.is_system_available() else "degraded",
             "service": "Frank Türen AG – Angebotserstellung",
             "version": settings.API_VERSION,
+            "ollama": {
+                "available": ollama_available,
+                "fallback_enabled": settings.OLLAMA_FALLBACK_ENABLED,
+            },
         }
 
         # Detailed info only in development/debug mode
         if settings.DEBUG:
+            health_response["ollama"].update({
+                "status": "ok" if ollama_available else "unavailable",
+                "models": ollama_status.get("models", []),
+                "model": settings.OLLAMA_MODEL,
+            })
             health_response.update({
                 "environment": settings.ENVIRONMENT.value,
                 "availability_manager": {
@@ -407,13 +417,6 @@ async def health_check() -> dict:
                 "catalog": {
                     "status": "ok" if catalog_ok else "error",
                     "products": catalog_count,
-                },
-                "ollama": {
-                    "status": "ok" if ollama_status.get("available") else "unavailable",
-                    "available": ollama_status.get("available", False),
-                    "models": ollama_status.get("models", []),
-                    "model": settings.OLLAMA_MODEL,
-                    "fallback_enabled": settings.OLLAMA_FALLBACK_ENABLED,
                 },
                 "cache": {
                     "text": text_cache.stats(),

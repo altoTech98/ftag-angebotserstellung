@@ -1239,10 +1239,14 @@ async function checkServerHealth() {
         const model = data.ollama.models && data.ollama.models[0] ? data.ollama.models[0].split(':')[0] : 'verbunden';
         ollamaText.textContent = `Ollama (${model})`;
         ollamaDot.title = 'Ollama verbunden';
+      } else if (data.ollama && data.ollama.fallback_enabled) {
+        ollamaDot.style.background = '#16a34a';
+        ollamaText.textContent = 'KI (Fallback aktiv)';
+        ollamaDot.title = 'Ollama nicht verfuegbar - Fallback-Matching aktiv';
       } else {
         ollamaDot.style.background = '#d97706';
         ollamaText.textContent = 'Ollama (offline)';
-        ollamaDot.title = 'Ollama nicht erreichbar - Fallback aktiv';
+        ollamaDot.title = 'Ollama nicht erreichbar';
       }
     }
   } catch (err) {
