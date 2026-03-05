@@ -193,7 +193,7 @@ class AvailabilityManager:
         try:
             from services.local_llm import check_ollama_status
             result = check_ollama_status()
-            return bool(result)
+            return bool(result and result.get("available"))
         except Exception as e:
             logger.debug(f"Ollama health check failed: {e}")
             return False
@@ -214,7 +214,7 @@ class AvailabilityManager:
             from services.memory_cache import text_cache
             # Versuche Cache-Operation
             test_key = "__health_check__"
-            text_cache.store(test_key, {"test": True}, ttl_seconds=60)
+            text_cache.set(test_key, {"test": True}, ttl_seconds=60)
             result = text_cache.get(test_key)
             return result is not None
         except Exception as e:

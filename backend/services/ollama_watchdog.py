@@ -97,22 +97,27 @@ class OllamaWatchdog:
     
     def start_ollama(self) -> bool:
         """
-        Starte Ollama Prozess
+        Starte Ollama Prozess.
+        Sets self._binary_missing if the binary is not found (stops further attempts).
         """
         if not self.ollama_binary:
             logger.error("Cannot start Ollama: binary not found")
             return False
-        
+
         if self.is_running():
             logger.info("Ollama already running")
             return True
-        
+
+        # If already detected as missing, don't try again
+        if getattr(self, '_binary_missing', False):
+            return False
+
         try:
             # Starte als detached process
             if sys.platform == "win32":
                 # Windows: CREATE_NEW_PROCESS_GROUP für echten Detach
                 creation_flags = (
-                    subprocess.CREATE_NEW_PROCESS_GROUP | 
+                    subprocess.CREATE_NEW_PROCESS_GROUP |
                     subprocess.CREATE_NO_WINDOW
                 )
                 self.process = subprocess.Popen(
@@ -133,41 +138,45 @@ class OllamaWatchdog:
                     start_new_session=True,
                     close_fds=True
                 )
-            
-            logger.info(f"✅ Ollama started | PID: {self.process.pid}")
+
+            logger.info(f"Ollama started | PID: {self.process.pid}")
             self.last_restart = datetime.now()
-            
+
             # Warte bis Ollama bereit ist
             max_wait = 30
             waited = 0
             while waited < max_wait:
                 if self.check_ollama_health():
-                    logger.info("✅ Ollama Health Check passed")
+                    logger.info("Ollama Health Check passed")
                     self.restart_attempts = 0  # Reset counter
                     return True
-                
+
                 time.sleep(2)
                 waited += 2
-            
+
             logger.warning(f"Ollama started but health check failed after {max_wait}s")
             return False
-        
+
+        except FileNotFoundError:
+            # Binary not installed (e.g. cloud deployment) – stop trying permanently
+            logger.warning("Ollama binary not found on this system. Watchdog entering passive mode (fallback only).")
+            self._binary_missing = True
+            return False
         except Exception as e:
-            logger.error(f"❌ Failed to start Ollama: {e}")
+            logger.error(f"Failed to start Ollama: {e}")
             return False
     
     def is_running(self) -> bool:
-        """Prüfe ob Ollama läuft"""
-        if self.process is None:
-            return False
-        
-        poll = self.process.poll()
-        if poll is not None:
-            # Prozess ist beendet
-            return False
-        
-        # Zusätzlich: Health Check
-        return self.check_ollama_health()
+        """Prüfe ob Ollama läuft (managed process OR external service)"""
+        # First check if the API is reachable (covers external Ollama too)
+        if self.check_ollama_health():
+            return True
+
+        # Check managed process
+        if self.process is not None and self.process.poll() is None:
+            return True  # Process alive but API not ready yet
+
+        return False
     
     def restart_ollama(self) -> bool:
         """
@@ -205,34 +214,44 @@ class OllamaWatchdog:
     
     def monitor_loop(self):
         """
-        Hauptüberwachungs-Loop - läuft in separatem Thread
+        Hauptüberwachungs-Loop - läuft in separatem Thread.
+        Enters passive mode if Ollama binary is not installed.
         """
-        logger.info("🔍 OllamaWatchdog monitor loop started")
-        
-        # Initial: Starte Ollama falls nicht laufen
-        if not self.is_running():
-            logger.info("Ollama not running, starting...")
+        logger.info("OllamaWatchdog monitor loop started")
+
+        # Initial: Check if Ollama is already reachable (e.g. external Ollama service)
+        if self.check_ollama_health():
+            logger.info("Ollama already reachable via API")
+        elif not getattr(self, '_binary_missing', False):
+            logger.info("Ollama not running, attempting to start...")
             self.start_ollama()
-        
+
         while self.running:
             try:
-                # Health Check
-                if not self.is_running():
-                    logger.error("❌ Ollama is DOWN!")
-                    
-                    if not self.restart_ollama():
-                        logger.critical("Failed to restart Ollama - entering recovery mode")
-                        # Versuche später nochmal
-                        time.sleep(60)
-                        continue
-                else:
-                    # Alles ok - Reset backoff
+                # If binary not installed, only do passive health checks (no restarts)
+                if getattr(self, '_binary_missing', False):
+                    if self.check_ollama_health():
+                        logger.info("Ollama became reachable (external service)")
+                        self._binary_missing = False  # Re-enable active mode
+                    time.sleep(self.health_check_interval * 2)
+                    continue
+
+                # Active mode: Health Check + restart
+                if self.check_ollama_health():
                     if self.restart_attempts > 0:
                         self.restart_attempts = 0
-                        logger.info("✅ Ollama recovered successfully")
-                
+                        logger.info("Ollama recovered successfully")
+                else:
+                    logger.warning("Ollama is not reachable")
+                    if not self.restart_ollama():
+                        if getattr(self, '_binary_missing', False):
+                            continue  # Binary missing, go to passive mode
+                        logger.error("Failed to restart Ollama - retrying in 60s")
+                        time.sleep(60)
+                        continue
+
                 time.sleep(self.health_check_interval)
-            
+
             except Exception as e:
                 logger.exception(f"Monitor loop error: {e}")
                 time.sleep(10)
@@ -264,9 +283,11 @@ class OllamaWatchdog:
     
     def get_status(self) -> Dict[str, Any]:
         """Get Watchdog Status"""
+        health = self.check_ollama_health()
         return {
-            "running": self.is_running(),
-            "health": self.check_ollama_health(),
+            "running": health,
+            "health": health,
+            "passive_mode": getattr(self, '_binary_missing', False),
             "last_restart": self.last_restart.isoformat() if self.last_restart else None,
             "restart_attempts": self.restart_attempts,
             "max_restart_attempts": self.max_restart_attempts,
