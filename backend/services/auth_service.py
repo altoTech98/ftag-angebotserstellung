@@ -6,6 +6,7 @@ Admin-User Management für Frank Türen AG
 import json
 import logging
 import secrets
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +25,26 @@ JWT_SECRET_FILE = DATA_DIR / ".jwt_secret"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
 
 # Default admin credentials (user should change password after first login)
-DEFAULT_ADMIN_EMAIL = "admin@franktüren.ch"
+DEFAULT_ADMIN_EMAIL = "admin@franktueren.ch"
 DEFAULT_ADMIN_PASSWORD = "Frank2024!"
+
+
+def _hash_password(password: str) -> str:
+    """Hash password with bcrypt."""
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def _verify_password(password: str, password_hash: str) -> bool:
+    """Verify password against bcrypt hash."""
+    return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+
+
+def _normalize_email(email: str) -> str:
+    """Normalize email for consistent comparison (NFC + lowercase)."""
+    return unicodedata.normalize("NFC", email).lower()
 
 
 def _get_jwt_secret() -> str:
@@ -69,7 +84,7 @@ def init_admin_user() -> None:
 
     admin = {
         "email": DEFAULT_ADMIN_EMAIL,
-        "password_hash": pwd_context.hash(DEFAULT_ADMIN_PASSWORD),
+        "password_hash": _hash_password(DEFAULT_ADMIN_PASSWORD),
         "role": "admin",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -80,9 +95,10 @@ def init_admin_user() -> None:
 def authenticate_user(email: str, password: str) -> dict | None:
     """Verify email + password, return user dict or None."""
     users = _load_users()
+    email_norm = _normalize_email(email)
     for user in users:
-        if user["email"].lower() == email.lower():
-            if pwd_context.verify(password, user["password_hash"]):
+        if _normalize_email(user["email"]) == email_norm:
+            if _verify_password(password, user["password_hash"]):
                 return user
             return None
     return None
@@ -108,12 +124,69 @@ def verify_token(token: str) -> dict | None:
             return None
         # Check user still exists
         users = _load_users()
+        email_norm = _normalize_email(email)
         for user in users:
-            if user["email"].lower() == email.lower():
+            if _normalize_email(user["email"]) == email_norm:
                 return {"email": user["email"], "role": user["role"]}
         return None
     except JWTError:
         return None
+
+
+def list_users() -> list[dict]:
+    """List all users (without password hashes)."""
+    users = _load_users()
+    return [
+        {
+            "email": u["email"],
+            "role": u.get("role", "user"),
+            "created_at": u.get("created_at", ""),
+        }
+        for u in users
+    ]
+
+
+def add_user(email: str, password: str, role: str = "user") -> dict:
+    """Add a new user. Raises ValueError if duplicate."""
+    users = _load_users()
+    email_norm = _normalize_email(email)
+    for u in users:
+        if _normalize_email(u["email"]) == email_norm:
+            raise ValueError(f"Benutzer '{email}' existiert bereits")
+    if role not in ("admin", "user"):
+        raise ValueError(f"Ungueltige Rolle: {role}")
+    new_user = {
+        "email": email,
+        "password_hash": _hash_password(password),
+        "role": role,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    users.append(new_user)
+    _save_users(users)
+    logger.info(f"[AUTH] User created: {email} (role={role})")
+    return {"email": email, "role": role, "created_at": new_user["created_at"]}
+
+
+def delete_user(email: str) -> bool:
+    """Delete a user. Protects last admin. Raises ValueError on error."""
+    users = _load_users()
+    email_norm = _normalize_email(email)
+    target_idx = None
+    for i, u in enumerate(users):
+        if _normalize_email(u["email"]) == email_norm:
+            target_idx = i
+            break
+    if target_idx is None:
+        raise ValueError(f"Benutzer '{email}' nicht gefunden")
+    # Protect last admin
+    if users[target_idx].get("role") == "admin":
+        admin_count = sum(1 for u in users if u.get("role") == "admin")
+        if admin_count <= 1:
+            raise ValueError("Letzter Admin kann nicht geloescht werden")
+    removed = users.pop(target_idx)
+    _save_users(users)
+    logger.info(f"[AUTH] User deleted: {removed['email']}")
+    return True
 
 
 async def get_current_user(

@@ -2,7 +2,7 @@
 Document Scanner – Scans supplementary documents for door-related data
 and enriches the Tuerliste (door list) with found properties.
 
-Uses Ollama (via local_llm) to analyze each document, with regex fallback.
+Uses fast regex-based extraction (no LLM calls).
 Only fills EMPTY fields in doors – never overwrites existing data.
 """
 
@@ -10,7 +10,6 @@ import os
 import re
 import logging
 
-from services.local_llm import scan_document_for_door_data
 from services.document_parser import parse_document_bytes, parse_pdf_specs_bytes
 
 logger = logging.getLogger(__name__)
@@ -76,9 +75,9 @@ def scan_and_enrich(
         if not text or len(text.strip()) < 20:
             continue
 
-        # Scan with Ollama (or regex fallback)
+        # Scan with fast regex extraction (no LLM)
         try:
-            scan_result = scan_document_for_door_data(text, filename)
+            scan_result = _regex_scan(text, filename)
         except Exception as e:
             logger.warning(f"Document scan failed for {filename}: {e}")
             continue
@@ -108,6 +107,138 @@ def scan_and_enrich(
 
     logger.info(f"Document scanning complete: {enriched_count} fields enriched across {len(doors)} doors")
     return doors
+
+
+def _regex_scan(text: str, filename: str = "") -> dict:
+    """
+    Fast regex-based document scan for door-related data.
+    Replaces the slow Ollama LLM call with pure pattern matching.
+    """
+    result = {
+        "is_relevant": False,
+        "door_properties": [],
+        "general_requirements": "",
+    }
+
+    if not text or not text.strip():
+        return result
+
+    text_lower = text.lower()
+
+    # Check relevance
+    door_keywords = [
+        "tuer", "tür", "door", "ei30", "ei60", "t30", "t60",
+        "brandschutz", "schallschutz", "rc2", "rc3", "wk2",
+        "rauchschutz", "zargen", "fluegel", "flügel",
+    ]
+    relevance_count = sum(1 for kw in door_keywords if kw in text_lower)
+    if relevance_count < 2:
+        return result
+
+    result["is_relevant"] = True
+
+    # Extract fire classes
+    fire_classes = set()
+    for m in re.finditer(r'(EI|T|F)\s*(\d{2,3})', text, re.IGNORECASE):
+        fire_classes.add(f"{m.group(1).upper()}{m.group(2)}")
+
+    # Extract resistance classes
+    resistance = set()
+    for m in re.finditer(r'(RC|WK)\s*(\d)', text, re.IGNORECASE):
+        resistance.add(f"{m.group(1).upper()}{m.group(2)}")
+
+    # Extract sound ratings
+    sound = set()
+    for m in re.finditer(r'(?:Rw\s*=?\s*)?(\d{2,3})\s*dB', text, re.IGNORECASE):
+        db_val = int(m.group(1))
+        if 15 <= db_val <= 60:
+            sound.add(f"Rw={m.group(1)}dB")
+
+    # Extract RAL colors
+    ral_colors = set()
+    for m in re.finditer(r'RAL\s*(\d{4})', text, re.IGNORECASE):
+        ral_colors.add(f"RAL {m.group(1)}")
+
+    # Extract smoke protection
+    smoke = set()
+    for m in re.finditer(r'(S200|S[_\s]*200|Rauchschutz)', text, re.IGNORECASE):
+        smoke.add("S200")
+
+    # Extract dimensions (BxH)
+    dimensions = []
+    for m in re.finditer(r'(\d{3,4})\s*[xX×]\s*(\d{3,4})', text):
+        dimensions.append((int(m.group(1)), int(m.group(2))))
+
+    # Extract door numbers with context-aware property assignment
+    door_nrs = {}
+    for m in re.finditer(
+        r'(?:Pos(?:ition)?\.?\s*|T(?:uer|ür)?\.?\s*)(\d+(?:[.\-/]\d+)*)',
+        text, re.IGNORECASE,
+    ):
+        nr = m.group(0).strip()
+        # Grab surrounding context (200 chars around match)
+        start = max(0, m.start() - 100)
+        end = min(len(text), m.end() + 200)
+        context = text[start:end]
+        door_nrs[nr] = context
+
+    # Build per-door properties from context
+    if door_nrs:
+        for nr, context in list(door_nrs.items())[:50]:
+            prop = {"tuer_nr": nr}
+            fc = re.search(r'(EI|T|F)\s*(\d{2,3})', context, re.IGNORECASE)
+            if fc:
+                prop["brandschutz"] = f"{fc.group(1).upper()}{fc.group(2)}"
+            rc = re.search(r'(RC|WK)\s*(\d)', context, re.IGNORECASE)
+            if rc:
+                prop["einbruchschutz"] = f"{rc.group(1).upper()}{rc.group(2)}"
+            snd = re.search(r'(?:Rw\s*=?\s*)?(\d{2,3})\s*dB', context, re.IGNORECASE)
+            if snd and 15 <= int(snd.group(1)) <= 60:
+                prop["schallschutz"] = f"Rw={snd.group(1)}dB"
+            ral = re.search(r'RAL\s*(\d{4})', context, re.IGNORECASE)
+            if ral:
+                prop["oberflaechenbehandlung"] = f"RAL {ral.group(1)}"
+            dim = re.search(r'(\d{3,4})\s*[xX×]\s*(\d{3,4})', context)
+            if dim:
+                prop["breite"] = int(dim.group(1))
+                prop["hoehe"] = int(dim.group(2))
+            smk = re.search(r'(S200|Rauchschutz)', context, re.IGNORECASE)
+            if smk:
+                prop["besonderheiten"] = "Rauchschutz S200"
+            result["door_properties"].append(prop)
+    else:
+        # No specific door numbers — create general properties
+        if fire_classes or resistance or sound:
+            prop = {}
+            if fire_classes:
+                prop["brandschutz"] = ", ".join(sorted(fire_classes))
+            if resistance:
+                prop["einbruchschutz"] = ", ".join(sorted(resistance))
+            if sound:
+                prop["schallschutz"] = ", ".join(sorted(sound))
+            if ral_colors:
+                prop["oberflaechenbehandlung"] = ", ".join(sorted(ral_colors))
+            result["door_properties"].append(prop)
+
+    # General requirements text
+    general = []
+    if ral_colors:
+        general.append(f"Oberflaeche: {', '.join(sorted(ral_colors))}")
+    if fire_classes:
+        general.append(f"Brandschutz: {', '.join(sorted(fire_classes))}")
+    if resistance:
+        general.append(f"Einbruchschutz: {', '.join(sorted(resistance))}")
+    if sound:
+        general.append(f"Schallschutz: {', '.join(sorted(sound))}")
+    if smoke:
+        general.append("Rauchschutz: S200")
+    result["general_requirements"] = "; ".join(general)
+
+    logger.info(
+        f"Regex scan ({filename}): relevant=True, "
+        f"properties={len(result['door_properties'])}, general='{result['general_requirements']}'"
+    )
+    return result
 
 
 def _merge_scanned_data(doors: list[dict], properties: list[dict], door_nrs: list[str]) -> int:

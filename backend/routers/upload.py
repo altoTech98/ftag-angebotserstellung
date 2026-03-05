@@ -236,7 +236,7 @@ async def upload_folder(files: List[UploadFile] = File(...)) -> dict:
             "total_size": 0,
         }
         
-        max_total = settings.MAX_FILE_SIZE_MB * 10 * 1024 * 1024
+        max_total = settings.CACHE_MAX_SIZE_MB * 1024 * 1024
         
         for uploaded_file in files:
             try:
@@ -314,7 +314,7 @@ async def upload_folder(files: List[UploadFile] = File(...)) -> dict:
             raise ValidationError("Keine unterstützten Dateien im Upload")
 
         # Persist project metadata via project_store (so get_project() works)
-        file_dicts = [f.dict() for f in file_entries]
+        file_dicts = [f.model_dump() for f in file_entries]
         project = create_project(file_dicts, project_id=project_id)
 
         # Cache raw file bytes for analysis (keyed by file_id)

@@ -69,12 +69,12 @@ class Settings:
         # CAD
         "dwg", "dxf",
     }
-    MAX_FILE_SIZE_MB: int = int(os.environ.get("MAX_FILE_SIZE_MB", 100))
-    MAX_FILES_PER_UPLOAD: int = int(os.environ.get("MAX_FILES_PER_UPLOAD", 40))
+    MAX_FILE_SIZE_MB: int = int(os.environ.get("MAX_FILE_SIZE_MB", 500))
+    MAX_FILES_PER_UPLOAD: int = int(os.environ.get("MAX_FILES_PER_UPLOAD", 200))
     UPLOAD_CLEANUP_HOURS: int = 24  # Alte Uploads nach X Stunden löschen
     
     # Caching
-    CACHE_MAX_SIZE_MB: int = int(os.environ.get("CACHE_MAX_SIZE_MB", 500))
+    CACHE_MAX_SIZE_MB: int = int(os.environ.get("CACHE_MAX_SIZE_MB", 2000))
     TEXT_CACHE_TTL_SECONDS: int = 3600  # 1 Stunde
     PROJECT_CACHE_TTL_SECONDS: int = 1800  # 30 Minuten
     OFFER_CACHE_TTL_SECONDS: int = 1800  # 30 Minuten

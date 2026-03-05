@@ -618,6 +618,13 @@ def match_all(
             if violations:
                 gaps = list(gaps) + violations
 
+        # Build structured missing_info from gap_items
+        missing_info = []
+        for gap_text in gaps:
+            mi = _parse_gap_to_missing_info(gap_text)
+            if mi:
+                missing_info.append(mi)
+
         result_entry = {
             "status": status,
             "confidence": round(score / 100, 2),
@@ -629,6 +636,7 @@ def match_all(
             "zubehoer_matched": [],
             "zubehoer_gap": [],
             "gap_items": gaps,
+            "missing_info": missing_info,
             "reason": best_product.compact_text if best_product else "Kein passendes Produkt gefunden",
             "original_position": pos,
             "category": category,
@@ -657,10 +665,54 @@ def match_all(
             "partial_count": len(partial),
             "unmatched_count": len(unmatched),
             "match_rate": round(
-                (len(matched) + len(partial) * 0.5) / max(total, 1) * 100, 1
+                len(matched) / max(total, 1) * 100, 1
             ),
         },
     }
+
+
+def _parse_gap_to_missing_info(gap_text: str) -> dict | None:
+    """Parse a gap text string into a structured missing_info dict."""
+    # Pattern: "Feld: braucht X, Produkt hat Y"
+    m = re.match(r'(?:KRITISCH:\s*)?(\w[\w\s]*?)(?::\s*| nicht erfuellt).*?braucht\s+(.+?),\s*Produkt hat\s+(.+)', gap_text)
+    if m:
+        return {
+            "feld": m.group(1).strip(),
+            "benoetigt": m.group(2).strip(),
+            "vorhanden": m.group(3).strip(),
+        }
+    # Pattern: "Feld: braucht X, Produkt ohne Angabe"
+    m = re.match(r'(?:KRITISCH:\s*)?(\w[\w\s]*?):\s*braucht\s+(.+?),\s*Produkt (ohne.*)', gap_text)
+    if m:
+        return {
+            "feld": m.group(1).strip(),
+            "benoetigt": m.group(2).strip(),
+            "vorhanden": m.group(3).strip(),
+        }
+    # Pattern: "Fluegel: braucht X, Produkt ist Y"
+    m = re.match(r'(\w[\w\s]*?):\s*braucht\s+(.+?),\s*Produkt ist\s+(.+)', gap_text)
+    if m:
+        return {
+            "feld": m.group(1).strip(),
+            "benoetigt": m.group(2).strip(),
+            "vorhanden": m.group(3).strip(),
+        }
+    # Pattern: "Masse: braucht XxYmm, Produkt max AxBmm"
+    m = re.match(r'(\w[\w\s]*?):\s*braucht\s+(.+?),\s*Produkt max\s+(.+)', gap_text)
+    if m:
+        return {
+            "feld": m.group(1).strip(),
+            "benoetigt": m.group(2).strip(),
+            "vorhanden": f"max {m.group(3).strip()}",
+        }
+    # Generic: just store the text
+    if gap_text:
+        return {
+            "feld": gap_text.split(":")[0].strip() if ":" in gap_text else "Sonstiges",
+            "benoetigt": gap_text,
+            "vorhanden": "—",
+        }
+    return None
 
 
 def _door_signature(door: dict) -> str:

@@ -148,28 +148,6 @@ body {
   white-space: nowrap;
 }
 
-/* ============ CTX BADGE ============ */
-.ctx-badge {
-  gap: 0.5rem;
-  min-width: 90px;
-}
-.ctx-bar-bg {
-  width: 40px;
-  height: 5px;
-  background: var(--border);
-  border-radius: 9999px;
-  overflow: hidden;
-  display: inline-block;
-}
-.ctx-bar-fill {
-  height: 100%;
-  width: 0%;
-  border-radius: 9999px;
-  background: #16a34a;
-  transition: width 0.5s ease, background 0.3s ease;
-  display: block;
-}
-
 /* ============ MAIN ============ */
 .main-content {
   max-width: var(--max-w);

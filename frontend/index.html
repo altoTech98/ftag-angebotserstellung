@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/style.css?v=9" />
+  <link rel="stylesheet" href="/static/style.css?v=10" />
 </head>
 <body>
 
@@ -19,7 +19,7 @@
       <form id="login-form" onsubmit="handleLogin(event)">
         <div class="form-group">
           <label class="form-label" for="login-email">E-Mail</label>
-          <input type="email" id="login-email" class="form-input" placeholder="admin@franktüren.ch" required autocomplete="username" />
+          <input type="email" id="login-email" class="form-input" placeholder="admin@franktueren.ch" required autocomplete="username" />
         </div>
         <div class="form-group">
           <label class="form-label" for="login-password">Passwort</label>
@@ -38,6 +38,7 @@
       <button class="nav-item active" id="nav-offer" onclick="switchView('offer', this)">Analyse</button>
       <button class="nav-item" id="nav-catalog" onclick="switchView('catalog', this)">Katalog</button>
       <button class="nav-item" id="nav-history" onclick="switchView('history', this)">Historie</button>
+      <button class="nav-item" id="nav-users" onclick="switchView('users', this)">Benutzer</button>
     </nav>
     <div class="header-status">
       <div class="status-badge" title="Server-Status">
@@ -47,10 +48,6 @@
       <div class="status-badge" title="KI-Engine">
         <span class="status-dot" id="ai-dot"></span>
         <span class="status-text" id="ai-text">KI</span>
-      </div>
-      <div class="status-badge ctx-badge" title="Context Window Auslastung" id="ctx-badge">
-        <span class="ctx-bar-bg"><span class="ctx-bar-fill" id="ctx-bar"></span></span>
-        <span class="status-text" id="ctx-text">Ctx --</span>
       </div>
       <button class="logout-btn" onclick="handleLogout()" title="Abmelden">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -368,7 +365,74 @@
       </div>
     </div>
 
+    <!-- ===== USERS VIEW ===== -->
+    <div id="view-users" class="view">
+      <h1 class="section-title">Benutzerverwaltung</h1>
+      <p class="section-desc">Benutzer hinzufuegen, entfernen und Rollen verwalten</p>
+
+      <div class="glass-card" style="margin-bottom:1.5rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+          <h2 style="font-size:1rem;font-weight:700;">Benutzer</h2>
+          <button class="cta-btn slim" onclick="showAddUserModal()">+ Benutzer hinzufuegen</button>
+        </div>
+        <div id="users-loading" class="loading-state hidden">
+          <div class="mini-spinner"></div>
+          <span>Benutzer werden geladen...</span>
+        </div>
+        <p id="users-error" class="error-inline hidden"></p>
+        <div id="users-table-wrap" class="table-wrap hidden" style="border-radius:var(--radius-lg);border-top:1px solid var(--border);">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>E-Mail</th>
+                <th>Rolle</th>
+                <th>Erstellt</th>
+                <th>Aktionen</th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </main>
+
+  <!-- Add User Modal -->
+  <div class="modal-overlay hidden" id="add-user-modal">
+    <div class="modal-card" style="max-width:420px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Benutzer hinzufuegen</h3>
+        <button class="modal-close" onclick="closeAddUserModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="new-user-email">E-Mail</label>
+          <input type="email" id="new-user-email" class="form-input" placeholder="benutzer@franktueren.ch" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="new-user-password">Passwort</label>
+          <input type="password" id="new-user-password" class="form-input" placeholder="Mindestens 6 Zeichen" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="new-user-role">Rolle</label>
+          <select id="new-user-role" class="form-input">
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <p id="add-user-error" class="login-error hidden"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="cta-btn secondary slim" onclick="closeAddUserModal()">Abbrechen</button>
+        <button class="cta-btn slim" onclick="submitAddUser()">Erstellen</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Detail Modal (Position Details + GAP) -->
   <div class="modal-overlay hidden" id="detail-modal">
@@ -435,6 +499,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=9"></script>
+  <script src="/static/app.js?v=10"></script>
 </body>
 </html>

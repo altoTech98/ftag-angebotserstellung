@@ -1,8 +1,9 @@
 """
-Auth Router – Login / Me / Logout
+Auth Router – Login / Me / Logout / User Management
 """
 
 import logging
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -11,6 +12,9 @@ from services.auth_service import (
     authenticate_user,
     create_access_token,
     get_current_user,
+    list_users,
+    add_user,
+    delete_user,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,6 +36,18 @@ class LoginResponse(BaseModel):
 class UserInfo(BaseModel):
     email: str
     role: str
+
+
+class CreateUserRequest(BaseModel):
+    email: str
+    password: str
+    role: str = "user"
+
+
+class UserListItem(BaseModel):
+    email: str
+    role: str
+    created_at: str = ""
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -59,3 +75,42 @@ async def get_me(user: dict = Depends(get_current_user)):
 async def logout():
     """Logout (no-op server-side, token invalidation happens client-side)."""
     return {"message": "Abgemeldet"}
+
+
+# ─────────────────────────────────────────────────────────────────────
+# USER MANAGEMENT (admin only)
+# ─────────────────────────────────────────────────────────────────────
+
+def _require_admin(user: dict = Depends(get_current_user)) -> dict:
+    """Dependency: require admin role."""
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Nur Admins duerfen Benutzer verwalten",
+        )
+    return user
+
+
+@router.get("/users", response_model=List[UserListItem])
+async def get_users(admin: dict = Depends(_require_admin)):
+    """List all users (admin only)."""
+    return list_users()
+
+
+@router.post("/users", response_model=UserListItem, status_code=201)
+async def create_user(req: CreateUserRequest, admin: dict = Depends(_require_admin)):
+    """Create a new user (admin only)."""
+    try:
+        return add_user(req.email, req.password, req.role)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/users/{email}")
+async def remove_user(email: str, admin: dict = Depends(_require_admin)):
+    """Delete a user (admin only). Cannot delete last admin."""
+    try:
+        delete_user(email)
+        return {"message": f"Benutzer '{email}' geloescht"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

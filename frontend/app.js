@@ -99,6 +99,7 @@ function switchView(view, btn) {
 
   if (view === 'catalog') loadCatalogInfo();
   if (view === 'history') loadHistory();
+  if (view === 'users') loadUsers();
 }
 
 // ─────────────────────────────────────────────
@@ -533,11 +534,16 @@ function showResults(analysis, offer) {
   metaCard.classList.add('hidden');
   metaCard.innerHTML = '';
 
-  // Match rate bar
+  // Match rate bar (now only counts full matches)
   const rate = summary.match_rate || 0;
   document.getElementById('match-rate-pct').textContent = `${rate}%`;
-  document.getElementById('match-rate-sub').textContent =
-    `${summary.total_positions || 0} Positionen`;
+  const partialCount = summary.partial_count || 0;
+  const matchedCount = summary.matched_count || 0;
+  const unmatchedCount = summary.unmatched_count || 0;
+  let subParts = [`${matchedCount} erfuellbar`];
+  if (partialCount > 0) subParts.push(`${partialCount} teilweise (Hinweise beachten!)`);
+  if (unmatchedCount > 0) subParts.push(`${unmatchedCount} nicht erfuellbar`);
+  document.getElementById('match-rate-sub').textContent = subParts.join(' | ');
   setTimeout(() => {
     document.getElementById('match-bar').style.width = `${rate}%`;
   }, 100);
@@ -602,10 +608,20 @@ function showResults(analysis, offer) {
         ftag = [...new Set(names)].join(' / ') || '—';
       }
 
+      // Missing info tags for partial matches
+      const missingInfo = item.missing_info || [];
+      let missingHtml = '';
+      if (status === 'partial' && missingInfo.length > 0) {
+        missingHtml = '<div style="margin-top:.25rem;">' +
+          missingInfo.map(mi =>
+            `<span class="criteria-tag criteria-teilweise" title="${esc(mi.benoetigt || '')} vs ${esc(mi.vorhanden || '')}">${esc(mi.feld || '')}</span>`
+          ).join(' ') + '</div>';
+      }
+
       return `
         <tr onclick="openDetailModal(${idx})" class="clickable-row">
           <td><strong>${esc(item.position || pos.position || '—')}</strong></td>
-          <td>${esc(item.beschreibung || pos.beschreibung || pos.tuertyp || '—')}</td>
+          <td>${esc(item.beschreibung || pos.beschreibung || pos.tuertyp || '—')}${missingHtml}</td>
           <td>${esc(String(pos.menge || item.menge || 1))}</td>
           <td>${esc(pos.brandschutz || '—')}</td>
           <td style="font-size:.8rem;" title="${esc(ftag)}">${esc(ftag.substring(0, 60))}${ftag.length > 60 ? '...' : ''}</td>
@@ -719,6 +735,37 @@ function openDetailModal(index) {
       </div>`;
   }
 
+  // Missing info (for partial matches)
+  const missingInfo = item.missing_info || [];
+  let missingHtml = '';
+  if (missingInfo.length > 0) {
+    missingHtml = `
+      <h4 style="font-size:.875rem;font-weight:600;margin:1rem 0 .5rem;color:var(--warning);">Was fehlt</h4>
+      <div class="detail-criteria">
+        ${missingInfo.map(mi => `
+          <div class="detail-gap-item criteria-teilweise">
+            <span><strong>${esc(mi.feld || '')}</strong></span>
+            <span style="font-size:.8rem;">Braucht: ${esc(mi.benoetigt || '')} | Hat: ${esc(mi.vorhanden || '')}</span>
+          </div>
+        `).join('')}
+      </div>`;
+  }
+
+  // Gap items (raw text, only if no structured missing_info)
+  const gapItems = item.gap_items || [];
+  let gapHtml = '';
+  if (gapItems.length > 0 && missingInfo.length === 0) {
+    gapHtml = `
+      <h4 style="font-size:.875rem;font-weight:600;margin:1rem 0 .5rem;color:var(--warning);">Abweichungen</h4>
+      <div class="detail-criteria">
+        ${gapItems.map(g => `
+          <div class="detail-gap-item criteria-fehlt">
+            <span>${esc(g)}</span>
+          </div>
+        `).join('')}
+      </div>`;
+  }
+
   // Reason
   const reasonHtml = item.reason
     ? `<div style="margin-top:.75rem;padding:.5rem .75rem;background:var(--bg-hover);border-radius:var(--radius);font-size:.8125rem;color:var(--text-muted);">${esc(item.reason)}</div>`
@@ -746,6 +793,8 @@ function openDetailModal(index) {
     ${productHtml}
 
     ${criteriaHtml}
+    ${missingHtml}
+    ${gapHtml}
     ${reasonHtml}
   `;
 
@@ -1367,27 +1416,105 @@ async function checkServerHealth() {
       }
     }
 
-    // Context window usage
-    const ctxBar = document.getElementById('ctx-bar');
-    const ctxText = document.getElementById('ctx-text');
-    if (ctxBar && ctxText && data.ai && data.ai.context) {
-      const ctx = data.ai.context;
-      const pct = ctx.usage_pct || 0;
-      ctxBar.style.width = Math.min(pct, 100) + '%';
-      const fmt = (n) => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'k' : n;
-      ctxText.textContent = `Ctx ${fmt(ctx.total_tokens)}`;
-      ctxBar.style.background = pct > 80 ? '#dc2626' : pct > 50 ? '#d97706' : '#16a34a';
-    }
   } catch (err) {
     serverDot.style.background = '#dc2626';
     serverText.textContent = 'Offline';
     if (aiDot) { aiDot.style.background = '#6b7280'; }
     if (aiText) { aiText.textContent = 'KI'; }
-    const ctxText = document.getElementById('ctx-text');
-    if (ctxText) { ctxText.textContent = 'Ctx --'; }
-    const ctxBar = document.getElementById('ctx-bar');
-    if (ctxBar) { ctxBar.style.width = '0%'; }
     console.warn('[Health Check] Server offline:', err.message);
+  }
+}
+
+// ─────────────────────────────────────────────
+// USER MANAGEMENT
+// ─────────────────────────────────────────────
+
+async function loadUsers() {
+  const loading = document.getElementById('users-loading');
+  const wrap = document.getElementById('users-table-wrap');
+  const errEl = document.getElementById('users-error');
+  if (!loading) return;
+
+  loading.classList.remove('hidden');
+  wrap.classList.add('hidden');
+  errEl.classList.add('hidden');
+
+  try {
+    const users = await api('/auth/users');
+    loading.classList.add('hidden');
+    wrap.classList.remove('hidden');
+
+    const tbody = document.getElementById('users-tbody');
+    tbody.innerHTML = users.map(u => `
+      <tr>
+        <td>${esc(u.email)}</td>
+        <td><span class="tag ${u.role === 'admin' ? 'tag-blue' : 'tag-green'}">${esc(u.role)}</span></td>
+        <td style="font-size:.8rem;color:var(--text-muted);">${u.created_at ? new Date(u.created_at).toLocaleDateString('de-CH') : '—'}</td>
+        <td>
+          <button class="correction-btn" onclick="confirmDeleteUser('${esc(u.email)}')">Entfernen</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    loading.classList.add('hidden');
+    errEl.textContent = err.message || 'Fehler beim Laden der Benutzer';
+    errEl.classList.remove('hidden');
+  }
+}
+
+function showAddUserModal() {
+  document.getElementById('add-user-modal').classList.remove('hidden');
+  document.getElementById('new-user-email').value = '';
+  document.getElementById('new-user-password').value = '';
+  document.getElementById('new-user-role').value = 'user';
+  document.getElementById('add-user-error').classList.add('hidden');
+}
+
+function closeAddUserModal() {
+  document.getElementById('add-user-modal').classList.add('hidden');
+}
+
+async function submitAddUser() {
+  const email = document.getElementById('new-user-email').value.trim();
+  const password = document.getElementById('new-user-password').value;
+  const role = document.getElementById('new-user-role').value;
+  const errEl = document.getElementById('add-user-error');
+  errEl.classList.add('hidden');
+
+  if (!email || !password) {
+    errEl.textContent = 'E-Mail und Passwort erforderlich';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (password.length < 6) {
+    errEl.textContent = 'Passwort muss mindestens 6 Zeichen haben';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    await api('/auth/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, role }),
+    });
+    closeAddUserModal();
+    showToast('Benutzer erstellt');
+    loadUsers();
+  } catch (err) {
+    errEl.textContent = err.message || 'Fehler beim Erstellen';
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function confirmDeleteUser(email) {
+  if (!confirm(`Benutzer "${email}" wirklich entfernen?`)) return;
+  try {
+    await api(`/auth/users/${encodeURIComponent(email)}`, { method: 'DELETE' });
+    showToast('Benutzer entfernt');
+    loadUsers();
+  } catch (err) {
+    alert(err.message || 'Fehler beim Entfernen');
   }
 }
 
@@ -1396,6 +1523,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     closeDetailModal();
     closeCorrection();
+    closeAddUserModal();
   }
 });
 

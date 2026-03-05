@@ -282,19 +282,20 @@ def generate_gap_report_excel(
     )
 
     ws.column_dimensions["A"].width = 8
-    ws.column_dimensions["B"].width = 35
+    ws.column_dimensions["B"].width = 30
     ws.column_dimensions["C"].width = 15
-    ws.column_dimensions["D"].width = 15
-    ws.column_dimensions["E"].width = 35
+    ws.column_dimensions["D"].width = 12
+    ws.column_dimensions["E"].width = 30
+    ws.column_dimensions["F"].width = 35
 
     row = 1
 
-    ws.merge_cells(f"A{row}:E{row}")
+    ws.merge_cells(f"A{row}:F{row}")
     ws[f"A{row}"] = f"GAP-REPORT – {settings.COMPANY_NAME}"
     ws[f"A{row}"].font = title_font
     row += 1
 
-    ws.merge_cells(f"A{row}:E{row}")
+    ws.merge_cells(f"A{row}:F{row}")
     ws[f"A{row}"] = f"Projekt: {requirements.get('projekt', 'Ausschreibung')} · Erstellt: {datetime.now().strftime('%d.%m.%Y')}"
     ws[f"A{row}"].font = small_font
     row += 2
@@ -313,7 +314,7 @@ def generate_gap_report_excel(
     for label, value in summary_data:
         ws[f"A{row}"] = label
         ws[f"A{row}"].font = bold_font
-        ws.merge_cells(f"B{row}:E{row}")
+        ws.merge_cells(f"B{row}:F{row}")
         ws[f"B{row}"] = value
         ws[f"B{row}"].font = normal_font
         row += 1
@@ -322,14 +323,14 @@ def generate_gap_report_excel(
 
     # Unmatched positions
     if unmatched_positions:
-        ws.merge_cells(f"A{row}:E{row}")
+        ws.merge_cells(f"A{row}:F{row}")
         ws[f"A{row}"] = "NICHT ERFÜLLBARE POSITIONEN"
         ws[f"A{row}"].font = header_font
         ws[f"A{row}"].fill = red_fill
         ws[f"A{row}"].alignment = Alignment(horizontal="center")
         row += 1
 
-        headers = ["Pos.", "Beschreibung", "Anforderung", "Status", "Empfehlung"]
+        headers = ["Pos.", "Beschreibung", "Anforderung", "Status", "Empfehlung", "Fehlende Anforderungen"]
         for col_idx, h in enumerate(headers, 1):
             cell = ws.cell(row=row, column=col_idx, value=h)
             cell.font = header_font
@@ -348,12 +349,20 @@ def generate_gap_report_excel(
             if pos.get("tuertyp"):
                 req_parts.append(f"Typ: {pos['tuertyp']}")
 
+            # Build "Fehlende Anforderungen" from missing_info or gap_items
+            missing_parts = []
+            for mi in item.get("missing_info", []):
+                missing_parts.append(f"{mi.get('feld', '')}: braucht {mi.get('benoetigt', '')}, hat {mi.get('vorhanden', '')}")
+            if not missing_parts:
+                missing_parts = item.get("gap_items", [])
+
             row_data = [
                 item.get("position", "?"),
                 item.get("beschreibung", pos.get("beschreibung", "")),
                 "\n".join(req_parts) or "Spezifische Anforderungen",
                 "Nicht verfügbar",
                 item.get("reason", "Sonderanfertigung prüfen"),
+                "\n".join(missing_parts) if missing_parts else "—",
             ]
             for col_idx, value in enumerate(row_data, 1):
                 cell = ws.cell(row=row, column=col_idx, value=value)
@@ -368,14 +377,14 @@ def generate_gap_report_excel(
 
     # Partial positions
     if partial_positions:
-        ws.merge_cells(f"A{row}:E{row}")
+        ws.merge_cells(f"A{row}:F{row}")
         ws[f"A{row}"] = "TEILWEISE ERFÜLLBARE POSITIONEN"
         ws[f"A{row}"].font = header_font
         ws[f"A{row}"].fill = orange_fill
         ws[f"A{row}"].alignment = Alignment(horizontal="center")
         row += 1
 
-        headers = ["Pos.", "Beschreibung", "Anforderung", "Status", "Hinweis"]
+        headers = ["Pos.", "Beschreibung", "Anforderung", "Status", "Hinweis", "Fehlende Anforderungen"]
         for col_idx, h in enumerate(headers, 1):
             cell = ws.cell(row=row, column=col_idx, value=h)
             cell.font = header_font
@@ -392,12 +401,20 @@ def generate_gap_report_excel(
             if pos.get("einbruchschutz"):
                 req_parts.append(f"Einbruch: {pos['einbruchschutz']}")
 
+            # Build "Fehlende Anforderungen" from missing_info or gap_items
+            missing_parts = []
+            for mi in item.get("missing_info", []):
+                missing_parts.append(f"{mi.get('feld', '')}: braucht {mi.get('benoetigt', '')}, hat {mi.get('vorhanden', '')}")
+            if not missing_parts:
+                missing_parts = item.get("gap_items", [])
+
             row_data = [
                 item.get("position", "?"),
                 item.get("beschreibung", pos.get("beschreibung", "")),
                 "\n".join(req_parts) or "Teilweise spezifiziert",
                 "Rückfrage nötig",
                 item.get("reason", "Technische Rückfrage empfohlen"),
+                "\n".join(missing_parts) if missing_parts else "—",
             ]
             for col_idx, value in enumerate(row_data, 1):
                 cell = ws.cell(row=row, column=col_idx, value=value)
@@ -411,7 +428,7 @@ def generate_gap_report_excel(
     row += 2
 
     # Recommendations
-    ws.merge_cells(f"A{row}:E{row}")
+    ws.merge_cells(f"A{row}:F{row}")
     ws[f"A{row}"] = "HANDLUNGSEMPFEHLUNGEN"
     ws[f"A{row}"].font = bold_font
     row += 1
@@ -423,7 +440,7 @@ def generate_gap_report_excel(
         "4. Angebot für erfüllbare Positionen separat einreichen (Teilangebot)",
     ]
     for rec in recommendations:
-        ws.merge_cells(f"A{row}:E{row}")
+        ws.merge_cells(f"A{row}:F{row}")
         ws[f"A{row}"] = rec
         ws[f"A{row}"].font = normal_font
         row += 1
