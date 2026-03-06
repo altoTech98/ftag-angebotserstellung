@@ -182,7 +182,7 @@ class OllamaWatchdog:
         """
         Restart Ollama mit Exponential Backoff
         """
-        logger.warning(f"⚠️ Restarting Ollama (attempt {self.restart_attempts + 1}/{self.max_restart_attempts})")
+        logger.warning(f"[WARN] Restarting Ollama (attempt {self.restart_attempts + 1}/{self.max_restart_attempts})")
         
         # Kill existing process
         if self.process:
@@ -207,7 +207,7 @@ class OllamaWatchdog:
         self.restart_attempts += 1
         
         if self.restart_attempts > self.max_restart_attempts:
-            logger.error(f"❌ Max restart attempts ({self.max_restart_attempts}) exceeded!")
+            logger.error(f"[FAIL] Max restart attempts ({self.max_restart_attempts}) exceeded!")
             return False
         
         return self.start_ollama()
@@ -269,7 +269,7 @@ class OllamaWatchdog:
             name="OllamaWatchdog"
         )
         self.monitor_thread.start()
-        logger.info("✅ OllamaWatchdog service started")
+        logger.info("[OK] OllamaWatchdog service started")
     
     def stop(self):
         """Stoppe Watchdog Service"""
@@ -279,7 +279,7 @@ class OllamaWatchdog:
         if self.monitor_thread:
             self.monitor_thread.join(timeout=5)
         
-        logger.info("✅ OllamaWatchdog stopped")
+        logger.info("[OK] OllamaWatchdog stopped")
     
     def get_status(self) -> Dict[str, Any]:
         """Get Watchdog Status"""

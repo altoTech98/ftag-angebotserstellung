@@ -16,7 +16,8 @@ from services.history_store import (
     delete_history_entry,
     save_analysis,
 )
-from services.product_matcher import match_requirements_ai, match_requirements
+from services.fast_matcher import match_all
+from services.product_matcher import match_requirements
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +54,10 @@ async def rematch_history(history_id: str):
         raise HTTPException(status_code=400, detail="Keine Positionen in der gespeicherten Analyse")
 
     try:
-        match_result = match_requirements_ai(requirements)
+        positionen = requirements.get("positionen", [])
+        match_result = match_all(positionen)
     except Exception as e:
-        logger.warning(f"AI rematch failed, falling back to keyword: {e}")
+        logger.warning(f"Fast rematch failed, falling back to keyword: {e}")
         try:
             match_result = match_requirements(requirements)
         except Exception as e2:

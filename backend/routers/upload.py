@@ -176,7 +176,7 @@ async def upload_single_file(file: UploadFile = File(...)) -> dict:
         # Response
         text_preview = text[:500] + ("..." if len(text) > 500 else "")
         
-        logger.info(f"✅ Upload successful: {file_id}")
+        logger.info(f"[OK] Upload successful: {file_id}")
         
         return {
             "file_id": file_id,

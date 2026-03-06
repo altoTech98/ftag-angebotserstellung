@@ -37,6 +37,21 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(log_data, ensure_ascii=False)
 
 
+class SafeStreamHandler(logging.StreamHandler):
+    """StreamHandler that replaces unencodable characters instead of crashing."""
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            stream = self.stream
+            # Replace characters that can't be encoded (e.g. emojis on cp1252)
+            if hasattr(stream, 'encoding') and stream.encoding:
+                msg = msg.encode(stream.encoding, errors='replace').decode(stream.encoding, errors='replace')
+            stream.write(msg + self.terminator)
+            self.flush()
+        except Exception:
+            self.handleError(record)
+
+
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -53,7 +68,7 @@ LOGGING_CONFIG = {
     },
     "handlers": {
         "console": {
-            "class": "logging.StreamHandler",
+            "()": SafeStreamHandler,
             "level": settings.LOG_LEVEL,
             "formatter": "standard",
             "stream": "ext://sys.stdout"

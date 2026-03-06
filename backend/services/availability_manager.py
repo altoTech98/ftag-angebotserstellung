@@ -129,7 +129,7 @@ class AvailabilityManager:
             if service["status"] != ServiceStatus.HEALTHY:
                 service["status"] = ServiceStatus.HEALTHY
                 service["recovery_in_progress"] = False
-                logger.info(f"✅ {service_name}: RECOVERED to healthy state")
+                logger.info(f"[OK] {service_name}: RECOVERED to healthy state")
             
             service["successful_checks"] += 1
         else:
@@ -140,7 +140,7 @@ class AvailabilityManager:
             if service["failures"] >= 3:
                 if service["status"] == ServiceStatus.HEALTHY:
                     service["status"] = ServiceStatus.DEGRADED
-                    logger.warning(f"⚠️ {service_name}: Status changed to DEGRADED (failures: {service['failures']})")
+                    logger.warning(f"[WARN] {service_name}: Status changed to DEGRADED (failures: {service['failures']})")
                 
                 # Versuche Wiederherstellung
                 if service["failures"] >= 5 and not service["recovery_in_progress"]:
@@ -156,7 +156,7 @@ class AvailabilityManager:
         service["recovery_in_progress"] = True
         service["status"] = ServiceStatus.RECOVERING
         
-        logger.warning(f"🔄 {service_name}: Attempting recovery...")
+        logger.warning(f"[RETRY] {service_name}: Attempting recovery...")
         
         for attempt in range(1, self.recovery_attempts + 1):
             try:
@@ -171,7 +171,7 @@ class AvailabilityManager:
                 elif service_name == "telegram":
                     await self._recover_telegram()
                 
-                logger.info(f"✅ {service_name}: Recovery successful on attempt {attempt}")
+                logger.info(f"[OK] {service_name}: Recovery successful on attempt {attempt}")
                 service["recovery_in_progress"] = False
                 service["failures"] = 0
                 return
@@ -180,7 +180,7 @@ class AvailabilityManager:
                 logger.warning(f"Recovery attempt {attempt}/{self.recovery_attempts} failed: {e}")
                 await asyncio.sleep(2 ** attempt)  # Exponential backoff
         
-        logger.error(f"❌ {service_name}: Recovery failed after {self.recovery_attempts} attempts")
+        logger.error(f"[FAIL] {service_name}: Recovery failed after {self.recovery_attempts} attempts")
         service["recovery_in_progress"] = False
         service["fallback_active"] = True
     

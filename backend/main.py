@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI):
         from services.ollama_watchdog import get_ollama_watchdog
         ollama_watchdog = get_ollama_watchdog()
         ollama_watchdog.start()
-        logger.info("[OK] ✅ OLLAMA WATCHDOG STARTED | 24/7 Monitoring & Auto-Restart enabled")
+        logger.info("[OK] OLLAMA WATCHDOG STARTED | 24/7 Monitoring & Auto-Restart enabled")
         logger.info("[INFO] Ollama wird jetzt überwacht und startet automatisch neu bei Fehlern")
     except Exception as e:
         logger.error(f"[ERROR] Ollama Watchdog failed: {e}")
@@ -76,7 +76,7 @@ async def lifespan(app: FastAPI):
         
         # Starte Background Monitoring
         asyncio.create_task(availability_mgr.start_monitoring())
-        logger.info("[OK] ✅ 24/7 Availability Manager started | Auto-healing enabled")
+        logger.info("[OK] 24/7 Availability Manager started | Auto-healing enabled")
     except Exception as e:
         logger.error(f"[ERROR] Availability Manager failed: {e}")
         startup_errors.append(f"Availability Manager init failed: {e}")
@@ -275,13 +275,20 @@ async def auth_middleware(request: Request, call_next):
             content={"detail": "Nicht authentifiziert"},
         )
 
-    from services.auth_service import verify_token
-    token = auth_header[7:]  # Remove "Bearer " prefix
-    user = verify_token(token)
-    if not user:
+    try:
+        from services.auth_service import verify_token
+        token = auth_header[7:]  # Remove "Bearer " prefix
+        user = verify_token(token)
+        if not user:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Token ungueltig oder abgelaufen"},
+            )
+    except Exception as e:
+        logger.error(f"Auth verification error: {e}")
         return JSONResponse(
             status_code=401,
-            content={"detail": "Token ungueltig oder abgelaufen"},
+            content={"detail": "Authentifizierung fehlgeschlagen"},
         )
 
     return await call_next(request)
@@ -376,7 +383,7 @@ app.include_router(catalog.router, prefix="/api", tags=["Catalog"])
 # ERP Router (nur wenn ERP enabled)
 if settings.ERP_ENABLED:
     app.include_router(erp.router)
-    logger.info("✅ ERP router registered")
+    logger.info("[OK] ERP router registered")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
