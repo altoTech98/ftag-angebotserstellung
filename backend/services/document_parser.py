@@ -202,8 +202,58 @@ def parse_pdf_specs(file_path: str, max_chars: int = 8000) -> str:
 # INTERNE PARSER
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _ocr_pdf_bytes(content: bytes, max_pages: int = 30) -> str:
+    """
+    OCR fallback for scanned PDFs using Tesseract.
+    Converts PDF pages to images, then runs OCR.
+    Returns extracted text or empty string if OCR is not available.
+    """
+    try:
+        import pytesseract
+        from PIL import Image
+    except ImportError:
+        logger.debug("[OCR] pytesseract or Pillow not available")
+        return ""
+
+    try:
+        # Try pdf2image first (best quality)
+        try:
+            from pdf2image import convert_from_bytes
+            images = convert_from_bytes(content, first_page=1, last_page=max_pages, dpi=200)
+        except ImportError:
+            # Fallback: use pdfplumber to render pages as images
+            import pdfplumber
+            images = []
+            with pdfplumber.open(io.BytesIO(content)) as pdf:
+                for page in pdf.pages[:max_pages]:
+                    try:
+                        img = page.to_image(resolution=200)
+                        images.append(img.original)
+                    except Exception:
+                        continue
+
+        if not images:
+            return ""
+
+        text_parts = []
+        for i, img in enumerate(images, 1):
+            try:
+                # Try German + English OCR
+                page_text = pytesseract.image_to_string(img, lang="deu+eng")
+                if page_text and page_text.strip():
+                    text_parts.append(f"--- Seite {i} (OCR) ---\n{page_text}")
+            except Exception as e:
+                logger.debug(f"[OCR] Page {i} failed: {e}")
+                continue
+
+        return "\n\n".join(text_parts)
+    except Exception as e:
+        logger.warning(f"[OCR] PDF OCR failed: {e}")
+        return ""
+
+
 def _parse_pdf_bytes(content: bytes) -> str:
-    """Extrahiert Text aus PDF mit pdfplumber"""
+    """Extrahiert Text aus PDF mit pdfplumber, OCR-Fallback für gescannte Dokumente"""
     import pdfplumber
     
     text_parts = []
@@ -237,13 +287,26 @@ def _parse_pdf_bytes(content: bytes) -> str:
                     continue
         
         result = "\n\n".join(text_parts)
+
+        # OCR fallback for scanned PDFs (no text extracted)
         if not result.strip():
+            ocr_text = _ocr_pdf_bytes(content)
+            if ocr_text and ocr_text.strip():
+                logger.info("[PDF] Using OCR fallback for scanned document")
+                return ocr_text[:DocumentParser.MAX_TEXT_LENGTH]
             raise FileError(
                 ErrorCode.FILE_PARSE_ERROR,
-                "PDF ist leer oder konnte nicht gelesen werden",
+                "PDF ist leer oder konnte nicht gelesen werden (auch OCR fehlgeschlagen)",
                 filename=".pdf"
             )
-        
+
+        # If text is suspiciously short, try OCR for additional content
+        if len(result.strip()) < 200:
+            ocr_text = _ocr_pdf_bytes(content)
+            if ocr_text and len(ocr_text.strip()) > len(result.strip()):
+                logger.info("[PDF] OCR produced better results than text extraction")
+                result = ocr_text
+
         return result[:DocumentParser.MAX_TEXT_LENGTH]
     
     except FileError:

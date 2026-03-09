@@ -103,6 +103,14 @@ async def lifespan(app: FastAPI):
         logger.warning(msg)
         startup_errors.append(msg)
     
+    # 1b. Pre-build Semantic Search Index
+    try:
+        from services.semantic_search import get_semantic_index
+        sem_index = get_semantic_index()
+        logger.info(f"[OK] Semantic search index built | {len(sem_index._profiles)} products indexed")
+    except Exception as e:
+        logger.warning(f"[WARN] Semantic search index build failed: {e}")
+
     # 2. Initialize AI Service (Claude -> Ollama -> Regex failover)
     try:
         from services.ai_service import get_ai_service
