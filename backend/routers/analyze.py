@@ -163,7 +163,37 @@ def _run_excel_analysis(file_id: str, excel_bytes: bytes) -> dict:
 
 def _run_text_analysis(file_id: str, text: str) -> dict:
     """Run text-based analysis for PDF/Word files (Claude extraction + matching)."""
-    requirements = extract_requirements_from_text(text)
+
+    # Try Vision-based structured extraction for PDFs
+    pdf_bytes = project_cache.get(f"pdf_{file_id}")
+    positions = []
+    vision_used = False
+
+    if pdf_bytes:
+        try:
+            from services.document_parser import parse_pdf_with_vision
+            vision_result = parse_pdf_with_vision(pdf_bytes)
+            if vision_result.get("positions"):
+                positions = vision_result["positions"]
+                vision_used = True
+                logger.info(f"[ANALYZE] Vision extracted {len(positions)} positions")
+                # Use vision text if original was poor
+                if vision_result.get("text") and len(vision_result["text"]) > len(text):
+                    text = vision_result["text"]
+        except Exception as e:
+            logger.debug(f"[ANALYZE] Vision analysis failed: {e}")
+
+    # Standard AI extraction (if no Vision positions)
+    if not positions:
+        requirements = extract_requirements_from_text(text)
+    else:
+        requirements = {
+            "projekt": "",
+            "auftraggeber": "",
+            "positionen": positions,
+            "gesamtanzahl_tueren": sum(p.get("menge", 1) for p in positions),
+            "hinweise": "Extrahiert via Claude Vision",
+        }
 
     # Extract project metadata from the document text
     try:

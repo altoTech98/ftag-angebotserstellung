@@ -172,6 +172,10 @@ async def upload_single_file(file: UploadFile = File(...)) -> dict:
         # For Excel: also cache raw bytes for structured parsing
         if ext in ('.xlsx', '.xls', '.xlsm'):
             project_cache.set(f"excel_{file_id}", content, ttl_seconds=1800)
+
+        # For PDF: also cache raw bytes for Vision analysis
+        if ext == '.pdf':
+            project_cache.set(f"pdf_{file_id}", content, ttl_seconds=1800)
         
         # Response
         text_preview = text[:500] + ("..." if len(text) > 500 else "")
