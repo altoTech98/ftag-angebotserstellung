@@ -5,6 +5,7 @@ import LoginForm from './components/LoginForm'
 import Header from './components/Header'
 import Toast from './components/Toast'
 import AnalysePage from './pages/AnalysePage'
+import KatalogPage from './pages/KatalogPage'
 
 function AppRoutes() {
   const { user, loading } = useAuth()
@@ -19,7 +20,7 @@ function AppRoutes() {
         <Routes>
           <Route path="/" element={<Navigate to="/analyse" replace />} />
           <Route path="/analyse" element={<AnalysePage />} />
-          <Route path="/katalog" element={<div>Katalog (TODO)</div>} />
+          <Route path="/katalog" element={<KatalogPage />} />
           <Route path="/historie" element={<div>Historie (TODO)</div>} />
           <Route path="/benutzer" element={
             user.role === 'admin' ? <div>Benutzer (TODO)</div> : <Navigate to="/analyse" replace />
