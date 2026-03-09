@@ -77,7 +77,7 @@ class AvailabilityManager:
             return
         
         self.running = True
-        logger.info("🟢 Availability Manager: Starting 24/7 monitoring")
+        logger.info("[OK] Availability Manager: Starting 24/7 monitoring")
         
         # Starte async monitoring loop
         while self.running:

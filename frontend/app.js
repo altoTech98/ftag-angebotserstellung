@@ -306,6 +306,7 @@ async function runAnalysisWorkflow() {
     const form = new FormData();
     form.append('file', state.file);
     const up = await api('/upload', { method: 'POST', body: form });
+    if (!up.file_id) throw new Error('Upload fehlgeschlagen: keine file_id erhalten');
     state.fileId = up.file_id;
     setStep('upload', 'done', `${up.filename} hochgeladen (${up.text_length.toLocaleString('de-CH')} Zeichen)`);
 
@@ -523,7 +524,7 @@ function showResults(analysis, offer) {
     { num: summary.unmatched_count || 0, label: 'Nicht erfuellbar', cls: 'red', target: 'section-unmatched' },
   ];
   statGrid.innerHTML = stats.map((s, i) => `
-    <div class="stat-card ${s.cls} clickable" style="animation-delay:${i * 80}ms" onclick="scrollToSection('${s.target}')">
+    <div class="stat-card ${esc(s.cls)} clickable" style="animation-delay:${i * 80}ms" onclick="scrollToSection('${esc(s.target)}')">
       <div class="stat-num">${s.num}</div>
       <div class="stat-label">${s.label}</div>
     </div>
@@ -1370,7 +1371,12 @@ async function api(path, opts = {}) {
     console.error(`[API] Error ${res.status} for ${path}:`, detail || msg);
     throw new Error(msg);
   }
-  return res.json();
+  try {
+    return await res.json();
+  } catch (parseErr) {
+    console.error('[API] JSON parse error:', parseErr);
+    throw new Error('Ungueltige Server-Antwort');
+  }
 }
 
 // ─────────────────────────────────────────────
