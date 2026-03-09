@@ -28,6 +28,7 @@ async function request(path, opts = {}) {
 
   if (res.status === 401) {
     localStorage.removeItem('auth_token')
+    window.dispatchEvent(new Event('auth:logout'))
     throw new ApiError('Sitzung abgelaufen – bitte erneut anmelden.', 401)
   }
 

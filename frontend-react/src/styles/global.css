@@ -92,14 +92,6 @@ body {
 
 @media (max-width: 640px) {
   .main-content { padding: 1.5rem 1rem 3rem; }
-  .header { padding: 0 1rem; gap: 1rem; }
-  .header-brand { font-size: 0.8125rem; }
-  .nav-item { font-size: 0.8125rem; padding: 0.375rem 0.5rem; }
-  .download-grid { grid-template-columns: 1fr; }
-  .stat-grid { grid-template-columns: repeat(2, 1fr); }
-  .steps-indicator { flex-wrap: wrap; gap: 0.25rem; }
-  .pill-connector { display: none; }
-  .pill-label { display: none; }
 }
 
 @media (max-width: 480px) {

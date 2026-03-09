@@ -78,11 +78,19 @@ function PositionDetailModal({ item, onClose }) {
     ['Hoehe', pos.hoehe ? `${pos.hoehe} mm` : null],
     ['Menge', pos.menge],
     ['Raum', pos.raum_bezeichnung || pos.raum],
+    ['Geschoss', pos.geschoss],
+    ['Zargentyp', pos.zargentyp],
+    ['Schlosstyp', pos.schloss_typ],
+    ['Bandtyp', pos.bandtyp || pos.band],
+    ['Oberflaeche', pos.oberflaechentyp || pos.oberflaeche],
+    ['Glasausschnitt', pos.glasausschnitt || pos.verglasung],
+    ['Fluegel', pos.fluegel_anzahl || pos.anzahl_fluegel],
   ].filter(([, v]) => v != null && v !== '' && v !== '\u2014')
 
   const products = item.matched_products || []
   const criteria = item.match_criteria || []
   const missingInfo = item.missing_info || []
+  const gapItems = item.gap_items || []
 
   useEffect(() => {
     const h = (e) => { if (e.key === 'Escape') onClose() }
@@ -158,6 +166,20 @@ function PositionDetailModal({ item, onClose }) {
                   <div key={i} className={`${styles.criteriaItem} ${styles.criteriaTeilweise}`}>
                     <span><strong>{mi.feld || ''}</strong></span>
                     <span style={{ fontSize: '.8rem' }}>Braucht: {mi.benoetigt || ''} | Hat: {mi.vorhanden || ''}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {gapItems.length > 0 && missingInfo.length === 0 && (
+            <>
+              <h4 className={styles.subHeading} style={{ marginTop: '1rem', color: 'var(--warning)' }}>Abweichungen</h4>
+              <div className={styles.criteriaList}>
+                {gapItems.map((gi, i) => (
+                  <div key={i} className={`${styles.criteriaItem} ${styles.criteriaTeilweise}`}>
+                    <span><strong>{gi.field || gi.feld || ''}</strong></span>
+                    <span style={{ fontSize: '.8rem' }}>{gi.description || gi.detail || ''}</span>
                   </div>
                 ))}
               </div>

@@ -46,21 +46,28 @@ function PositionSection({ title, positions, colorCls }) {
           </tr>
         </thead>
         <tbody>
-          {positions.map((pos, i) => (
-            <tr key={i}>
-              <td>{pos.position || i + 1}</td>
-              <td>{pos.beschreibung || pos.description || '-'}</td>
-              <td>{pos.menge || pos.quantity || '-'}</td>
-              <td>{pos.tuertyp || pos.door_type || '-'}</td>
-              <td>
-                <div className={styles.criteriaList}>
-                  {(pos.kriterien || pos.criteria || []).map((c, j) => (
-                    <CriteriaTag key={j} criterion={c} />
-                  ))}
-                </div>
-              </td>
-            </tr>
-          ))}
+          {positions.map((item, i) => {
+            const pos = item.original_position || item
+            const criteria = item.match_criteria || item.kriterien || item.criteria || []
+            return (
+              <tr key={i}>
+                <td><strong>{item.position || pos.position || i + 1}</strong></td>
+                <td>{item.beschreibung || pos.beschreibung || '-'}</td>
+                <td>{String(pos.menge || item.menge || 1)} {pos.einheit || 'Stk'}</td>
+                <td>{pos.tuertyp || '-'}</td>
+                <td>
+                  <div className={styles.criteriaList}>
+                    {criteria.map((c, j) => (
+                      <CriteriaTag key={j} criterion={c} />
+                    ))}
+                    {item.reason && criteria.length === 0 && (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '.8rem' }}>{item.reason}</span>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
@@ -70,17 +77,19 @@ function PositionSection({ title, positions, colorCls }) {
 function DetailPanel({ detail, onClose }) {
   if (!detail) return null
 
-  const matched = (detail.positions || []).filter(p => p.status === 'matched' || p.status === 'erfuellt')
-  const partial = (detail.positions || []).filter(p => p.status === 'partial' || p.status === 'teilweise')
-  const unmatched = (detail.positions || []).filter(p => p.status === 'unmatched' || p.status === 'nicht_erfuellt')
-  const total = detail.positions?.length || 0
+  const match = detail.matching || {}
+  const summary = match.summary || {}
+  const matched = match.matched || []
+  const partial = match.partial || []
+  const unmatched = match.unmatched || []
+  const total = summary.total_positions || (matched.length + partial.length + unmatched.length)
 
   return (
     <div className={styles.detailPanel}>
       <div className={styles.detailHeader}>
         <div>
-          <div className={styles.detailTitle}>{detail.filename || 'Analyse-Details'}</div>
-          <div className={styles.detailSubtitle}>{detail.date ? formatDate(detail.date) : ''}</div>
+          <div className={styles.detailTitle}>Analyse: {detail.filename || detail.id || 'Details'}</div>
+          <div className={styles.detailSubtitle}>{detail.timestamp ? formatDate(detail.timestamp) : detail.date ? formatDate(detail.date) : ''}</div>
         </div>
         <button className={styles.closeBtn} onClick={onClose}>Schliessen</button>
       </div>
@@ -124,7 +133,7 @@ export default function HistoriePage() {
     setError('')
     try {
       const data = await getHistory()
-      setHistory(Array.isArray(data) ? data : data.history || [])
+      setHistory(Array.isArray(data) ? data : data.analyses || data.history || [])
     } catch (err) {
       setError(`Historie konnte nicht geladen werden: ${err.message}`)
     } finally {
@@ -202,18 +211,19 @@ export default function HistoriePage() {
             </thead>
             <tbody>
               {history.map((entry) => {
-                const matched = entry.matched || 0
-                const partial = entry.partial || 0
-                const unmatched = entry.unmatched || 0
-                const total = entry.total || (matched + partial + unmatched)
-                const rate = total > 0 ? Math.round((matched / total) * 100) : 0
+                const matched = entry.matched_count || entry.matched || 0
+                const partial = entry.partial_count || entry.partial || 0
+                const unmatched = entry.unmatched_count || entry.unmatched || 0
+                const rate = entry.match_rate != null ? entry.match_rate : (
+                  (matched + partial + unmatched) > 0 ? Math.round((matched / (matched + partial + unmatched)) * 100) : 0
+                )
                 const rc = rateColor(rate)
 
                 return (
                   <tr key={entry.id}>
-                    <td>{entry.date ? formatDate(entry.date) : '-'}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{entry.timestamp ? formatDate(entry.timestamp) : entry.date ? formatDate(entry.date) : '-'}</td>
+                    <td>{entry.filename || entry.id || '-'}</td>
                     <td>{entry.filename || '-'}</td>
-                    <td>{entry.project || '-'}</td>
                     <td>
                       <div className={styles.tagGroup}>
                         {matched > 0 && <span className={`${styles.tag} ${styles.tagGreen}`}>{matched} erfuellt</span>}

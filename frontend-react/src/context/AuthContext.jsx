@@ -21,6 +21,15 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false))
   }, [])
 
+  // Listen for 401 logout events from the API client
+  useEffect(() => {
+    const handleLogout = () => {
+      setUser(null)
+    }
+    window.addEventListener('auth:logout', handleLogout)
+    return () => window.removeEventListener('auth:logout', handleLogout)
+  }, [])
+
   const login = useCallback(async (email, password) => {
     const data = await api.login(email, password)
     localStorage.setItem('auth_token', data.token)
