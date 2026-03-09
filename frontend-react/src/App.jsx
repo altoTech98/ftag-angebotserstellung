@@ -4,6 +4,7 @@ import { AppProvider } from './context/AppContext'
 import LoginForm from './components/LoginForm'
 import Header from './components/Header'
 import Toast from './components/Toast'
+import AnalysePage from './pages/AnalysePage'
 
 function AppRoutes() {
   const { user, loading } = useAuth()
@@ -17,7 +18,7 @@ function AppRoutes() {
       <main className="main-content">
         <Routes>
           <Route path="/" element={<Navigate to="/analyse" replace />} />
-          <Route path="/analyse" element={<div>Analyse (TODO)</div>} />
+          <Route path="/analyse" element={<AnalysePage />} />
           <Route path="/katalog" element={<div>Katalog (TODO)</div>} />
           <Route path="/historie" element={<div>Historie (TODO)</div>} />
           <Route path="/benutzer" element={
