@@ -6,6 +6,7 @@ import Header from './components/Header'
 import Toast from './components/Toast'
 import AnalysePage from './pages/AnalysePage'
 import KatalogPage from './pages/KatalogPage'
+import HistoriePage from './pages/HistoriePage'
 
 function AppRoutes() {
   const { user, loading } = useAuth()
@@ -21,7 +22,7 @@ function AppRoutes() {
           <Route path="/" element={<Navigate to="/analyse" replace />} />
           <Route path="/analyse" element={<AnalysePage />} />
           <Route path="/katalog" element={<KatalogPage />} />
-          <Route path="/historie" element={<div>Historie (TODO)</div>} />
+          <Route path="/historie" element={<HistoriePage />} />
           <Route path="/benutzer" element={
             user.role === 'admin' ? <div>Benutzer (TODO)</div> : <Navigate to="/analyse" replace />
           } />
