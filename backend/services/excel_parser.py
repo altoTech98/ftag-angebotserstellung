@@ -66,6 +66,69 @@ def combine_multi_row_headers(row1: list, row2: list = None) -> list:
     return combined
 
 
+# Column mapping cache (persists during session)
+_column_mapping_cache: dict[str, str] = {}
+
+
+def _call_ai_for_columns(unknown_columns: list[str], known_mapping: dict) -> dict | None:
+    """Ask Claude to identify unknown column headers. Returns {header: field} or None."""
+    from services.local_llm import _call_ai
+
+    known_str = ", ".join(f"{v} → {k}" for k, v in known_mapping.items())
+    unknown_str = ", ".join(f'"{c}"' for c in unknown_columns)
+
+    prompt = f"""Du bist Experte für Schweizer Türlisten (Excel-Tabellen mit Türpositionen).
+
+Bereits erkannte Spalten: {known_str}
+
+Unbekannte Spaltenüberschriften: {unknown_str}
+
+Ordne jede unbekannte Spalte einem dieser Felder zu (oder "unknown" wenn unklar):
+tuer_nr, geschoss, breite, hoehe, brandschutz, schallschutz, einbruchschutz,
+tuertyp, beschlaege, oberflaechenbehandlung, verglasung, menge, besonderheiten,
+raum, wandtyp, schloss_typ, zylinder, glas_typ, schliessblech, tuerschliesser,
+fluegel_anzahl, bandtyp, zargentyp
+
+Antworte NUR als JSON-Objekt: {{"Spaltenname": "feldname", ...}}"""
+
+    response = _call_ai(prompt, timeout=30)
+    if not response:
+        return None
+
+    try:
+        import json
+        text = response.strip()
+        if text.startswith("```"):
+            text = re.sub(r'^```\w*\n?', '', text)
+            text = re.sub(r'\n?```$', '', text)
+        mapping = json.loads(text.strip())
+        # Filter out "unknown" values
+        return {k: v for k, v in mapping.items() if v != "unknown" and isinstance(v, str)}
+    except Exception:
+        return None
+
+
+def ai_map_unknown_columns(unknown_columns: list[str], known_mapping: dict) -> dict:
+    """
+    Use AI to identify unknown column headers. Results are cached.
+    Returns {header_name: field_name} for successfully mapped columns.
+    """
+    if not unknown_columns:
+        return {}
+
+    # Check cache first
+    uncached = [c for c in unknown_columns if c not in _column_mapping_cache]
+
+    if uncached:
+        ai_result = _call_ai_for_columns(uncached, known_mapping)
+        if ai_result:
+            _column_mapping_cache.update(ai_result)
+            logger.info(f"[EXCEL] AI mapped {len(ai_result)} unknown columns: {ai_result}")
+
+    # Return cached results for requested columns
+    return {c: _column_mapping_cache[c] for c in unknown_columns if c in _column_mapping_cache}
+
+
 # ---------------------------------------------------------------------------
 # Known field patterns for fuzzy column header matching
 # ---------------------------------------------------------------------------
@@ -565,6 +628,18 @@ def _map_columns(df: pd.DataFrame) -> dict[str, str]:
             if field and field not in mapping and score >= threshold:
                 mapping[field] = col
                 used_columns.add(col)
+
+    # AI mapping for remaining unmapped columns
+    unmapped = [col for col in df.columns if col not in used_columns and str(col).strip()]
+    if unmapped and len(unmapped) <= 20 and not os.environ.get("TESTING"):  # Don't AI-map if too many unknowns or testing
+        try:
+            ai_mapped = ai_map_unknown_columns(unmapped, mapping)
+            for header, field in ai_mapped.items():
+                if field not in mapping:
+                    mapping[field] = header
+                    used_columns.add(header)
+        except Exception as e:
+            logger.debug(f"[EXCEL] AI column mapping failed: {e}")
 
     return mapping
 

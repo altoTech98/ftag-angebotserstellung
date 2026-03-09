@@ -147,3 +147,34 @@ class TestMergedCellParsing:
         doors = result["doors"]
         assert len(doors) >= 1
         assert doors[0].get("brandschutz") is not None or doors[0].get("einbruchschutz") is not None
+
+
+class TestAIColumnMapping:
+    """Tests for AI-assisted column mapping of unknown headers."""
+
+    def test_ai_mapping_returns_dict(self):
+        from services.excel_parser import ai_map_unknown_columns
+        from unittest.mock import patch
+
+        unknown = ["RBM B", "OB", "ZT"]
+        known = {"tuer_nr": "Tür-Nr.", "brandschutz": "BS"}
+
+        # Mock AI response
+        with patch("services.excel_parser._call_ai_for_columns") as mock_ai:
+            mock_ai.return_value = {
+                "RBM B": "breite",
+                "OB": "oberflaechenbehandlung",
+                "ZT": "zargentyp"
+            }
+            result = ai_map_unknown_columns(unknown, known)
+            assert result["RBM B"] == "breite"
+            assert result["OB"] == "oberflaechenbehandlung"
+
+    def test_ai_mapping_graceful_without_ai(self):
+        from services.excel_parser import ai_map_unknown_columns
+        from unittest.mock import patch
+
+        with patch("services.excel_parser._call_ai_for_columns") as mock_ai:
+            mock_ai.return_value = None
+            result = ai_map_unknown_columns(["XYZ"], {})
+            assert result == {}
