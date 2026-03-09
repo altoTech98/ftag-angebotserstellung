@@ -147,12 +147,14 @@ KNOWN_FIELD_PATTERNS = {
         "türbreite", "breite mm", "breite [mm]", "lichte b",
         "rohbaumass breite", "rbm breite", "width",
         "rm-b rohbaumass breite", "dm-b durchgang breite", "durchgang breite",
+        "rbm b", "rohbaumass b", "lw b", "lichtes mass b",
     ],
     "hoehe": [
         "höhe", "hoehe", "h [mm]", "h[mm]", "h (mm)", "lichte höhe", "th",
         "türhöhe", "höhe mm", "höhe [mm]", "lichte h", "lichte höhe",
         "rohbaumass höhe", "rbm höhe", "height",
         "rm-h rohbaumass höhe", "dm-h durchgang höhe", "durchgang höhe",
+        "rbm h", "rohbaumass h", "lw h", "lichtes mass h",
     ],
     "brandschutz": [
         "brandschutz", "feuerschutz", "bs", "feuerwiderstand",
@@ -183,7 +185,7 @@ KNOWN_FIELD_PATTERNS = {
     "oberflaechenbehandlung": [
         "oberfläche", "oberflaeche", "farbe", "ral", "beschichtung",
         "anstrich", "finish", "surface", "oberflächenbehandlung",
-        "farbgebung", "ral-ton",
+        "farbgebung", "ral-ton", "oberfl",
     ],
     "verglasung": [
         "verglasung", "verglast", "lichtausschnitt",
@@ -203,7 +205,7 @@ KNOWN_FIELD_PATTERNS = {
     ],
     "wandtyp": [
         "wandtyp", "wand", "wandkonstruktion", "wandaufbau", "mauerwerk",
-        "wandstärke", "wanddicke", "mauertyp", "mauerart",
+        "wandstärke", "wanddicke", "mauertyp", "mauerart", "wandart",
     ],
     "schloss_typ": [
         "schloss", "schlosstyp", "schlossart", "verriegelung",
@@ -236,6 +238,7 @@ KNOWN_FIELD_PATTERNS = {
     "zargentyp": [
         "zargentyp", "zargenart", "zarge", "umfassungszarge",
         "blockzarge", "eckzarge", "umfassungsart", "umfassung",
+        "zarge typ",
     ],
 }
 
@@ -284,7 +287,7 @@ def _best_field_match(column_name: str) -> tuple[str | None, float]:
                 if len(pattern) < 4:
                     continue
                 ratio = _fuzzy_ratio(col_lower, pattern)
-                score = ratio if ratio >= 0.75 else 0.0
+                score = ratio if ratio >= 0.60 else 0.0
 
             if score > field_best:
                 field_best = score
