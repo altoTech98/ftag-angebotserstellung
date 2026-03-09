@@ -131,6 +131,8 @@ def run_in_background(job: Job, fn, *args, **kwargs):
             raise RuntimeError("Too many concurrent jobs")
         _active_count += 1
 
+    timeout = settings.BACKGROUND_JOB_TIMEOUT_SECONDS
+
     def wrapper():
         global _active_count
         update_job(job.id, status="running")
@@ -146,6 +148,15 @@ def run_in_background(job: Job, fn, *args, **kwargs):
 
     t = threading.Thread(target=wrapper, daemon=False)
     t.start()
+
+    # Watchdog: enforce timeout
+    def _timeout_watchdog():
+        t.join(timeout=timeout)
+        if t.is_alive():
+            logger.warning(f"Job {job.id} exceeded timeout of {timeout}s")
+            update_job(job.id, status="failed", error=f"Timeout nach {timeout}s ueberschritten")
+
+    threading.Thread(target=_timeout_watchdog, daemon=True).start()
 
 
 def _cleanup():

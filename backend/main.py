@@ -257,13 +257,12 @@ async def auth_middleware(request: Request, call_next):
     path = request.url.path
     method = request.method
 
-    # Skip auth for whitelisted paths, OPTIONS, static files, and downloads
+    # Skip auth for whitelisted paths, OPTIONS, and static files
     if (
         method == "OPTIONS"
         or path in AUTH_WHITELIST
         or path.startswith("/static/")
         or not path.startswith("/api/")
-        or "/download" in path
     ):
         return await call_next(request)
 

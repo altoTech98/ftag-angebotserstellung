@@ -11,6 +11,12 @@ outputs/
 data/analysis_history.json
 data/projects.json
 data/produktuebersicht_backup_*.xlsx
+data/users.json
+data/.jwt_secret
+
+# Logs
+logs/
+debug.log
 
 # Environment
 .env

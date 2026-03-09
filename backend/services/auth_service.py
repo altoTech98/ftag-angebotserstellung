@@ -5,6 +5,7 @@ Admin-User Management für Frank Türen AG
 
 import json
 import logging
+import os
 import secrets
 import unicodedata
 from datetime import datetime, timedelta, timezone
@@ -27,9 +28,9 @@ ACCESS_TOKEN_EXPIRE_HOURS = 24
 
 security = HTTPBearer(auto_error=False)
 
-# Default admin credentials (user should change password after first login)
-DEFAULT_ADMIN_EMAIL = "admin@franktueren.ch"
-DEFAULT_ADMIN_PASSWORD = "Frank2024!"
+# Default admin credentials from environment (fallback for first-time setup only)
+DEFAULT_ADMIN_EMAIL = os.environ.get("DEFAULT_ADMIN_EMAIL", "admin@franktueren.ch")
+DEFAULT_ADMIN_PASSWORD = os.environ.get("DEFAULT_ADMIN_PASSWORD", "ChangeMeOnFirstLogin!")
 
 
 def _hash_password(password: str) -> str:
