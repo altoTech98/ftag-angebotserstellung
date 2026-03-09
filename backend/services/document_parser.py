@@ -198,9 +198,51 @@ def parse_pdf_specs(file_path: str, max_chars: int = 8000) -> str:
         return f"[Datei konnte nicht gelesen werden: {str(e)}]"
 
 
+def parse_pdf_with_vision(content: bytes) -> dict:
+    """
+    Parse PDF with hybrid analysis (pdfplumber + Vision).
+    Returns {"text": str, "positions": list, "method": str, "stats": dict}.
+    For use by analyze router when structured extraction is needed.
+    """
+    try:
+        from services.vision_parser import analyze_pdf_hybrid
+        return analyze_pdf_hybrid(content)
+    except ImportError:
+        logger.debug("[PDF] vision_parser not available")
+        return {
+            "text": _parse_pdf_bytes(content),
+            "positions": [],
+            "method": "text_only",
+            "stats": {},
+        }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # INTERNE PARSER
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _configure_tesseract():
+    """Configure Tesseract binary and tessdata paths."""
+    import pytesseract
+    import os
+
+    # Set Tesseract binary path (Windows default)
+    tesseract_cmd = os.environ.get("TESSERACT_CMD")
+    if not tesseract_cmd:
+        default = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        if os.path.isfile(default):
+            tesseract_cmd = default
+    if tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+
+    # Set tessdata path – prefer project-local data/tessdata, then env var
+    if not os.environ.get("TESSDATA_PREFIX"):
+        local_tessdata = os.path.join(
+            os.path.dirname(__file__), "..", "..", "data", "tessdata"
+        )
+        if os.path.isdir(local_tessdata):
+            os.environ["TESSDATA_PREFIX"] = os.path.abspath(local_tessdata)
+
 
 def _ocr_pdf_bytes(content: bytes, max_pages: int = 30) -> str:
     """
@@ -214,6 +256,8 @@ def _ocr_pdf_bytes(content: bytes, max_pages: int = 30) -> str:
     except ImportError:
         logger.debug("[OCR] pytesseract or Pillow not available")
         return ""
+
+    _configure_tesseract()
 
     try:
         # Try pdf2image first (best quality)
@@ -235,11 +279,20 @@ def _ocr_pdf_bytes(content: bytes, max_pages: int = 30) -> str:
         if not images:
             return ""
 
+        # Determine available languages
+        ocr_lang = "deu+eng"
+        try:
+            available = pytesseract.get_languages()
+            if "deu" not in available:
+                ocr_lang = "eng"
+                logger.debug("[OCR] German language not available, using English only")
+        except Exception:
+            ocr_lang = "eng"
+
         text_parts = []
         for i, img in enumerate(images, 1):
             try:
-                # Try German + English OCR
-                page_text = pytesseract.image_to_string(img, lang="deu+eng")
+                page_text = pytesseract.image_to_string(img, lang=ocr_lang)
                 if page_text and page_text.strip():
                     text_parts.append(f"--- Seite {i} (OCR) ---\n{page_text}")
             except Exception as e:
@@ -294,6 +347,26 @@ def _parse_pdf_bytes(content: bytes) -> str:
             if ocr_text and ocr_text.strip():
                 logger.info("[PDF] Using OCR fallback for scanned document")
                 return ocr_text[:DocumentParser.MAX_TEXT_LENGTH]
+            # Vision fallback for scanned/drawing PDFs
+            try:
+                from services.vision_parser import analyze_pdf_hybrid
+                vision_result = analyze_pdf_hybrid(content)
+                if vision_result.get("positions"):
+                    pos_texts = []
+                    for p in vision_result["positions"]:
+                        pos_texts.append(
+                            f"Position {p.get('position', p.get('tuer_nr', '?'))}: "
+                            f"{p.get('beschreibung', '')} "
+                            f"Menge: {p.get('menge', 1)}"
+                        )
+                    vision_text = "\n".join(pos_texts)
+                    if vision_text:
+                        logger.info(f"[PDF] Vision extracted {len(vision_result['positions'])} positions")
+                        return vision_text[:DocumentParser.MAX_TEXT_LENGTH]
+                elif vision_result.get("text"):
+                    return vision_result["text"][:DocumentParser.MAX_TEXT_LENGTH]
+            except Exception as e:
+                logger.debug(f"[PDF] Vision fallback failed: {e}")
             raise FileError(
                 ErrorCode.FILE_PARSE_ERROR,
                 "PDF ist leer oder konnte nicht gelesen werden (auch OCR fehlgeschlagen)",
@@ -306,6 +379,27 @@ def _parse_pdf_bytes(content: bytes) -> str:
             if ocr_text and len(ocr_text.strip()) > len(result.strip()):
                 logger.info("[PDF] OCR produced better results than text extraction")
                 result = ocr_text
+            # If still short, try Vision
+            if len(result.strip()) < 200:
+                try:
+                    from services.vision_parser import analyze_pdf_hybrid
+                    vision_result = analyze_pdf_hybrid(content)
+                    if vision_result.get("positions"):
+                        pos_texts = []
+                        for p in vision_result["positions"]:
+                            pos_texts.append(
+                                f"Position {p.get('position', p.get('tuer_nr', '?'))}: "
+                                f"{p.get('beschreibung', '')} "
+                                f"Menge: {p.get('menge', 1)}"
+                            )
+                        vision_text = "\n".join(pos_texts)
+                        if vision_text and len(vision_text) > len(result.strip()):
+                            logger.info(f"[PDF] Vision extracted {len(vision_result['positions'])} positions (short text fallback)")
+                            result = vision_text
+                    elif vision_result.get("text") and len(vision_result["text"].strip()) > len(result.strip()):
+                        result = vision_result["text"]
+                except Exception as e:
+                    logger.debug(f"[PDF] Vision fallback failed: {e}")
 
         return result[:DocumentParser.MAX_TEXT_LENGTH]
     
