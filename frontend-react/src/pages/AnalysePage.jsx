@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect } from 'react'
 import FileUpload from '../components/FileUpload'
+import CorrectionModal from '../components/CorrectionModal'
 import { useApp } from '../context/AppContext'
 import { useSSE } from '../hooks/useSSE'
 import * as api from '../services/api'
 import styles from '../styles/AnalysePage.module.css'
+import corrStyles from '../styles/CorrectionModal.module.css'
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024
 
@@ -178,6 +180,7 @@ function PositionDetailModal({ item, onClose }) {
 
 function ResultsPanel({ analysis, offer, onReset }) {
   const [detailItem, setDetailItem] = useState(null)
+  const [correctionItem, setCorrectionItem] = useState(null)
   const match = analysis.matching || {}
   const summary = match.summary || {}
 
@@ -258,7 +261,7 @@ function ResultsPanel({ analysis, offer, onReset }) {
               <table className={styles.dataTable}>
                 <thead><tr>
                   <th>Pos.</th><th>Beschreibung</th><th>Menge</th>
-                  <th>Brandschutz</th><th>FTAG Produkt</th><th>Kategorie</th><th>Begruendung</th>
+                  <th>Brandschutz</th><th>FTAG Produkt</th><th>Kategorie</th><th>Begruendung</th><th>Aktion</th>
                 </tr></thead>
                 <tbody>
                   {items.map((item, i) => {
@@ -296,6 +299,14 @@ function ResultsPanel({ analysis, offer, onReset }) {
                           {item.confidence ? <span style={{ color: 'var(--text-faint)' }}>{(item.confidence * 100).toFixed(0)}% </span> : ''}
                           {item.reason ? <span style={{ color: 'var(--text-muted)' }}>{item.reason.substring(0, 60)}</span> : ''}
                         </td>
+                        <td>
+                          <button
+                            className={corrStyles.correctionBtn}
+                            onClick={(e) => { e.stopPropagation(); setCorrectionItem({ ...item, _status: status }) }}
+                          >
+                            Korrigieren
+                          </button>
+                        </td>
                       </tr>
                     )
                   })}
@@ -307,6 +318,14 @@ function ResultsPanel({ analysis, offer, onReset }) {
       })}
 
       {detailItem && <PositionDetailModal item={detailItem} onClose={() => setDetailItem(null)} />}
+
+      {correctionItem && (
+        <CorrectionModal
+          item={correctionItem}
+          onClose={() => setCorrectionItem(null)}
+          onSaved={() => setCorrectionItem(null)}
+        />
+      )}
     </div>
   )
 }

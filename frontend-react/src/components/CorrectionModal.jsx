@@ -1,0 +1,243 @@
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { searchProducts, saveFeedback } from '../services/api'
+import { useApp } from '../context/AppContext'
+import styles from '../styles/CorrectionModal.module.css'
+
+export default function CorrectionModal({ item, onClose, onSaved }) {
+  const { showToast } = useApp()
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+  const [selectedProduct, setSelectedProduct] = useState(null)
+  const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [searched, setSearched] = useState(false)
+  const debounceRef = useRef(null)
+  const inputRef = useRef(null)
+
+  const pos = item.original_position || item
+
+  // Build requirement display
+  const requirementDisplay = [
+    pos.beschreibung || item.beschreibung,
+    pos.tuertyp,
+    pos.brandschutz,
+    pos.einbruchschutz || pos.widerstandsklasse,
+  ].filter(Boolean).join(' | ')
+
+  // Build current product display
+  const products = item.matched_products || []
+  const currentProductDisplay = products.length > 0
+    ? Object.entries(products[0])
+        .filter(([k, v]) => v != null && v !== '' && !k.startsWith('_'))
+        .slice(0, 6)
+        .map(([, v]) => String(v))
+        .join(' | ')
+    : 'Kein Produkt zugeordnet'
+
+  // Search function
+  const doSearch = useCallback(async (q) => {
+    if (!q || q.trim().length < 2) {
+      setResults([])
+      setSearched(false)
+      return
+    }
+    try {
+      const data = await searchProducts(q.trim())
+      setResults(data.products || data || [])
+      setSearched(true)
+    } catch (err) {
+      console.error('[CorrectionModal] Search failed:', err)
+      setResults([])
+      setSearched(true)
+    }
+  }, [])
+
+  // Auto-search on open
+  useEffect(() => {
+    const initial = [pos.tuertyp, pos.brandschutz].filter(Boolean).join(' ')
+    if (initial) {
+      setQuery(initial)
+      doSearch(initial)
+    }
+    if (inputRef.current) inputRef.current.focus()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced search on query change
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      doSearch(query)
+    }, 350)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [query, doSearch])
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  // Save feedback
+  const handleSave = async () => {
+    if (!selectedProduct || saving) return
+    setSaving(true)
+
+    const body = {
+      requirement_text: [
+        pos.beschreibung || item.beschreibung,
+        pos.tuertyp,
+        pos.brandschutz,
+        pos.einbruchschutz || pos.widerstandsklasse,
+      ].filter(Boolean).join(' | '),
+      requirement_fields: {
+        tuertyp: pos.tuertyp || null,
+        brandschutz: pos.brandschutz || null,
+        einbruchschutz: pos.einbruchschutz || pos.widerstandsklasse || null,
+        breite: pos.breite ? parseInt(pos.breite, 10) || null : null,
+        hoehe: pos.hoehe ? parseInt(pos.hoehe, 10) || null : null,
+      },
+      wrong_product: {
+        row_index: null,
+        product_summary: currentProductDisplay,
+      },
+      correct_product: {
+        row_index: selectedProduct._row_index,
+        product_summary: selectedProduct._summary,
+      },
+      position_id: item.position || pos.position || '?',
+      match_status_was: item._status || 'unknown',
+      user_note: note,
+    }
+
+    try {
+      await saveFeedback(body)
+      showToast('Korrektur gespeichert')
+      onClose()
+      if (onSaved) onSaved()
+    } catch (err) {
+      console.error('[CorrectionModal] Save failed:', err)
+      showToast('Fehler: ' + (err.message || 'Korrektur konnte nicht gespeichert werden'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <h3 className={styles.modalTitle}>Produkt-Zuordnung korrigieren</h3>
+          <button className={styles.modalClose} onClick={onClose}>&times;</button>
+        </div>
+
+        <div className={styles.modalBody}>
+          {/* Current requirement */}
+          <div className={styles.correctionSection}>
+            <div className={styles.correctionLabel}>Kundenanforderung</div>
+            <div className={styles.correctionValue}>
+              {requirementDisplay || '\u2014'}
+            </div>
+          </div>
+
+          {/* Current product */}
+          <div className={styles.correctionSection}>
+            <div className={styles.correctionLabel}>Aktuelle Zuordnung</div>
+            <div className={styles.correctionValue}>
+              {currentProductDisplay}
+            </div>
+          </div>
+
+          {/* Search */}
+          <div className={styles.correctionSection}>
+            <div className={styles.correctionLabel}>Richtiges Produkt suchen</div>
+            <div className={styles.searchWrap}>
+              <span className={styles.searchIcon}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </span>
+              <input
+                ref={inputRef}
+                type="text"
+                className={styles.searchInput}
+                placeholder="Produkt suchen..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+
+            {/* Results */}
+            <div className={styles.correctionResults}>
+              {results.length === 0 && searched && (
+                <div className={styles.noResults}>Keine Produkte gefunden</div>
+              )}
+              {results.length === 0 && !searched && (
+                <div className={styles.noResults}>Suchbegriff eingeben...</div>
+              )}
+              {results.map((product, i) => {
+                const isSelected = selectedProduct && selectedProduct._row_index === product._row_index
+                const details = Object.entries(product)
+                  .filter(([k, v]) => v != null && v !== '' && !k.startsWith('_'))
+                  .slice(0, 6)
+                return (
+                  <div
+                    key={product._row_index ?? i}
+                    className={`${styles.productItem} ${isSelected ? styles.productItemSelected : ''}`}
+                    onClick={() => setSelectedProduct(product)}
+                  >
+                    <div className={styles.productSummary}>
+                      {product._summary || `Produkt ${product._row_index || i + 1}`}
+                    </div>
+                    {details.length > 0 && (
+                      <div className={styles.productDetails}>
+                        {details.map(([k, v]) => (
+                          <span key={k} className={`${styles.tag} ${styles.tagBlue}`}>
+                            {String(v)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Note */}
+          <div className={styles.correctionSection}>
+            <div className={styles.correctionLabel}>Anmerkung (optional)</div>
+            <input
+              type="text"
+              className={styles.noteInput}
+              placeholder="z.B. Grund fuer Korrektur..."
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className={styles.modalFooter}>
+          <button
+            className={`${styles.ctaBtn} ${styles.secondary}`}
+            onClick={onClose}
+            disabled={saving}
+          >
+            Abbrechen
+          </button>
+          <button
+            className={styles.ctaBtn}
+            onClick={handleSave}
+            disabled={!selectedProduct || saving}
+          >
+            {saving ? 'Wird gespeichert...' : 'Korrektur speichern'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
