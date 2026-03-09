@@ -21,6 +21,51 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+
+def unmerge_cells(ws) -> None:
+    """
+    Resolve merged cells in an openpyxl worksheet.
+    Copies the merged cell's value into all cells of the merged range.
+    Must be called BEFORE reading with pandas.
+    """
+    for merge_range in list(ws.merged_cells.ranges):
+        min_row, min_col = merge_range.min_row, merge_range.min_col
+        value = ws.cell(row=min_row, column=min_col).value
+        ws.unmerge_cells(str(merge_range))
+        for row in range(merge_range.min_row, merge_range.max_row + 1):
+            for col in range(merge_range.min_col, merge_range.max_col + 1):
+                ws.cell(row=row, column=col).value = value
+
+
+def combine_multi_row_headers(row1: list, row2: list = None) -> list:
+    """
+    Combine two header rows into one.
+    If row1[i] is a group header and row2[i] is a detail header,
+    combines them: "Masse" + "Breite [mm]" -> "Masse Breite [mm]".
+    Skips combining if row1 value is same as row2 or if row2 is None.
+    """
+    if row2 is None:
+        return row1
+
+    combined = []
+    for i in range(max(len(row1), len(row2))):
+        top = str(row1[i]).strip() if i < len(row1) and row1[i] else ""
+        bot = str(row2[i]).strip() if i < len(row2) and row2[i] else ""
+
+        if not top and not bot:
+            combined.append("")
+        elif not top:
+            combined.append(bot)
+        elif not bot:
+            combined.append(top)
+        elif top.lower() == bot.lower():
+            combined.append(bot)
+        else:
+            combined.append(f"{top} {bot}")
+
+    return combined
+
+
 # ---------------------------------------------------------------------------
 # Known field patterns for fuzzy column header matching
 # ---------------------------------------------------------------------------
@@ -267,7 +312,28 @@ def _clean_string_value(value) -> str | None:
 
 def parse_tuerliste_bytes(content: bytes) -> dict:
     """Parse an Excel Türliste from raw bytes. See parse_tuerliste for return format."""
-    return _parse_tuerliste_from_excel(pd.ExcelFile(io.BytesIO(content)))
+    buf = io.BytesIO(content)
+
+    # Pre-process: resolve merged cells with openpyxl
+    import openpyxl as _opx
+    try:
+        wb = _opx.load_workbook(buf, data_only=True)
+        for ws in wb.worksheets:
+            unmerge_cells(ws)
+        # Save back to buffer
+        buf2 = io.BytesIO()
+        wb.save(buf2)
+        buf2.seek(0)
+        buf = buf2
+    except Exception as e:
+        logger.debug(f"[EXCEL] Merged cell pre-processing failed: {e}")
+        buf.seek(0)
+
+    xl = pd.ExcelFile(buf)
+    try:
+        return _parse_tuerliste_from_excel(xl)
+    finally:
+        xl.close()
 
 
 def parse_tuerliste(file_path: str) -> dict:
@@ -320,6 +386,24 @@ def _parse_tuerliste_from_excel(xl: pd.ExcelFile) -> dict:
     # Re-read with correct header
     df = pd.read_excel(xl, sheet_name=sheet_name, header=header_idx, dtype=str)
     df.columns = [str(c).strip() for c in df.columns]
+
+    # Check for multi-row headers: if the row above header_idx looks like group headers
+    if header_idx is not None and header_idx > 0:
+        try:
+            group_row = df_raw.iloc[header_idx - 1].tolist()
+            detail_row = df_raw.iloc[header_idx].tolist()
+            # Check if group row has fewer unique non-empty values (sign of group headers)
+            group_values = [str(v).strip() for v in group_row if str(v).strip()]
+            detail_values = [str(v).strip() for v in detail_row if str(v).strip()]
+            if group_values and len(set(group_values)) < len(set(detail_values)):
+                combined = combine_multi_row_headers(group_row, detail_row)
+                # Apply combined headers to DataFrame
+                if len(combined) >= len(df.columns):
+                    df.columns = [str(c).strip() for c in combined[:len(df.columns)]]
+                    logger.info(f"[EXCEL] Combined multi-row headers from rows {header_idx - 1} and {header_idx}")
+        except Exception as e:
+            logger.debug(f"[EXCEL] Multi-row header detection failed: {e}")
+
     df = df.fillna("")
 
     # Drop completely empty rows
