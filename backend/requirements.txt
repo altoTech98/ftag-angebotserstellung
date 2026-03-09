@@ -27,7 +27,10 @@ anthropic>=0.45.0
 python-telegram-bot==21.10
 
 # ─── Database & Storage ───
-sqlalchemy==2.0.25  # For future DB integration
+sqlalchemy==2.0.25
+alembic==1.13.1  # Database migrations
+asyncpg==0.29.0  # Async PostgreSQL driver
+aiosqlite==0.20.0  # Async SQLite for dev/testing
 
 # ─── Monitoring & Logging ───
 python-json-logger==2.0.7  # Structured logging

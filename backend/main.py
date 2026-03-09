@@ -50,7 +50,16 @@ async def lifespan(app: FastAPI):
     # ─────── STARTUP ────────────
     startup_errors = []
     
-    # 0. Initialize Auth (Admin-User erstellen falls nötig)
+    # 0. Initialize Database
+    try:
+        from db.engine import init_db
+        await init_db()
+        logger.info("[OK] Database initialized")
+    except Exception as e:
+        logger.error(f"[ERROR] Database initialization failed: {e}")
+        startup_errors.append(f"DB init failed: {e}")
+
+    # 0a. Initialize Auth (Admin-User erstellen falls nötig)
     try:
         from services.auth_service import init_admin_user
         init_admin_user()
@@ -195,6 +204,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"File cleanup failed: {e}")
     
+    # Close database connections
+    try:
+        from db.engine import close_db
+        await close_db()
+        logger.info("[OK] Database connections closed")
+    except Exception as e:
+        logger.warning(f"Database shutdown error: {e}")
+
     logger.info("[OK] Shutdown complete")
 
 
