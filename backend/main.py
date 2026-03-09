@@ -414,28 +414,66 @@ if settings.ERP_ENABLED:
 # STATIC FILES & FRONTEND
 # ─────────────────────────────────────────────────────────────────────────────
 
-frontend_path = BASE_DIR / "frontend"
-if frontend_path.exists():
-    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+# React Frontend (production build)
+react_dist_path = BASE_DIR / "frontend-react-dist"
+if react_dist_path.exists():
+    # Serve static assets (JS, CSS, images)
+    assets_path = react_dist_path / "assets"
+    if assets_path.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_path)), name="react-assets")
 
     @app.get("/", name="Frontend")
-    async def serve_frontend():
-        """Serve index.html with no-cache headers"""
-        index_file = frontend_path / "index.html"
-        if index_file.exists():
-            return FileResponse(
-                index_file,
-                headers={
-                    "Cache-Control": "no-cache, must-revalidate",
-                    "Content-Type": "text/html; charset=utf-8",
-                },
-            )
-        return JSONResponse(
-            status_code=404,
-            content={"error": "Frontend not found"},
+    async def serve_react_frontend():
+        """Serve React SPA index.html"""
+        return FileResponse(
+            react_dist_path / "index.html",
+            headers={
+                "Cache-Control": "no-cache, must-revalidate",
+                "Content-Type": "text/html; charset=utf-8",
+            },
         )
+
+    # Catch-all for client-side routing (React Router)
+    @app.get("/{full_path:path}", name="React SPA Fallback")
+    async def serve_react_spa(full_path: str):
+        """Serve React SPA for all non-API routes (client-side routing)"""
+        # Don't catch API routes, health, or static file routes
+        if full_path.startswith(("api/", "health", "info", "docs", "redoc", "openapi.json", "static/")):
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+        return FileResponse(
+            react_dist_path / "index.html",
+            headers={
+                "Cache-Control": "no-cache, must-revalidate",
+                "Content-Type": "text/html; charset=utf-8",
+            },
+        )
+
+    logger.info(f"[OK] React frontend serving from: {react_dist_path}")
+
 else:
-    logger.warning(f"Frontend directory not found: {frontend_path}")
+    # Fallback: serve old vanilla JS frontend
+    frontend_path = BASE_DIR / "frontend"
+    if frontend_path.exists():
+        app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+
+        @app.get("/", name="Frontend")
+        async def serve_frontend():
+            """Serve index.html with no-cache headers"""
+            index_file = frontend_path / "index.html"
+            if index_file.exists():
+                return FileResponse(
+                    index_file,
+                    headers={
+                        "Cache-Control": "no-cache, must-revalidate",
+                        "Content-Type": "text/html; charset=utf-8",
+                    },
+                )
+            return JSONResponse(
+                status_code=404,
+                content={"error": "Frontend not found"},
+            )
+    else:
+        logger.warning(f"Frontend directory not found: {frontend_path}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
