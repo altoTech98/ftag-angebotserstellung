@@ -4,6 +4,7 @@ import CorrectionModal from '../components/CorrectionModal'
 import { useApp } from '../context/AppContext'
 import { useSSE } from '../hooks/useSSE'
 import * as api from '../services/api'
+import { mapV2ResultToDisplay } from '../utils/v2ResultMapper'
 import styles from '../styles/AnalysePage.module.css'
 import corrStyles from '../styles/CorrectionModal.module.css'
 
@@ -72,15 +73,15 @@ function ProcessingPanel({ steps, subtitle, positionProgress }) {
 function PositionDetailModal({ item, onClose }) {
   const pos = item.original_position || item
   const statusMap = {
-    matched: { label: 'Erfuellbar', cls: styles.tagGreen },
-    partial: { label: 'Teilweise', cls: styles.tagOrange },
-    unmatched: { label: 'Nicht erfuellbar', cls: styles.tagRed },
+    matched: { label: 'Erfuellbar (Bestaetigt)', cls: styles.tagGreen },
+    partial: { label: 'Teilweise (Unsicher)', cls: styles.tagOrange },
+    unmatched: { label: 'Nicht erfuellbar (Abgelehnt)', cls: styles.tagRed },
   }
   const st = statusMap[item._status] || { label: item._status, cls: '' }
 
   const fields = [
-    ['Tuer-Nr', pos.position || item.position],
-    ['Beschreibung', item.beschreibung || pos.beschreibung],
+    ['Tuer-Nr', pos.positions_nr || pos.position || item.position],
+    ['Beschreibung', pos.positions_bezeichnung || item.beschreibung || pos.beschreibung],
     ['Tuertyp', pos.tuertyp],
     ['Brandschutz', pos.brandschutz],
     ['Schallschutz', pos.schallschutz],
@@ -113,7 +114,7 @@ function PositionDetailModal({ item, onClose }) {
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modalCard} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
-          <h3 className={styles.modalTitle}>Position {item.position || pos.position || '\u2014'}</h3>
+          <h3 className={styles.modalTitle}>Position {item.position || pos.positions_nr || pos.position || '\u2014'}</h3>
           <button className={styles.modalClose} onClick={onClose}>&times;</button>
         </div>
         <div className={styles.modalBody}>
@@ -218,9 +219,9 @@ function ResultsPanel({ analysis, offer, onReset }) {
   const summary = match.summary || {}
 
   const sections = [
-    { items: match.matched || [], status: 'matched', label: 'Erfuellbare Positionen', cls: 'green', icon: '\u2713' },
-    { items: match.partial || [], status: 'partial', label: 'Teilweise erfuellbare Positionen', cls: 'orange', icon: '\u26A0' },
-    { items: match.unmatched || [], status: 'unmatched', label: 'Nicht erfuellbare Positionen', cls: 'red', icon: '\u2717' },
+    { items: match.matched || [], status: 'matched', label: 'Erfuellbar (Bestaetigt)', cls: 'green', icon: '\u2713' },
+    { items: match.partial || [], status: 'partial', label: 'Teilweise (Unsicher)', cls: 'orange', icon: '\u26A0' },
+    { items: match.unmatched || [], status: 'unmatched', label: 'Nicht erfuellbar (Abgelehnt)', cls: 'red', icon: '\u2717' },
   ]
 
   const stats = [
@@ -275,7 +276,7 @@ function ResultsPanel({ analysis, offer, onReset }) {
               <div className={styles.dlGroupTitle}>Machbarkeitsanalyse + GAP-Report</div>
               <button
                 className={`${styles.dlBtn} ${styles.dlExcel}`}
-                onClick={() => api.downloadResult(offer.result_id)}
+                onClick={() => api.downloadV2Result(offer.result_id)}
               >
                 <span>Excel herunterladen</span>
               </button>
@@ -306,7 +307,7 @@ function ResultsPanel({ analysis, offer, onReset }) {
                     let ftag = '\u2014'
                     if (products.length > 0) {
                       const names = products.map(p =>
-                        p['Türblatt / Verglasungsart / Rollkasten'] ||
+                        p['\u0054\u00fcrblatt / Verglasungsart / Rollkasten'] ||
                         p['Tuerblatt / Verglasungsart / Rollkasten'] || ''
                       ).filter(n => n)
                       ftag = [...new Set(names)].join(' / ') || '\u2014'
@@ -314,9 +315,9 @@ function ResultsPanel({ analysis, offer, onReset }) {
                     const missingInfo = item.missing_info || []
                     return (
                       <tr key={i} className={styles.clickableRow} onClick={() => setDetailItem({ ...item, _status: status })}>
-                        <td><strong>{item.position || pos.position || '\u2014'}</strong></td>
+                        <td><strong>{item.position || pos.positions_nr || pos.position || '\u2014'}</strong></td>
                         <td>
-                          {item.beschreibung || pos.beschreibung || pos.tuertyp || '\u2014'}
+                          {item.beschreibung || pos.positions_bezeichnung || pos.beschreibung || pos.tuertyp || '\u2014'}
                           {status === 'partial' && missingInfo.length > 0 && (
                             <div style={{ marginTop: '.25rem' }}>
                               {missingInfo.map((mi, j) => (
@@ -397,6 +398,28 @@ export default function AnalysePage() {
     }
   }
 
+  /** V2 progress callback shared by both workflows */
+  const handleV2Progress = useCallback((progressStr) => {
+    try {
+      const info = JSON.parse(progressStr)
+      const stageMap = { extraction: 1, matching: 2, adversarial: 2, gap_analyse: 2, plausibility: 3 }
+      setCurrentStep(stageMap[info.stage] || 2)
+      setSubtitle(info.message || 'Analyse laeuft...')
+      if (info.positions_total) {
+        setPositionProgress({ done: info.positions_done, total: info.positions_total, current: info.current_position })
+      } else {
+        setPositionProgress(null)
+      }
+      if (info.stage === 'matching' || info.stage === 'adversarial' || info.stage === 'gap_analyse') {
+        updateStep('ai', 'done', 'Tuerlisten geparst')
+        updateStep('match', 'running', info.message)
+      }
+    } catch {
+      setSubtitle(progressStr || 'Analyse laeuft...')
+      setPositionProgress(null)
+    }
+  }, [updateStep])
+
   const runSingleWorkflow = async (file) => {
     setPanel('processing')
     setCurrentStep(2)
@@ -405,40 +428,33 @@ export default function AnalysePage() {
     setSubtitle('Datei wird hochgeladen...')
 
     try {
-      const up = await api.uploadFile(file)
-      if (!up.file_id) throw new Error('Upload fehlgeschlagen: keine file_id erhalten')
-      updateStep('upload', 'done', `${up.filename} hochgeladen (${up.text_length.toLocaleString('de-CH')} Zeichen)`)
+      // Step 1: V2 single-file upload
+      const up = await api.uploadSingleV2(file)
+      if (!up.tender_id) throw new Error('Upload fehlgeschlagen: keine tender_id erhalten')
+      updateStep('upload', 'done', `${up.filename} hochgeladen`)
 
+      // Step 2: V2 analysis
       updateStep('ai', 'running', 'Tuerliste wird geparst...')
       setSubtitle('Tuerliste wird analysiert...')
-      const { job_id } = await api.startAnalysis(up.file_id)
-      const result = await pollJob(job_id, (progressStr) => {
-        try {
-          const info = JSON.parse(progressStr)
-          setSubtitle(info.message || 'Analyse laeuft...')
-          if (info.positions_total) {
-            setPositionProgress({ done: info.positions_done, total: info.positions_total, current: info.current_position })
-          } else {
-            setPositionProgress(null)
-          }
-        } catch {
-          setSubtitle(progressStr || 'Analyse laeuft...')
-          setPositionProgress(null)
-        }
-      })
-      setAnalysis(result)
+      const { job_id } = await api.startV2Analysis(up.tender_id)
+      const result = await pollJob(job_id, handleV2Progress, '/v2/analyze/status/')
 
-      const pos = result.requirements?.positionen?.length || 0
+      // Transform v2 result to display structure
+      const mapped = mapV2ResultToDisplay(result)
+      setAnalysis(mapped)
+
+      const pos = mapped.matching.summary.total_positions || 0
       updateStep('ai', 'done', `${pos} Tuerpositionen erkannt`)
-      const s = result.matching?.summary || {}
+      const s = mapped.matching.summary
       updateStep('match', 'done', `${s.matched_count || 0} erfuellbar, ${s.partial_count || 0} teilweise, ${s.unmatched_count || 0} nicht erfuellbar`)
 
+      // Step 3: V2 offer generation
       setSubtitle('Machbarkeitsanalyse wird erstellt...')
       updateStep('gen', 'running', 'Machbarkeitsanalyse wird erstellt...')
-      const { job_id: rjid } = await api.generateResult(result.requirements, result.matching)
-      const offerResult = await pollJob(rjid, (p) => setSubtitle(p || 'Ergebnis wird erstellt...'), '/result/status/')
-      setOffer(offerResult)
-      updateStep('gen', 'done', offerResult.message)
+      const { job_id: offerJobId } = await api.generateV2Offer(mapped.analysis_id)
+      const offerResult = await pollJob(offerJobId, (p) => setSubtitle(p || 'Ergebnis wird erstellt...'), '/offer/status/')
+      setOffer({ ...offerResult, result_id: offerResult.result_id || mapped.analysis_id })
+      updateStep('gen', 'done', offerResult.message || 'Machbarkeitsanalyse erstellt')
 
       setCurrentStep(3)
       setPanel('results')
@@ -458,52 +474,33 @@ export default function AnalysePage() {
     setSubtitle('Dateien werden hochgeladen...')
 
     try {
+      // Step 1: V2 folder upload
       const uploadResult = await api.uploadFolderV2(files)
       const fileNames = (uploadResult.files || []).map(f => f.filename).join(', ')
       updateStep('upload', 'done', `${uploadResult.total_files} Dateien hochgeladen: ${fileNames}`)
 
+      // Step 2: V2 analysis
       updateStep('ai', 'running', 'Tuerlisten werden geparst...')
       setSubtitle('Projekt wird analysiert...')
       const { job_id } = await api.startV2Analysis(uploadResult.tender_id)
-      const result = await pollJob(job_id, (progressStr) => {
-        // Try parsing as structured JSON progress (v2 pipeline)
-        try {
-          const info = JSON.parse(progressStr)
-          const stageMap = { extraction: 1, matching: 2, adversarial: 2, gap_analyse: 2, plausibility: 3 }
-          setCurrentStep(stageMap[info.stage] || 2)
-          setSubtitle(info.message || 'Analyse laeuft...')
-          if (info.positions_total) {
-            setPositionProgress({ done: info.positions_done, total: info.positions_total, current: info.current_position })
-          } else {
-            setPositionProgress(null)
-          }
-          if (info.stage === 'matching' || info.stage === 'adversarial' || info.stage === 'gap_analyse') {
-            updateStep('ai', 'done', 'Tuerlisten geparst')
-            updateStep('match', 'running', info.message)
-          }
-        } catch {
-          // Plain string progress (v1 style)
-          setSubtitle(progressStr || 'Analyse laeuft...')
-          setPositionProgress(null)
-          if (progressStr?.includes('Matching')) {
-            updateStep('ai', 'done', 'Tuerlisten geparst')
-            updateStep('match', 'running', progressStr)
-          }
-        }
-      }, '/v2/analyze/status/')
-      setAnalysis(result)
+      const result = await pollJob(job_id, handleV2Progress, '/v2/analyze/status/')
 
-      const pos = result.requirements?.positionen?.length || 0
+      // Transform v2 result to display structure
+      const mapped = mapV2ResultToDisplay(result)
+      setAnalysis(mapped)
+
+      const pos = mapped.matching.summary.total_positions || 0
       updateStep('ai', 'done', `${pos} Tuerpositionen erkannt`)
-      const s = result.matching?.summary || {}
+      const s = mapped.matching.summary
       updateStep('match', 'done', `${s.matched_count || 0} erfuellbar, ${s.partial_count || 0} teilweise, ${s.unmatched_count || 0} nicht erfuellbar`)
 
+      // Step 3: V2 offer generation
       setSubtitle('Machbarkeitsanalyse wird erstellt...')
       updateStep('gen', 'running', 'Machbarkeitsanalyse wird erstellt...')
-      const { job_id: rjid } = await api.generateResult(result.requirements, result.matching)
-      const offerResult = await pollJob(rjid, (p) => setSubtitle(p || 'Ergebnis wird erstellt...'), '/result/status/')
-      setOffer(offerResult)
-      updateStep('gen', 'done', offerResult.message)
+      const { job_id: offerJobId } = await api.generateV2Offer(mapped.analysis_id)
+      const offerResult = await pollJob(offerJobId, (p) => setSubtitle(p || 'Ergebnis wird erstellt...'), '/offer/status/')
+      setOffer({ ...offerResult, result_id: offerResult.result_id || mapped.analysis_id })
+      updateStep('gen', 'done', offerResult.message || 'Machbarkeitsanalyse erstellt')
 
       setCurrentStep(3)
       setPanel('results')
