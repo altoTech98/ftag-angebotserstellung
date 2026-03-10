@@ -49,10 +49,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Qualitätssicherung
 
-- [ ] **QUAL-01**: System führt Ergebnis-Plausibilitätsprüfung am Ende durch (alle Positionen abgedeckt, keine Duplikate, keine verdächtigen Muster)
-- [ ] **QUAL-02**: System loggt jeden Analyseschritt (welche Anforderung, welcher Pass, welches Ergebnis)
+- [x] **QUAL-01**: System führt Ergebnis-Plausibilitätsprüfung am Ende durch (alle Positionen abgedeckt, keine Duplikate, keine verdächtigen Muster)
+- [x] **QUAL-02**: System loggt jeden Analyseschritt (welche Anforderung, welcher Pass, welches Ergebnis)
 - [ ] **QUAL-03**: System zeigt Live-Fortschritt im Frontend (welcher Schritt läuft, welche Position wird verarbeitet)
-- [ ] **QUAL-04**: System gibt bei AI-Ausfall klare Fehlermeldung statt degradierter Ergebnisse
+- [x] **QUAL-04**: System gibt bei AI-Ausfall klare Fehlermeldung statt degradierter Ergebnisse
 
 ### API & Integration
 
@@ -127,10 +127,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | EXEL-04 | Phase 7 | Complete |
 | EXEL-05 | Phase 7 | Complete |
 | EXEL-06 | Phase 7 | Complete |
-| QUAL-01 | Phase 8 | Pending |
-| QUAL-02 | Phase 8 | Pending |
+| QUAL-01 | Phase 8 | Complete |
+| QUAL-02 | Phase 8 | Complete |
 | QUAL-03 | Phase 8 | Pending |
-| QUAL-04 | Phase 8 | Pending |
+| QUAL-04 | Phase 8 | Complete |
 | APII-01 | Phase 2 | Complete |
 | APII-02 | Phase 8 | Pending |
 | APII-03 | Phase 8 | Pending |
