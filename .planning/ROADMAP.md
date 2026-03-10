@@ -161,10 +161,11 @@ Plans:
   2. Frontend calls POST /api/offer/generate with analysis_id from v2 response, polls status, and downloads the 4-sheet Excel file
   3. CorrectionModal detects v2 analysis context and sends corrections to POST /api/v2/feedback with v2 schema (positions_nr, original_produkt_id, corrected_produkt_id, etc.)
   4. Downloaded Excel contains all 4 sheets (Uebersicht, Details, Gap-Analyse, Executive Summary) with color coding and reasoning
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — Wire v2 result consumption, v2 offer generation, v2 download, and v2 feedback in frontend
+- [ ] 09-01-PLAN.md — Backend single-file endpoint, v2 result mapper, v2 API functions, and workflow rewiring
+- [ ] 09-02-PLAN.md — PositionDetailModal adversarial/gap sections and CorrectionModal v2 feedback wiring
 
 ## Progress
 
@@ -181,4 +182,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 6. Gap Analysis | 2/2 | Complete   | 2026-03-10 |
 | 7. Excel Output Generation | 2/2 | Complete   | 2026-03-10 |
 | 8. Quality, Observability & End-to-End | 3/3 | Complete   | 2026-03-10 |
-| 9. Frontend V2 Offer & Feedback Wiring | 0/1 | Not started | - |
+| 9. Frontend V2 Offer & Feedback Wiring | 0/2 | Not started | - |
