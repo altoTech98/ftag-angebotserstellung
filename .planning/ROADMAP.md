@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Adversarial Validation** - Double-check and triple-check passes that actively challenge matches with chain-of-thought reasoning (completed 2026-03-10)
 - [x] **Phase 6: Gap Analysis** - Categorized gap reports with severity ratings and alternative product suggestions (completed 2026-03-10)
 - [ ] **Phase 7: Excel Output Generation** - 4-sheet Excel with color-coding, reasoning columns, and executive summary
-- [x] **Phase 8: Quality, Observability & End-to-End** - Plausibility checks, step logging, live progress streaming, and full pipeline integration (completed 2026-03-10)
+- [ ] **Phase 8: Quality, Observability & End-to-End** - Plausibility checks, step logging, live progress streaming, and full pipeline integration
 
 ## Phase Details
 
@@ -143,11 +143,12 @@ Plans:
   3. User sees live progress in the frontend showing which step is running and which position is being processed
   4. If the AI service fails, the user receives a clear error message instead of partial or degraded results
   5. POST /api/analyze triggers the full pipeline with SSE streaming for real-time progress, and GET /api/analyze/status/{job_id} returns detailed position-level progress
-**Plans**: 2 plans
+**Plans**: 3 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — PlausibilityChecker, structured step logging, and fail-fast AI error handling
-- [ ] 08-02-PLAN.md — Background job execution with SSE streaming, progress callbacks, and frontend integration
+- [x] 08-01-PLAN.md — PlausibilityChecker, structured step logging, and fail-fast AI error handling
+- [x] 08-02-PLAN.md — Background job execution with SSE streaming, progress callbacks, and frontend integration
+- [ ] 08-03-PLAN.md — Gap closure: wire frontend folder workflow to v2 upload + analyze endpoints
 
 ## Progress
 
@@ -163,4 +164,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 5. Adversarial Validation | 2/2 | Complete   | 2026-03-10 |
 | 6. Gap Analysis | 2/2 | Complete   | 2026-03-10 |
 | 7. Excel Output Generation | 0/2 | Not started | - |
-| 8. Quality, Observability & End-to-End | 2/2 | Complete   | 2026-03-10 |
+| 8. Quality, Observability & End-to-End | 2/3 | Gap closure | - |
