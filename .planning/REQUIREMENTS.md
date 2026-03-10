@@ -70,7 +70,7 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 
 ### Infrastruktur
 
-- [ ] **INFRA-01**: Next.js 16 App Router + Prisma 7 + Neon Postgres (via Vercel)
+- [x] **INFRA-01**: Next.js 16 App Router + Prisma 7 + Neon Postgres (via Vercel)
 - [ ] **INFRA-02**: Python/FastAPI auf Railway deployen mit Service-Auth
 - [ ] **INFRA-03**: BFF-Pattern: Next.js API Routes proxyen zu Python-Backend
 - [ ] **INFRA-04**: Vercel Blob Storage fuer Datei-Uploads (signed URLs)
@@ -156,7 +156,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | ADMIN-02 | Phase 15 | Pending |
 | ADMIN-03 | Phase 15 | Pending |
 | ADMIN-04 | Phase 15 | Pending |
-| INFRA-01 | Phase 10 | Pending |
+| INFRA-01 | Phase 10 | Complete |
 | INFRA-02 | Phase 11 | Pending |
 | INFRA-03 | Phase 11 | Pending |
 | INFRA-04 | Phase 12 | Pending |
