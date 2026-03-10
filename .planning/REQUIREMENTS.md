@@ -9,9 +9,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Dokument-Analyse
 
-- [ ] **DOKA-01**: System parst PDF-Dateien und extrahiert vollständigen Text mit Tabellenstruktur
-- [ ] **DOKA-02**: System parst DOCX-Dateien und extrahiert Text mit Formatierung
-- [ ] **DOKA-03**: System parst XLSX-Dateien und erkennt Türlisten-Spaltenstruktur automatisch
+- [x] **DOKA-01**: System parst PDF-Dateien und extrahiert vollständigen Text mit Tabellenstruktur
+- [x] **DOKA-02**: System parst DOCX-Dateien und extrahiert Text mit Formatierung
+- [x] **DOKA-03**: System parst XLSX-Dateien und erkennt Türlisten-Spaltenstruktur automatisch
 - [ ] **DOKA-04**: System akzeptiert mehrere Dateien pro Ausschreibung (PDF + Excel + DOCX gemischt)
 - [ ] **DOKA-05**: System führt Multi-Pass-Analyse durch (Pass 1: strukturell, Pass 2: AI-semantisch, Pass 3: Cross-Reference-Validierung)
 - [ ] **DOKA-06**: System extrahiert ALLE technischen Anforderungen als einzelne Datenpunkte (Maße, Material, Normen, Zertifizierungen, Leistungsdaten)
@@ -99,9 +99,9 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DOKA-01 | Phase 1 | Pending |
-| DOKA-02 | Phase 1 | Pending |
-| DOKA-03 | Phase 1 | Pending |
+| DOKA-01 | Phase 1 | Complete |
+| DOKA-02 | Phase 1 | Complete |
+| DOKA-03 | Phase 1 | Complete |
 | DOKA-04 | Phase 2 | Pending |
 | DOKA-05 | Phase 2 | Pending |
 | DOKA-06 | Phase 2 | Pending |
