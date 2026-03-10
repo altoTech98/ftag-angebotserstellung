@@ -22,6 +22,10 @@ from v2.matching.adversarial_prompts import (
     AGAINST_SYSTEM_PROMPT,
     FOR_USER_TEMPLATE,
     AGAINST_USER_TEMPLATE,
+    WIDER_POOL_SYSTEM_PROMPT,
+    WIDER_POOL_USER_TEMPLATE,
+    INVERTED_SYSTEM_PROMPT,
+    INVERTED_USER_TEMPLATE,
 )
 from v2.schemas.adversarial import (
     AdversarialCandidate,
@@ -208,10 +212,197 @@ def _build_adversarial_candidate(
     )
 
 
+async def triple_check_position(
+    client: anthropic.Anthropic,
+    match_result: MatchResult,
+    debate_result: AdversarialResult,
+    tfidf_index,
+    semaphore: asyncio.Semaphore,
+) -> AdversarialResult:
+    """Triple-check: run wider pool + inverted prompt in parallel.
+
+    Two independent approaches to re-evaluate the match:
+    1. Wider pool: expand TF-IDF search to top_k=80, re-evaluate with Opus
+    2. Inverted prompt: requirement-centric evaluation (different from product-centric)
+
+    Selects the approach with higher confidence. Merges candidates from both.
+
+    Args:
+        client: Anthropic client instance.
+        match_result: Original Phase 4 MatchResult.
+        debate_result: Result from initial FOR/AGAINST debate.
+        tfidf_index: TF-IDF index for wider pool search.
+        semaphore: Semaphore for rate-limiting Opus calls.
+
+    Returns:
+        Updated AdversarialResult with triple-check data.
+    """
+    # Build content for both approaches
+    # 1. Wider pool: search with top_k=80
+    anforderung = f"Position {match_result.positions_nr}"
+
+    # Get wider pool candidates from TF-IDF
+    wider_results = tfidf_index.search(match_result.bester_match or match_result, top_k=80)
+    wider_candidates_data = []
+    for idx, score in wider_results[:80]:
+        if hasattr(tfidf_index, "catalog_rows") and idx < len(tfidf_index.catalog_rows):
+            row = tfidf_index.catalog_rows[idx]
+            wider_candidates_data.append({
+                "produkt_id": row.get("produkt_id", f"IDX-{idx}"),
+                "produkt_name": row.get("produkt_name", f"Product {idx}"),
+                "tfidf_score": round(score, 4),
+            })
+
+    wider_content = WIDER_POOL_USER_TEMPLATE.format(
+        anforderung=anforderung,
+        kandidaten_erweitert=json.dumps(wider_candidates_data, ensure_ascii=False, indent=2),
+    )
+
+    # 2. Inverted prompt: requirement-centric
+    candidates_data = []
+    if match_result.bester_match:
+        candidates_data.append(_format_candidate_for_prompt(match_result.bester_match))
+    for alt in match_result.alternative_matches[:MAX_ALTERNATIVES_TO_DEBATE]:
+        candidates_data.append(_format_candidate_for_prompt(alt))
+
+    inverted_content = INVERTED_USER_TEMPLATE.format(
+        anforderung_dimensionen=anforderung,
+        kandidaten=json.dumps(candidates_data, ensure_ascii=False, indent=2),
+    )
+
+    api_calls = 0
+
+    async with semaphore:
+        # Run both approaches in parallel
+        wider_task = asyncio.to_thread(
+            client.messages.parse,
+            model="claude-opus-4-6",
+            max_tokens=4096,
+            system=WIDER_POOL_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": wider_content}],
+            output_format=ForArgument,
+        )
+        inverted_task = asyncio.to_thread(
+            client.messages.parse,
+            model="claude-opus-4-6",
+            max_tokens=4096,
+            system=INVERTED_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": inverted_content}],
+            output_format=ForArgument,
+        )
+
+        wider_response, inverted_response = await asyncio.gather(wider_task, inverted_task)
+        api_calls += 2
+
+    wider_parsed: ForArgument = wider_response.parsed
+    inverted_parsed: ForArgument = inverted_response.parsed
+
+    # Compute adjusted confidence for each approach using dimension scores
+    def _compute_confidence(parsed: ForArgument) -> float:
+        scores = {db.dimension: db.score for db in parsed.dimension_bewertungen}
+        weighted_sum = 0.0
+        weight_total = 0.0
+        for dim_name in ["Masse", "Brandschutz", "Schallschutz", "Material", "Zertifizierung", "Leistung"]:
+            s = scores.get(dim_name, 0.5)
+            w = DIMENSION_WEIGHTS.get(dim_name, 1.0)
+            weighted_sum += s * w
+            weight_total += w
+        return round(weighted_sum / weight_total, 4) if weight_total > 0 else 0.0
+
+    wider_confidence = _compute_confidence(wider_parsed)
+    inverted_confidence = _compute_confidence(inverted_parsed)
+
+    # Select winner
+    if wider_confidence >= inverted_confidence:
+        winning_method = "wider_pool"
+        winning_parsed = wider_parsed
+        winning_confidence = wider_confidence
+    else:
+        winning_method = "inverted_prompt"
+        winning_parsed = inverted_parsed
+        winning_confidence = inverted_confidence
+
+    # Build dimension CoT from winning approach
+    winning_cot = []
+    for db in winning_parsed.dimension_bewertungen:
+        confidence_level = "hoch" if db.score > 0.9 else "niedrig"
+        winning_cot.append(DimensionCoT(
+            dimension=db.dimension,
+            score=db.score,
+            reasoning=db.begruendung,
+            confidence_level=confidence_level,
+        ))
+
+    # Build triple-check candidate
+    tc_candidate = AdversarialCandidate(
+        produkt_id=winning_parsed.produkt_id,
+        produkt_name=winning_parsed.produkt_name,
+        adjusted_confidence=winning_confidence,
+        dimension_scores=winning_cot,
+        reasoning_summary=winning_parsed.zusammenfassung,
+    )
+
+    # Merge candidates: keep debate alternatives + add triple-check candidates
+    merged_alternatives = list(debate_result.alternative_candidates)
+
+    # Add losing approach candidate if different product
+    losing_parsed = inverted_parsed if winning_method == "wider_pool" else wider_parsed
+    losing_confidence = inverted_confidence if winning_method == "wider_pool" else wider_confidence
+    losing_candidate = AdversarialCandidate(
+        produkt_id=losing_parsed.produkt_id,
+        produkt_name=losing_parsed.produkt_name,
+        adjusted_confidence=losing_confidence,
+        dimension_scores=[
+            DimensionCoT(
+                dimension=db.dimension,
+                score=db.score,
+                reasoning=db.begruendung,
+                confidence_level="hoch" if db.score > 0.9 else "niedrig",
+            )
+            for db in losing_parsed.dimension_bewertungen
+        ],
+        reasoning_summary=losing_parsed.zusammenfassung,
+    )
+
+    # Deduplicate by produkt_id (keep higher score)
+    existing_ids = {c.produkt_id: c for c in merged_alternatives}
+    for new_cand in [tc_candidate, losing_candidate]:
+        if new_cand.produkt_id in existing_ids:
+            if new_cand.adjusted_confidence > existing_ids[new_cand.produkt_id].adjusted_confidence:
+                existing_ids[new_cand.produkt_id] = new_cand
+        else:
+            existing_ids[new_cand.produkt_id] = new_cand
+    merged_alternatives = list(existing_ids.values())
+
+    # Determine final status
+    if winning_confidence >= BESTAETIGT_THRESHOLD:
+        status = ValidationStatus.BESTAETIGT
+    else:
+        status = ValidationStatus.UNSICHER
+
+    total_api_calls = debate_result.api_calls_count + api_calls
+
+    return AdversarialResult(
+        positions_nr=debate_result.positions_nr,
+        validation_status=status,
+        adjusted_confidence=winning_confidence,
+        bester_match=tc_candidate if winning_confidence > debate_result.adjusted_confidence else debate_result.bester_match,
+        alternative_candidates=merged_alternatives,
+        debate=debate_result.debate,
+        resolution_reasoning=debate_result.resolution_reasoning,
+        per_dimension_cot=winning_cot if winning_confidence > debate_result.adjusted_confidence else debate_result.per_dimension_cot,
+        triple_check_used=True,
+        triple_check_method=winning_method,
+        triple_check_reasoning=winning_parsed.zusammenfassung,
+        api_calls_count=total_api_calls,
+    )
+
+
 async def validate_single_position(
     client: anthropic.Anthropic,
     match_result: MatchResult,
     semaphore: asyncio.Semaphore,
+    tfidf_index=None,
 ) -> AdversarialResult:
     """Validate a single position through adversarial debate.
 
@@ -347,10 +538,9 @@ async def validate_single_position(
     if best_adjusted >= BESTAETIGT_THRESHOLD:
         status = ValidationStatus.BESTAETIGT
     else:
-        # unsicher for now; triple-check will be added in Plan 02
         status = ValidationStatus.UNSICHER
 
-    return AdversarialResult(
+    initial_result = AdversarialResult(
         positions_nr=match_result.positions_nr,
         validation_status=status,
         adjusted_confidence=best_adjusted,
@@ -362,10 +552,28 @@ async def validate_single_position(
         api_calls_count=api_calls,
     )
 
+    # Triple-check: if below threshold and tfidf_index available
+    if best_adjusted < BESTAETIGT_THRESHOLD and tfidf_index is not None:
+        try:
+            return await triple_check_position(
+                client=client,
+                match_result=match_result,
+                debate_result=initial_result,
+                tfidf_index=tfidf_index,
+                semaphore=semaphore,
+            )
+        except Exception as e:
+            logger.error(f"Triple-check failed for position {match_result.positions_nr}: {e}")
+            # Fall back to initial result
+            return initial_result
+
+    return initial_result
+
 
 async def validate_positions(
     client: anthropic.Anthropic,
     match_results: list[MatchResult],
+    tfidf_index=None,
 ) -> list[AdversarialResult]:
     """Validate multiple positions concurrently through adversarial debate.
 
@@ -375,6 +583,7 @@ async def validate_positions(
     Args:
         client: Anthropic client instance.
         match_results: Phase 4 MatchResults to validate.
+        tfidf_index: Optional TF-IDF index for triple-check wider pool search.
 
     Returns:
         List of AdversarialResult, one per position (in order).
@@ -387,6 +596,7 @@ async def validate_positions(
                 client=client,
                 match_result=mr,
                 semaphore=semaphore,
+                tfidf_index=tfidf_index,
             )
         except Exception as e:
             logger.error(

@@ -76,6 +76,78 @@ Suche aktiv nach Gruenden, warum diese Zuordnung falsch sein koennte. \
 Bewerte jede Dimension einzeln und gib an, wie sicher du bist dass der Match falsch ist.
 """
 
+WIDER_POOL_SYSTEM_PROMPT = """\
+Du bist ein Experte fuer FTAG-Tuerprodukte. Du erhaeltst eine Anforderung aus einer Ausschreibung \
+und eine ERWEITERTE Liste von Produktkandidaten (bis zu 80 Stueck).
+
+Deine Aufgabe: Bewerte jeden Kandidaten und finde den besten Match.
+
+## Bewertung pro Dimension:
+Fuer jede der 6 Dimensionen (Masse, Brandschutz, Schallschutz, Material, Zertifizierung, Leistung):
+- Vergleiche die Anforderung mit dem Kandidaten
+- Score 0.0-1.0 (1.0 = perfekte Uebereinstimmung)
+
+## Domain-Regeln:
+- Brandschutz-Hierarchie: hoehere Klasse erfuellt niedrigere (EI60 erfuellt EI30)
+- Masse-Toleranz: +-10mm ist akzeptabel
+- Schallschutz: hoeherer dB-Wert erfuellt niedrigeren
+- Sicherheitskritische Dimensionen (Brandschutz, Masse, Schallschutz) sind am wichtigsten
+
+## Ausgabe:
+Waehle den besten Kandidaten und gib eine detaillierte Bewertung mit Gesamtkonfidenz.
+"""
+
+WIDER_POOL_USER_TEMPLATE = """\
+## Anforderung (Position aus Ausschreibung):
+{anforderung}
+
+## Erweiterte Kandidatenliste (Top 80 TF-IDF):
+{kandidaten_erweitert}
+
+Bewerte alle Kandidaten und waehle den besten Match. \
+Gib eine detaillierte Bewertung pro Dimension ab.
+"""
+
+INVERTED_SYSTEM_PROMPT = """\
+Du bist ein Experte fuer FTAG-Tuerprodukte. Du bewertest aus der ANFORDERUNGS-PERSPEKTIVE: \
+Statt zu fragen "passt das Produkt zur Anforderung?", fragst du \
+"welches Produkt erfuellt diese Anforderung am besten?".
+
+## Anforderungs-zentrierter Ansatz:
+Fuer jede Dimension der Anforderung:
+1. Was wird genau gefordert?
+2. Welcher Kandidat erfuellt diese Dimension am besten?
+3. Gibt es Abweichungen oder Risiken?
+
+## Dimensionen (in Prioritaetsreihenfolge):
+1. Brandschutz (sicherheitskritisch, 2x Gewicht)
+2. Masse (normativ, 1.5x Gewicht)
+3. Schallschutz (normativ, 1.5x Gewicht)
+4. Material (1x Gewicht)
+5. Zertifizierung (1x Gewicht)
+6. Leistung (0.8x Gewicht, kleinere Abweichungen tolerierbar)
+
+## Domain-Regeln:
+- Brandschutz-Hierarchie: EI30 < EI60 < EI90 < EI120 (hoehere erfuellt niedrigere)
+- Masse-Toleranz: +-10mm akzeptabel
+- Schallschutz: hoeherer dB-Wert erfuellt niedrigeren
+
+## Ausgabe:
+Waehle den besten Kandidaten basierend auf der Anforderungsanalyse.
+"""
+
+INVERTED_USER_TEMPLATE = """\
+## Anforderung (aufgeschluesselt nach Dimensionen):
+{anforderung_dimensionen}
+
+## Kandidaten:
+{kandidaten}
+
+Analysiere die Anforderung dimension-fuer-dimension und bestimme, \
+welcher Kandidat diese am besten erfuellt. \
+Bewerte aus der Anforderungs-Perspektive, nicht aus der Produkt-Perspektive.
+"""
+
 RESOLUTION_PROMPT = """\
 Synthesisiere die FOR- und AGAINST-Argumente zu einem finalen Urteil.
 
