@@ -240,19 +240,20 @@ class TestPromptTemplates:
 class TestCrossDocMatcher:
     """Tests for cross-document position matcher."""
 
-    def test_exact_id_match(self, xlsx_positions, pdf_positions):
+    def test_exact_id_match(self):
         """Positions with same positions_nr match with confidence 1.0."""
         from v2.extraction.cross_doc_matcher import match_positions_across_docs
 
+        pos_a = [ExtractedDoorPosition(positions_nr="1.01", breite_mm=1000)]
+        pos_b = [ExtractedDoorPosition(positions_nr="1.01", hoehe_mm=2100)]
         matches = match_positions_across_docs({
-            "tuerliste.xlsx": xlsx_positions,
-            "spec.pdf": pdf_positions,
+            "tuerliste.xlsx": pos_a,
+            "spec.pdf": pos_b,
         })
-        # Position 1.01 exists in both -> should match
         exact_matches = [m for m in matches if m.match_method == "exact_id"]
-        assert len(exact_matches) >= 1
-        assert all(m.confidence == 1.0 for m in exact_matches)
-        assert all(m.auto_merge is True for m in exact_matches)
+        assert len(exact_matches) == 1
+        assert exact_matches[0].confidence == 1.0
+        assert exact_matches[0].auto_merge is True
 
     def test_normalized_id_match(self, xlsx_positions, pdf_positions):
         """'Tuer 1.02' from PDF matches '1.02' from XLSX via normalization."""
