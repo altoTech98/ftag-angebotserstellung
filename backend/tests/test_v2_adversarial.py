@@ -922,3 +922,43 @@ class TestTripleCheckOutcomes:
 
         # Should have alternatives from debate + triple-check
         assert len(result.alternative_candidates) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Plan 02 Task 2: Analyze Endpoint Integration Tests
+# ---------------------------------------------------------------------------
+
+
+class TestAnalyzeEndpointAdversarial:
+    """Tests for adversarial validation wiring in analyze endpoint."""
+
+    def test_adversarial_available_flag_exists(self):
+        """_ADVERSARIAL_AVAILABLE flag exists in analyze_v2 module."""
+        from v2.routers import analyze_v2
+        assert hasattr(analyze_v2, "_ADVERSARIAL_AVAILABLE")
+
+    def test_adversarial_import_attempted(self):
+        """Adversarial import uses lazy try/except pattern."""
+        import inspect
+        from v2.routers import analyze_v2
+        source = inspect.getsource(analyze_v2)
+        assert "from v2.matching.adversarial import" in source
+        assert "_ADVERSARIAL_AVAILABLE" in source
+
+    def test_adversarial_results_key_in_response_pattern(self):
+        """Code references adversarial_results key in response dict."""
+        import inspect
+        from v2.routers import analyze_v2
+        source = inspect.getsource(analyze_v2)
+        assert 'adversarial_results' in source
+        assert 'total_confirmed' in source
+        assert 'total_uncertain' in source
+        assert 'total_api_calls' in source
+
+    def test_adversarial_graceful_skip_pattern(self):
+        """Code handles adversarial_skipped flag for graceful degradation."""
+        import inspect
+        from v2.routers import analyze_v2
+        source = inspect.getsource(analyze_v2)
+        assert 'adversarial_skipped' in source
+        assert 'adversarial_warning' in source

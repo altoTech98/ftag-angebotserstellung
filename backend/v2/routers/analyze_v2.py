@@ -31,6 +31,14 @@ except ImportError as _import_err:
     _MATCHING_AVAILABLE = False
     logger.warning(f"[V2 Analyze] Matching modules not available: {_import_err}")
 
+# Lazy imports for adversarial validation (may not be available)
+try:
+    from v2.matching.adversarial import validate_positions
+    _ADVERSARIAL_AVAILABLE = True
+except ImportError as _adv_import_err:
+    _ADVERSARIAL_AVAILABLE = False
+    logger.warning(f"[V2 Analyze] Adversarial modules not available: {_adv_import_err}")
+
 router = APIRouter(prefix="/api/v2", tags=["V2 Analysis"])
 
 # Lazy singleton for TF-IDF index
@@ -145,6 +153,41 @@ async def analyze_tender(request: AnalyzeRequest):
                         1 for mr in match_results if mr.hat_match
                     )
                     response["total_positions_matched"] = len(match_results)
+
+                    # --- Adversarial Validation Phase ---
+                    if _ADVERSARIAL_AVAILABLE and match_results:
+                        try:
+                            adversarial_results = await validate_positions(
+                                client=client,
+                                match_results=match_results,
+                                tfidf_index=tfidf_idx,
+                            )
+
+                            response["adversarial_results"] = [
+                                ar.model_dump() for ar in adversarial_results
+                            ]
+                            response["total_confirmed"] = sum(
+                                1 for ar in adversarial_results
+                                if ar.validation_status.value == "bestaetigt"
+                            )
+                            response["total_uncertain"] = sum(
+                                1 for ar in adversarial_results
+                                if ar.validation_status.value == "unsicher"
+                            )
+                            response["total_api_calls"] = sum(
+                                ar.api_calls_count for ar in adversarial_results
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"[V2 Analyze] Adversarial validation failed for tender {tender_id}: {e}\n"
+                                f"{traceback.format_exc()}"
+                            )
+                            response["adversarial_skipped"] = True
+                            response["adversarial_warning"] = f"Adversarial validation failed: {str(e)}"
+                    elif not _ADVERSARIAL_AVAILABLE:
+                        response["adversarial_skipped"] = True
+                        response["adversarial_warning"] = "Adversarial modules not installed"
+
                 else:
                     response["matching_skipped"] = True
                     response["matching_warning"] = "TF-IDF index not available"
