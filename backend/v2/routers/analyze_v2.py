@@ -9,6 +9,8 @@ Returns structured ExtractionResult with MatchResults.
 
 import logging
 import traceback
+import uuid
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
@@ -52,6 +54,9 @@ router = APIRouter(prefix="/api/v2", tags=["V2 Analysis"])
 # Lazy singleton for TF-IDF index
 _tfidf_index: Optional["CatalogTfidfIndex"] = None  # type: ignore
 
+# Analysis results storage for Excel generation (keyed by analysis_id)
+_analysis_results: dict[str, dict] = {}
+
 
 def _get_tfidf_index():
     """Get or create the TF-IDF index singleton."""
@@ -66,6 +71,9 @@ async def _run_gap_analysis(client, match_results, adversarial_results, tfidf_id
 
     Extracted as helper to avoid duplication between real and synthetic
     adversarial result paths.
+
+    Returns:
+        List of GapReport Pydantic objects (for storage), or empty list on failure.
     """
     try:
         gap_results = await analyze_gaps(
@@ -77,6 +85,7 @@ async def _run_gap_analysis(client, match_results, adversarial_results, tfidf_id
         response["gap_results"] = [gr.model_dump() for gr in gap_results]
         response["total_gaps"] = sum(len(gr.gaps) for gr in gap_results)
         response["total_gap_reports"] = len(gap_results)
+        return gap_results
     except Exception as e:
         logger.error(
             f"[V2 Analyze] Gap analysis failed for tender {tender_id}: {e}\n"
@@ -84,6 +93,7 @@ async def _run_gap_analysis(client, match_results, adversarial_results, tfidf_id
         )
         response["gaps_skipped"] = True
         response["gaps_warning"] = f"Gap analysis failed: {str(e)}"
+        return []
 
 
 class AnalyzeRequest(BaseModel):
@@ -223,8 +233,9 @@ async def analyze_tender(request: AnalyzeRequest):
 
                     # --- Gap Analysis Phase ---
                     adversarial_results_for_gaps = locals().get("adversarial_results", [])
+                    gap_results_raw = []
                     if _GAPS_AVAILABLE and adversarial_results_for_gaps:
-                        await _run_gap_analysis(
+                        gap_results_raw = await _run_gap_analysis(
                             client, match_results, adversarial_results_for_gaps,
                             tfidf_idx, tender_id, response,
                         )
@@ -247,7 +258,7 @@ async def analyze_tender(request: AnalyzeRequest):
                             )
                             for mr in match_results
                         ]
-                        await _run_gap_analysis(
+                        gap_results_raw = await _run_gap_analysis(
                             client, match_results, synthetic_adversarial,
                             tfidf_idx, tender_id, response,
                         )
@@ -269,6 +280,17 @@ async def analyze_tender(request: AnalyzeRequest):
         elif not _MATCHING_AVAILABLE:
             response["matching_skipped"] = True
             response["matching_warning"] = "Matching modules not installed"
+
+        # Store analysis results for later Excel generation
+        analysis_id = str(uuid.uuid4())[:8]
+        _analysis_results[analysis_id] = {
+            "positions": result.positionen,
+            "match_results": locals().get("match_results", []),
+            "adversarial_results": locals().get("adversarial_results", []),
+            "gap_reports": locals().get("gap_results_raw", []),
+            "created_at": datetime.now(),
+        }
+        response["analysis_id"] = analysis_id
 
         return response
 
