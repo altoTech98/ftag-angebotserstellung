@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Phase 3 context gathered
-last_updated: "2026-03-10T14:12:06.128Z"
-last_activity: 2026-03-10 — Completed 02-03 (AI Passes + Pipeline)
+status: in-progress
+stopped_at: Completed 03-01 (Cross-Doc Intelligence Core)
+last_updated: "2026-03-10T14:35:31Z"
+last_activity: 2026-03-10 — Completed 03-01 (Cross-Doc Intelligence Core)
 progress:
   total_phases: 8
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
-  percent: 25
+  total_plans: 6
+  completed_plans: 6
+  percent: 30
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** 100% korrekte Zuordnung jeder Anforderung zum richtigen Produkt — oder eine explizite, begründete Gap-Meldung.
-**Current focus:** Phase 2 - Multi-Pass Extraction
+**Current focus:** Phase 3 - Cross-Document Intelligence
 
 ## Current Position
 
-Phase: 2 of 8 (Multi-Pass Extraction) -- COMPLETE
-Plan: 3 of 3 in current phase
-Status: Phase 02 Complete
-Last activity: 2026-03-10 — Completed 02-03 (AI Passes + Pipeline)
+Phase: 3 of 8 (Cross-Document Intelligence)
+Plan: 1 of 2 in current phase
+Status: Plan 03-01 Complete
+Last activity: 2026-03-10 — Completed 03-01 (Cross-Doc Intelligence Core)
 
-Progress: [███░░░░░░░] 25%
+Progress: [███░░░░░░░] 30%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 5min
-- Total execution time: 0.4 hours
+- Total plans completed: 6
+- Average duration: 5.3min
+- Total execution time: 0.5 hours
 
 **By Phase:**
 
@@ -45,6 +45,7 @@ Progress: [███░░░░░░░] 25%
 |-------|-------|-------|----------|
 | 01 | 2/2 | 11min | 5.5min |
 | 02 | 3/3 | 13min | 4.3min |
+| 03 | 1/2 | 8min | 8min |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -79,6 +80,10 @@ Recent decisions affecting current work:
 - 02-03: Pass 2 konfidenz=0.9, Pass 3 konfidenz=0.95 for provenance hierarchy
 - 02-03: Position batching at 25 per batch for Pass 3 context limits
 - 02-03: Compact position summaries (key fields only) sent to Pass 3
+- 03-01: Tiered matching: exact_id(1.0) > normalized_id(0.92) > room_floor_type(0.7), auto_merge at 0.9+
+- 03-01: Severity classification deterministic via SAFETY_FIELDS/MAJOR_FIELDS sets (not AI)
+- 03-01: Enrichment never downgrades: gap_fill and confidence_upgrade only
+- 03-01: General specs use scope matching (field==value) at konfidenz=0.7, empty fields only
 
 ### Pending Todos
 
@@ -91,6 +96,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T14:12:06.123Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-cross-document-intelligence/03-CONTEXT.md
+Last session: 2026-03-10T14:35:31Z
+Stopped at: Completed 03-01 (Cross-Doc Intelligence Core)
+Resume file: .planning/phases/03-cross-document-intelligence/03-01-SUMMARY.md

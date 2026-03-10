@@ -15,8 +15,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **DOKA-04**: System akzeptiert mehrere Dateien pro Ausschreibung (PDF + Excel + DOCX gemischt)
 - [x] **DOKA-05**: System führt Multi-Pass-Analyse durch (Pass 1: strukturell, Pass 2: AI-semantisch, Pass 3: Cross-Reference-Validierung)
 - [x] **DOKA-06**: System extrahiert ALLE technischen Anforderungen als einzelne Datenpunkte (Maße, Material, Normen, Zertifizierungen, Leistungsdaten)
-- [ ] **DOKA-07**: System reichert Positionen mit Daten aus verschiedenen Dokumenten an (Cross-Document Enrichment: Excel-Türliste + PDF-Spezifikation + DOCX-Anforderungen)
-- [ ] **DOKA-08**: System erkennt und meldet Konflikte zwischen Dokumenten (z.B. unterschiedliche Brandschutzklassen in verschiedenen Dateien)
+- [x] **DOKA-07**: System reichert Positionen mit Daten aus verschiedenen Dokumenten an (Cross-Document Enrichment: Excel-Türliste + PDF-Spezifikation + DOCX-Anforderungen)
+- [x] **DOKA-08**: System erkennt und meldet Konflikte zwischen Dokumenten (z.B. unterschiedliche Brandschutzklassen in verschiedenen Dateien)
 
 ### Produkt-Matching
 
@@ -105,8 +105,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | DOKA-04 | Phase 2 | Complete |
 | DOKA-05 | Phase 2 | Complete |
 | DOKA-06 | Phase 2 | Complete |
-| DOKA-07 | Phase 3 | Pending |
-| DOKA-08 | Phase 3 | Pending |
+| DOKA-07 | Phase 3 | Complete |
+| DOKA-08 | Phase 3 | Complete |
 | MATC-01 | Phase 4 | Pending |
 | MATC-02 | Phase 4 | Pending |
 | MATC-03 | Phase 4 | Pending |
