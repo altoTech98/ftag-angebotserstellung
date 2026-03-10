@@ -28,7 +28,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **MATC-06**: System führt Triple-Check durch bei Konfidenz <95% (dritter AI-Durchlauf mit alternativem Prompt)
 - [x] **MATC-07**: System begründet jeden Match mit Chain-of-Thought (Schritt-für-Schritt-Argumentation)
 - [x] **MATC-08**: System listet bei mehreren möglichen Produkten alle auf mit Begründung
-- [ ] **MATC-09**: System integriert Feedback/Korrekturen aus früheren Analysen als Few-Shot-Examples
+- [x] **MATC-09**: System integriert Feedback/Korrekturen aus früheren Analysen als Few-Shot-Examples
 
 ### Gap-Analyse
 
@@ -36,7 +36,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **GAPA-02**: System kategorisiert Gaps nach Dimension: Maße, Material, Norm, Zertifizierung, Leistung
 - [x] **GAPA-03**: System bewertet Gap-Schweregrad: Kritisch (keine Lösung), Major (signifikante Abweichung), Minor (nahe am Match)
 - [x] **GAPA-04**: System generiert AI-Vorschlag was sich ändern müsste damit ein Produkt passt
-- [ ] **GAPA-05**: System schlägt alternative Produkte vor die den Gap schließen könnten (mit Erklärung was noch abweicht)
+- [x] **GAPA-05**: System schlägt alternative Produkte vor die den Gap schließen könnten (mit Erklärung was noch abweicht)
 
 ### Excel-Output
 
@@ -115,12 +115,12 @@ Deferred to future release. Tracked but not in current roadmap.
 | MATC-06 | Phase 5 | Complete |
 | MATC-07 | Phase 5 | Complete |
 | MATC-08 | Phase 5 | Complete |
-| MATC-09 | Phase 9 | Pending |
+| MATC-09 | Phase 9 | Complete |
 | GAPA-01 | Phase 6 | Complete |
 | GAPA-02 | Phase 6 | Complete |
 | GAPA-03 | Phase 6 | Complete |
 | GAPA-04 | Phase 6 | Complete |
-| GAPA-05 | Phase 9 | Pending |
+| GAPA-05 | Phase 9 | Complete |
 | EXEL-01 | Phase 9 | Complete |
 | EXEL-02 | Phase 9 | Complete |
 | EXEL-03 | Phase 9 | Complete |
