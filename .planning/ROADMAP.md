@@ -111,11 +111,11 @@ Plans:
   3. Each gap has a severity rating: Critical (no solution exists), Major (significant deviation), Minor (close to matching)
   4. System generates a suggestion for what would need to change for a product to match the requirement
   5. Alternative products that could partially close the gap are suggested with explanation of remaining deviations
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
+- [ ] 06-01-PLAN.md — Gap schemas expansion, gap analyzer engine with Opus calls, German prompts, and test suite
+- [ ] 06-02-PLAN.md — Wire gap analysis into analyze endpoint with graceful degradation
 
 ### Phase 7: Excel Output Generation
 **Goal**: The complete analysis (matches, gaps, reasoning) is exported as a professional 4-sheet Excel file that the sales team can use directly for customer offers
