@@ -139,6 +139,39 @@ export default function CorrectionModal({ item, onClose, onSaved }) {
             </div>
           </div>
 
+          {/* Dimensional confidence breakdown */}
+          {(() => {
+            const dimScores = item._v2?.dimension_scores || item._v2?.match?.bester_match?.dimension_scores
+            if (!dimScores || dimScores.length === 0) return null
+            return (
+              <div className={styles.correctionSection}>
+                <div className={styles.correctionLabel}>Dimensionale Bewertung</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem' }}>
+                  {dimScores.map((d, i) => {
+                    const score = typeof d.score === 'number' ? d.score : 0
+                    const color = score >= 0.95 ? '#22c55e' : score >= 0.60 ? '#f59e0b' : '#ef4444'
+                    const bg = score >= 0.95 ? 'rgba(34,197,94,.12)' : score >= 0.60 ? 'rgba(245,158,11,.12)' : 'rgba(239,68,68,.12)'
+                    return (
+                      <span
+                        key={i}
+                        title={d.begruendung || d.reasoning || ''}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '.35rem',
+                          padding: '.25rem .6rem', borderRadius: '999px',
+                          background: bg, fontSize: '.8rem', fontWeight: 500,
+                        }}
+                      >
+                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: color, flexShrink: 0 }} />
+                        <span style={{ color: 'var(--text-secondary)' }}>{d.dimension}:</span>
+                        <span style={{ fontWeight: 600, color }}>{(score * 100).toFixed(0)}%</span>
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Search */}
           <div className={styles.correctionSection}>
             <div className={styles.correctionLabel}>Richtiges Produkt suchen</div>
