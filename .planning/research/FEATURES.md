@@ -1,155 +1,210 @@
 # Feature Landscape
 
-**Domain:** AI-powered construction tender analysis with product catalog matching (door industry)
+**Domain:** B2B SaaS web platform for AI-powered construction tender analysis (Next.js frontend for existing FastAPI/Claude AI pipeline)
 **Researched:** 2026-03-10
-**Overall confidence:** HIGH (domain well-understood from existing codebase + industry research)
+**Overall confidence:** HIGH (well-understood SaaS patterns + clear project requirements)
+
+## Scope Note
+
+This document covers ONLY v2.0 SaaS platform features. The AI pipeline (multi-pass extraction, adversarial matching, gap analysis, Excel generation) is already shipped in v1.0 and is NOT covered here. These features wrap the existing pipeline in a professional B2B web application.
+
+---
 
 ## Table Stakes
 
-Features users expect. Missing = product feels incomplete or untrustworthy.
+Features users expect from a professional B2B SaaS tool. Missing = product feels amateur or incomplete.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Multi-format document parsing (PDF, XLSX, DOCX) | Tenders always arrive as mixed file types | Low | Already exists in v1. PyMuPDF + pdfplumber + openpyxl + python-docx. Keep as-is. |
-| Structured Excel Tuerliste parsing | 80%+ of Swiss construction tenders use Excel door lists with specific column layouts | Medium | Already exists. Column auto-detection for ~54 FTAG columns. Critical path. |
-| Complete requirement extraction (zero missed positions) | v1 problem: missed requirements. A single missed door position = lost revenue or compliance failure | High | Multi-pass parsing needed. Single-pass is the #1 cause of missed positions. |
-| Product catalog matching against ~891 FTAG products | Core value proposition. Without it, system has no purpose | High | Exists as 3-stage (TF-IDF + rules + feedback). Needs upgrade to multi-dimensional AI matching. |
-| Confidence scoring per match (0-100%) | Sales team needs to know which matches are reliable vs. questionable. Without scores, every match needs manual review | Medium | v1 has implicit scoring via thresholds (60/35). Needs explicit per-match confidence with breakdown. |
-| Gap analysis for unmatched requirements | Sales team must know WHAT cannot be fulfilled and WHY, to communicate to the customer | High | v1 has basic gap list. Needs detailed gap categorization (which dimension failed: size, fire rating, sound, material). |
-| Color-coded Excel output (green/yellow/red) | Sales team works in Excel. Visual status at a glance is non-negotiable for 200-500 position tenders | Medium | Already exists with 2-sheet output. Needs expansion to 4 sheets per PROJECT.md. |
-| Match traceability (WHY was this product chosen) | v1 problem: no explanation for matches. Sales team cannot trust opaque AI decisions | High | Chain-of-thought reasoning per match. Must be stored and displayed in Excel output. |
-| SSE real-time progress streaming | Analyses take 2-10 minutes. Users abandon if they see no progress | Low | Already exists. Job system + SSE streaming with keepalive. Keep as-is. |
-| Multi-file upload per tender | Real tenders have 3-15 files (door list + specs + plans). Single-file = unusable for real work | Medium | Already exists as project analysis. File classification (tuerliste/spezifikation/plan/sonstig). |
-| Feedback/correction persistence | Corrections from past tenders must improve future matches. Without learning, same errors repeat | Low | Already exists. JSON-based feedback store. Corrections injected as few-shot examples. |
+| Feature | Why Expected | Complexity | Dependencies |
+|---------|--------------|------------|--------------|
+| **Authentication with email/password** | Any multi-user system requires login. Internal tool with 4 roles demands identity | Low | NextAuth.js + Prisma adapter |
+| **Role-based route protection** | Admin pages visible to Analysts = security failure. Middleware-level blocking is minimum viable RBAC | Low | Auth system must exist first |
+| **Dashboard with status overview** | First screen after login. Users need: active projects count, recent analyses, pending reviews at a glance | Medium | Project + Analysis data models must exist |
+| **Status cards (KPIs)** | How many analyses this week? How many gaps found? Average confidence? Users expect quantified overview | Low | Aggregate queries on analysis results |
+| **Recent activity feed** | "What happened since I last logged in?" -- standard in every B2B tool from Notion to Linear | Low | Audit log or activity tracking |
+| **Analysis file upload with drag-and-drop** | Users upload 3-15 files per tender. Drag-and-drop is baseline UX for file upload in 2026 | Low | Vercel Blob Storage for file persistence |
+| **Analysis progress indicator (SSE)** | Existing v1 feature. Analyses take 2-10 minutes. No progress = user abandonment | Low | Already exists in FastAPI backend, needs Next.js SSE client |
+| **Results table with sorting and filtering** | 200-500 positions per tender. Unsorted flat list is unusable. Filter by confidence, status, gap type | Medium | Analysis results data model |
+| **Match detail expansion (click-to-expand rows)** | Users need to see WHY a match was chosen: confidence breakdown, reasoning, alternatives | Medium | Chain-of-thought data from AI pipeline |
+| **Excel download from results view** | Final deliverable is always Excel. Download button on results page is the minimum output action | Low | Existing Excel generator in FastAPI |
+| **Project list with search** | Users manage 5-20 active tenders. Need to find by name, customer, date | Low | Project data model with text search |
+| **Responsive layout (desktop-first)** | Sales team uses laptops and desktop monitors. Layout must not break at common resolutions (1280-1920px) | Low | Tailwind CSS responsive utilities |
+| **Loading states and error handling** | Skeleton loaders, toast notifications, error boundaries. Without these, app feels broken during API calls | Low | Standard React/Next.js patterns |
+| **Breadcrumb navigation** | Multi-level app (Dashboard > Project > Analysis > Results). Users must know where they are | Low | Next.js layout nesting |
 
 ## Differentiators
 
-Features that set the system apart from generic AI tender tools. Not expected by users upfront, but create significant competitive advantage once experienced.
+Features that elevate this from "internal tool" to "professional SaaS platform." Not expected by the 4-person sales team initially, but create significant quality-of-life improvements.
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Multi-pass document analysis (2-3 passes per document) | Catches requirements missed by single-pass. v1's biggest weakness was missed positions. Each pass uses a different extraction strategy (structural, semantic, cross-reference) | High | PROJECT.md mandates this. Pass 1: structural column parsing. Pass 2: AI semantic extraction. Pass 3: cross-reference validation against spec documents. |
-| Adversarial double-check (Devil's Advocate AI pass) | Second AI call actively tries to DISPROVE each match. If it succeeds, match is downgraded. Dramatically reduces false positives | High | Novel pattern for this domain. Send each match + product + requirement to a second prompt that argues why it is WRONG. If argument is convincing, flag for review. |
-| Triple-check on low confidence (<95%) | Third AI pass with alternative prompt formulation when first two disagree. Majority voting on match quality | Medium | Only triggers when needed (estimated 10-20% of positions). Cost impact manageable since costs are explicitly irrelevant per PROJECT.md. |
-| Multi-dimensional match scoring breakdown | Instead of one score, show: dimensions (pass/fail), fire rating (pass/fail), sound (pass/fail), material (pass/fail), certification (pass/fail), price (informational). Sales team sees exactly WHERE a product falls short | Medium | Enables targeted product substitution. If only sound rating fails, suggest product with higher dB. |
-| Gap severity categorization | Not all gaps are equal. "Product is 5mm too narrow" vs "No fire-rated product exists" have very different business implications. Categorize: Critical (no solution exists), Major (significant deviation), Minor (close match, may be acceptable) | Medium | Enables prioritized action by sales team. Critical gaps get escalated, minor gaps may be accepted by customer. |
-| Alternative product suggestions for gaps | When a match fails, suggest the closest alternatives with explanation of what would need to change. "Product X matches except fire rating is EI30 instead of required EI60" | Medium | Depends on gap analysis. Use same catalog search but relax the failing constraint. |
-| 4-sheet Excel output (Overview + Details + Gaps + Executive Summary) | Single sheet is insufficient for 200-500 position tenders. Structured multi-sheet gives different stakeholders what they need: summary for managers, details for sales engineers, gaps for product managers | Medium | Sheet 1: Overview matrix (existing Tuermatrix-FTAG format). Sheet 2: Detail per match with confidence + reasoning. Sheet 3: Gap analysis with categories + severity. Sheet 4: Executive summary with statistics + recommendations. |
-| Cross-document enrichment | Merge data from Excel door list + PDF specifications + Word requirements into unified position data. One document says "EI30", another specifies "Schallschutz 32dB" for the same door | High | Already partially implemented (scan_and_enrich). Needs to be more robust: map spec requirements to door positions by position number, room, or floor. |
-| Chain-of-thought reasoning export | Every match decision includes the AI's step-by-step reasoning, stored and exportable. Audit trail for compliance-critical decisions | Medium | Use Claude structured output to enforce CoT format. Store reasoning alongside match result. Display in Excel "Hinweise" column. |
-| Plausibility check at end | Final sanity check: Are all position numbers accounted for? Do match percentages add up? Any duplicate matches? Any position matched to same product suspiciously often? | Low | Simple algorithmic check after AI matching completes. Catches systematic errors. |
+| Feature | Value Proposition | Complexity | Dependencies |
+|---------|-------------------|------------|--------------|
+| **5-step Analysis Wizard** | Guided flow: Upload > Catalog Select > Configuration > Analysis > Results. Prevents misconfiguration, reduces errors vs. single-page form. Users cannot skip steps or submit incomplete data | High | File upload, catalog system, AI pipeline integration |
+| **Wizard step validation with Zod schemas** | Each wizard step validates before allowing "Next." Catches problems early (wrong file types, missing catalog, invalid config) instead of failing during analysis | Medium | react-hook-form + Zod per step |
+| **Product Catalog versioning** | Upload new catalog version without breaking existing analyses. Roll back if new version has errors. Each analysis records which catalog version was used | High | Catalog data model with version tracking, Vercel Blob for catalog files |
+| **Product Catalog CRUD with search** | Browse, search, filter the 891 products. Edit individual products. Bulk import from Excel. Avoids "upload and pray" workflow | Medium | Catalog data model, search index |
+| **Project archiving with full history** | Completed tenders move to archive but remain searchable. Analysis history preserved for audits and re-analysis | Medium | Project status enum, soft-delete pattern |
+| **Project sharing between users** | Manager assigns project to Analyst. Multiple people can view same project results. Simple permission model (owner + shared-with) | Medium | Project-User junction table |
+| **Confidence-based color coding in results** | Green (95%+), Yellow (80-94%), Red (<80%) -- visual scanning of 500 positions in seconds. Mirrors Excel output but interactive | Low | Existing confidence scores from AI pipeline |
+| **Gap analysis drill-down** | Click a gap to see: which dimensions failed, severity, suggested alternatives, reasoning. More interactive than Excel sheet | Medium | Gap data from AI pipeline |
+| **Admin audit log** | Who ran which analysis, when, with what parameters. Required for B2B compliance and debugging | Medium | Event logging to database on key actions |
+| **Admin user management** | Create/edit/deactivate users, assign roles. Admin does not want to touch database directly | Medium | User CRUD with role assignment |
+| **System settings panel** | API key configuration, default confidence thresholds, catalog defaults. Avoids environment variable management | Low | Settings table in database |
+| **Red/White design system** | FTAG brand identity (red primary). Consistent across all pages. Professional B2B appearance (Linear/Notion style) | Medium | Tailwind CSS config + shadcn/ui theming |
+| **Keyboard shortcuts for power users** | Navigate wizard steps, toggle filters, quick-search projects. Sales team processes 5+ tenders/week | Low | Event listeners, can be added incrementally |
 
 ## Anti-Features
 
-Features to explicitly NOT build. These would waste effort, add complexity, or actively harm the product.
+Features to explicitly NOT build in v2.0. Each has been considered and rejected for specific reasons.
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
-| Fancy frontend / SPA redesign | PROJECT.md explicitly scopes this as "Backend-Fokus, minimales Frontend". Sales team needs Upload + Download + Live-Log, not a dashboard | Keep minimal React frontend. Improve SSE progress display, add download buttons. No charts, no dashboards. |
-| Automatic offer generation with pricing | Pricing requires business logic, customer relationships, volume discounts -- too much implicit knowledge to automate safely. Wrong prices = legal liability | Generate the match/gap Excel. Let sales team fill in prices manually in the FTAG format they already use. |
-| Local LLM / Ollama fallback | PROJECT.md: "v2 nutzt ausschliesslich Claude (bestes Modell, Kosten irrelevant)". Multi-pass validation with local models would produce unreliable results | Remove Ollama code paths from v2. Single AI provider (Claude) simplifies testing and validation. |
-| User authentication / role management | Explicitly out of scope per PROJECT.md. Small internal team, no external access | Skip auth entirely. Direct upload/download. |
-| ERP integration | Out of scope per PROJECT.md. Would require understanding their specific ERP system | Export clean Excel that can be manually imported into ERP later. |
-| Real-time collaborative editing of results | Sales team works individually on tenders. No need for multi-user concurrent editing | Generate Excel, download, edit locally in Excel. |
-| Auto-retry on AI failures with degraded quality | Better to fail clearly than return bad results. "Genauigkeit vor Effizienz" | Retry same quality level 2-3 times. If Claude is down, fail with clear error message. Do not fall back to regex matching. |
-| Embedding-based semantic search for catalog | TF-IDF + rule-based scoring already works well for structured catalog data. Embeddings add complexity without clear benefit for 891 structured products with known schemas | Keep TF-IDF pre-filter + rule-based scoring. Add AI verification on top. Embeddings would matter at 10K+ products. |
-| PDF plan/drawing analysis | Construction plans require specialized CV models. Out of scope and unreliable with current LLM vision | Skip plan files during analysis. Classify as "plan" and ignore. Focus on text-based documents. |
+| **Multi-tenancy** | PROJECT.md explicitly defers to v3.0+. FTAG is single company. Architecture can prepare (tenant_id column) but no tenant switching, billing, or isolation logic | Add tenant_id to data models for future-proofing. Do not build tenant management UI. |
+| **2FA / MFA** | Deferred to v3.0+ per PROJECT.md. Internal tool, not internet-facing. Low security risk | Simple email/password auth via NextAuth.js. Revisit when external users are added. |
+| **Dark mode** | Deferred to v3.0+ per PROJECT.md. Nice-to-have, not needed for internal B2B tool | Build with CSS variables so dark mode can be added later without refactor. |
+| **Multi-language (DE/EN)** | Deferred to v3.0+ per PROJECT.md. FTAG works in German only | Hardcode German UI strings. Use a pattern (e.g., constants file) that can be swapped for i18n later. |
+| **PDF export of results** | Deferred to v3.0+ per PROJECT.md. Excel is the standard deliverable | Excel download only. PDF adds complexity (layout engine, pagination) for low value. |
+| **Real-time collaboration** | Sales team works individually on tenders. No concurrent editing need | Single-user project ownership with read-only sharing. |
+| **Automatic pricing** | Too risky per PROJECT.md. Pricing requires business context, customer relationships, volume discounts | Generate match/gap Excel. Sales fills in prices manually. |
+| **Mobile-optimized layout** | PROJECT.md: web-only, desktop users. Mobile layout for data-dense tables is poor UX anyway | Desktop-first responsive. Readable on tablet but not optimized for phone. |
+| **Notification system (email/push)** | Over-engineering for 4 internal users. They check the tool directly | Activity feed on dashboard is sufficient. No email notifications. |
+| **Custom dashboard widgets / drag-to-rearrange** | Complex to build, minimal value for fixed use case. Dashboard layout is predictable and consistent | Fixed dashboard layout with the 4-6 most useful cards. |
+| **File preview (PDF/Word viewer in browser)** | Complex to implement well. Users have local apps for viewing source documents | Download button for source files. Users open in their native apps. |
+| **AI chatbot / conversational interface** | The analysis is structured and repeatable. A wizard is better than freeform chat for this workflow | 5-step wizard with clear inputs and outputs. |
 
 ## Feature Dependencies
 
 ```
-Multi-format parsing (existing)
+Authentication (NextAuth.js + Prisma)
   |
-  v
-Multi-pass document analysis -----> Structured requirement extraction
-  |                                    |
-  v                                    v
-Cross-document enrichment          Multi-dimensional product matching
-  |                                    |
-  v                                    v
-Complete position list             Confidence score per match (0-100%)
-                                       |
-                                       +---> Adversarial double-check
-                                       |        |
-                                       |        v
-                                       |     Triple-check (if <95%)
-                                       |        |
-                                       v        v
-                                   Match results with confidence
-                                       |
-                                       +---> Gap analysis (categorized)
-                                       |        |
-                                       |        v
-                                       |     Alternative product suggestions
-                                       |        |
-                                       v        v
-                                   4-sheet Excel output
-                                       |
-                                       v
-                                   Plausibility check
-                                       |
-                                       v
-                                   Chain-of-thought export
+  +---> Role-based route protection (middleware)
+  |       |
+  |       +---> Admin Panel (Admin role required)
+  |       |       |
+  |       |       +---> User Management (CRUD)
+  |       |       +---> Audit Log (view)
+  |       |       +---> System Settings
+  |       |       +---> API Key Management
+  |       |
+  |       +---> Dashboard (all roles, filtered by permissions)
+  |               |
+  |               +---> Status Cards (KPIs)
+  |               +---> Recent Activity Feed
+  |               +---> Quick Actions
+  |
+  +---> Project Management
+  |       |
+  |       +---> Project CRUD
+  |       +---> Project Sharing (between users)
+  |       +---> Project Archiving
+  |       +---> Project History
+  |
+  +---> Product Catalog Management
+  |       |
+  |       +---> Catalog Upload (Excel)
+  |       +---> Catalog CRUD (browse/search/edit)
+  |       +---> Catalog Versioning
+  |
+  +---> Analysis Wizard (5 steps)
+          |
+          Step 1: File Upload --> Vercel Blob Storage
+          Step 2: Catalog Selection --> Catalog Management
+          Step 3: Configuration --> Analysis parameters
+          Step 4: Analysis Start --> FastAPI AI Pipeline (existing)
+          Step 5: Results --> Results View
+                    |
+                    +---> Results Table (sort/filter)
+                    +---> Match Detail Expansion
+                    +---> Gap Analysis Drill-down
+                    +---> Excel Download
 ```
 
 Key dependency chains:
-- Multi-pass parsing MUST come before matching (you cannot match what you did not extract)
-- Confidence scoring MUST come before adversarial check (you need a baseline to challenge)
-- Gap analysis MUST come after matching (gaps are the complement of matches)
-- 4-sheet Excel is the final output -- depends on all upstream data being ready
-- Plausibility check runs last, validates the entire pipeline output
+- Auth MUST come first -- every other feature depends on knowing who the user is
+- Database schema (Prisma) MUST come before any CRUD feature
+- Project model MUST exist before Analysis Wizard (analyses belong to projects)
+- Catalog Management MUST exist before Wizard Step 2 (wizard selects a catalog)
+- FastAPI integration MUST work before Wizard Steps 4-5 (analysis execution + results)
+- Dashboard is a consumer of all other data -- build last or incrementally
 
 ## MVP Recommendation
 
-**Phase 1 -- Foundation (must ship first):**
-1. Multi-pass document analysis (2 passes minimum: structural + AI semantic)
-2. Multi-dimensional product matching with explicit confidence scores
-3. Basic gap analysis (matched/partial/unmatched with reason text)
-4. 4-sheet Excel output structure
+**Phase 1 -- Auth + Data Foundation:**
+1. NextAuth.js authentication (email/password, 4 roles)
+2. Prisma schema (Users, Projects, Catalogs, Analyses)
+3. Role-based middleware protection
+4. Basic layout shell with Red/White design system
 
-**Phase 2 -- Validation layer:**
-5. Adversarial double-check (second AI pass)
-6. Triple-check for low-confidence matches
-7. Gap severity categorization (Critical/Major/Minor)
-8. Alternative product suggestions
+**Phase 2 -- Core Workflows:**
+5. Project Management (CRUD, list, search)
+6. Product Catalog Management (upload, browse, search)
+7. Analysis Wizard (5 steps with validation)
+8. FastAPI pipeline integration (proxy calls from Next.js to existing backend)
 
-**Phase 3 -- Polish:**
-9. Cross-document enrichment improvements
-10. Chain-of-thought reasoning in Excel
-11. Plausibility check
-12. Live progress detail (which position is being processed)
+**Phase 3 -- Results + Dashboard:**
+9. Results View (table, filters, detail expansion, Excel download)
+10. Gap analysis drill-down in results
+11. Dashboard with status cards and activity feed
+12. Confidence color coding throughout
 
-**Defer indefinitely:**
-- Embedding search (TF-IDF sufficient at current catalog size)
-- Frontend redesign (minimal is fine)
-- Pricing automation (too risky)
+**Phase 4 -- Admin + Polish:**
+13. Admin user management
+14. Audit log
+15. System settings panel
+16. Catalog versioning
+17. Project sharing and archiving
+18. Keyboard shortcuts
+
+**Defer to v3.0+:**
+- Multi-tenancy, 2FA, dark mode, i18n, PDF export, mobile optimization
 
 ## Complexity Budget
 
-| Feature Group | Estimated Effort | Risk |
-|---------------|-----------------|------|
-| Multi-pass parsing | 3-5 days | Medium -- prompt engineering intensive |
-| Multi-dimensional matching + confidence | 3-5 days | Medium -- need to design scoring rubric |
-| Adversarial double-check | 2-3 days | Low -- well-defined pattern, just a second prompt |
-| Triple-check | 1-2 days | Low -- conditional extension of double-check |
-| Gap analysis (categorized + alternatives) | 3-4 days | Medium -- requires good taxonomy |
-| 4-sheet Excel output | 2-3 days | Low -- openpyxl work, extend existing generator |
-| Cross-document enrichment | 2-3 days | High -- position-to-spec mapping is ambiguous |
-| Chain-of-thought export | 1 day | Low -- store what Claude already generates |
-| Plausibility check | 1 day | Low -- algorithmic, no AI needed |
+| Feature Group | Estimated Effort | Risk | Notes |
+|---------------|-----------------|------|-------|
+| Auth + RBAC | 3-4 days | Low | Well-documented NextAuth.js + Prisma pattern |
+| Design System (Red/White) | 2-3 days | Low | Tailwind config + shadcn/ui theme customization |
+| Layout Shell + Navigation | 2-3 days | Low | App Router layouts, sidebar, breadcrumbs |
+| Project Management | 3-4 days | Low | Standard CRUD with Prisma |
+| Catalog Management | 4-5 days | Medium | Excel upload parsing, search, versioning adds complexity |
+| Analysis Wizard (5 steps) | 5-7 days | Medium | State management across steps, file upload, SSE integration |
+| FastAPI Integration | 3-4 days | Medium | Proxy layer, error handling, SSE forwarding from Python to Next.js |
+| Results View | 4-5 days | Medium | Data-dense table, filters, expandable rows, color coding |
+| Dashboard | 3-4 days | Low | Aggregate queries, card components, activity feed |
+| Admin Panel | 3-4 days | Low | User CRUD, settings form, audit log table |
+| Catalog Versioning | 2-3 days | Medium | Version tracking, rollback logic, migration path |
+| Project Sharing + Archive | 2-3 days | Low | Permission model, soft-delete |
 
-**Total estimated: 18-27 days for full feature set**
+**Total estimated: 36-49 days for full v2.0 SaaS platform**
+
+## Role Permission Matrix
+
+| Feature | Admin | Manager | Analyst | Viewer |
+|---------|-------|---------|---------|--------|
+| Dashboard | Full stats | Team stats | Own stats | Own stats |
+| Create Project | Yes | Yes | Yes | No |
+| Run Analysis | Yes | Yes | Yes | No |
+| View Results | All | Team | Own | Shared only |
+| Download Excel | Yes | Yes | Yes | Yes |
+| Manage Catalog | Yes | Yes | No | No |
+| Upload Catalog Version | Yes | Yes | No | No |
+| User Management | Yes | No | No | No |
+| System Settings | Yes | No | No | No |
+| Audit Log | Yes | View only | No | No |
+| Archive Project | Yes | Yes | Own only | No |
+| Share Project | Yes | Yes | Own only | No |
 
 ## Sources
 
-- [Tenderbolt - Best AI solutions for tenders 2025](https://www.tenderbolt.ai/en/post/les-meilleures-solutions-ia-de-reponse-aux-appels-doffres-en-2025)
-- [Altura - AI in tender and RFP management 2025](https://altura.io/en/blog/ai-tendermanagement)
-- [Altura - Document Analysis Feature](https://altura.io/en/feature/document-analysis)
-- [iFieldSmart - AI Scope Gap Analysis for Construction](https://www.ifieldsmart.com/blogs/ai-scope-gap-analysis-for-construction-teams/)
-- [TruBuild - AI-Powered Tender Evaluation in Construction](https://trubuild.io/blog/ai-powered-tender-evaluation-a-new-era-of-procurement-in-construction)
-- [TenderStrike - AI Tender Documentation Analysis](https://www.tenderstrike.com/en/blog/AI-tender-documentation-analysis-construction-tool-over-ChatGPT/)
-- [arXiv - Confidence alignment with correctness for LLM error detection](https://arxiv.org/html/2603.06604)
-- [arXiv - Fact-checking with LLMs via probabilistic certainty](https://arxiv.org/html/2601.02574)
-- [FastAPI SSE documentation](https://fastapi.tiangolo.com/tutorial/server-sent-events/)
-- [openpyxl conditional formatting docs](https://openpyxl.readthedocs.io/en/3.1/formatting.html)
-- Existing codebase analysis (HIGH confidence -- direct code review)
+- [Next.js SaaS Dashboard Best Practices](https://www.ksolves.com/blog/next-js/best-practices-for-saas-dashboards)
+- [Why Use Next.js for SaaS - 2026 Guide](https://makerkit.dev/blog/tutorials/why-you-should-use-nextjs-saas)
+- [Auth.js Role-Based Access Control](https://authjs.dev/guides/role-based-access-control)
+- [Next.js Authentication Guide](https://nextjs.org/docs/app/guides/authentication)
+- [RBAC in Next.js with NextAuth](https://medium.com/@mesutas.dev/role-based-access-control-in-next-js-with-nextauth-b438fe59eeeb)
+- [Middleware for RBAC in Next.js 15 App Router](https://www.jigz.dev/blogs/how-to-use-middleware-for-role-based-access-control-in-next-js-15-app-router)
+- [Multi-Step Form with Next.js + React Hook Form + Zod](https://kodaschool.com/blog/build-a-multistep-form-in-next-js-powered-by-react-hook-form-and-zod)
+- [Multi-Step Forms in SaaS Kits](https://makerkit.dev/docs/next-supabase-turbo/components/multi-step-forms)
+- [Audit Trail for NextAuth.js](https://pangea.cloud/blog/integrate-an-audit-trail-for-nextauthjs-in-a-few-lines-of-code/)
+- [Salesforce Versioning and Lifecycle Management](https://trailhead.salesforce.com/content/learn/modules/industries-epc-foundations/explore-versioning-and-lifecycle-management)
+- [SaaS Product Catalog Strategy - Zuora](https://www.zuora.com/guides/saas-product-catalog-strategy/)
+- [Vercel SaaS Starter Template](https://vercel.com/templates/next.js/next-js-saas-starter)
+- Existing v1.0 codebase analysis (HIGH confidence -- direct code review)
+- PROJECT.md requirements and constraints (HIGH confidence -- project specification)

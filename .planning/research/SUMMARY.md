@@ -1,181 +1,210 @@
 # Project Research Summary
 
-**Project:** FTAG KI-Angebotserstellung v2 (Multi-Pass Validation)
-**Domain:** AI-powered construction tender analysis with product catalog matching (door industry, Swiss/German market)
+**Project:** FTAG KI-Angebotserstellung v2.0 SaaS Platform
+**Domain:** B2B SaaS web platform wrapping an existing Python/FastAPI AI tender analysis pipeline
 **Researched:** 2026-03-10
 **Confidence:** HIGH
 
 ## Executive Summary
 
-This project upgrades an existing AI-assisted offer-creation tool for Frank Türen AG from a single-pass extraction system to a multi-pass validation pipeline. The v1 system proved the concept but had a critical flaw: single-pass document parsing missed 10-30% of door positions, which directly translates to lost revenue and compliance failures in the construction tendering context. The v2 approach resolves this by introducing a two-stage extraction (structural column parsing + Claude AI semantic pass), followed by AI product matching with an adversarial double-check pass and optional triple-check for low-confidence results. The entire system already exists in skeleton form; v2 is a focused upgrade of the AI pipeline and output format, not a rewrite.
+The v2.0 milestone transforms a working single-user local tool into a multi-user B2B SaaS platform. The core AI pipeline — multi-pass document extraction, adversarial matching against 891 FTAG products, gap analysis, and Excel generation — is complete in v1.0 and stays untouched. The new work is entirely the SaaS wrapper: a Next.js 16 frontend, authentication with four-role RBAC, persistent file storage, project management, and a professional results UI. The recommended architecture is a Backend-for-Frontend (BFF) pattern: Next.js on Vercel handles auth, UI, DB, and file storage; the existing Python/FastAPI backend deploys to Railway and owns all AI processing. The browser never calls the Python backend directly — every request passes through authenticated Next.js API routes.
 
-The recommended implementation keeps the existing FastAPI + Python stack with targeted dependency upgrades: `anthropic` SDK from 0.49 to 0.84+ to unlock grammar-enforced structured outputs via `messages.parse()`, and `pymupdf4llm` from 0.0.17 to 0.3.4 for improved table detection in construction tender PDFs. The core architectural pattern is Pydantic-first: every Claude API call returns a validated Pydantic model, eliminating JSON parsing failures and retry logic. Batching 5-10 requirements per API call reduces the 500-position worst case from 500 sequential calls to 50-100 batched calls, cutting analysis time from over 16 minutes to 2-4 minutes.
+The recommended stack is Next.js 16 with the App Router, Better Auth (the official successor to NextAuth.js/Auth.js after the teams merged in September 2025) with a Prisma 7 adapter, Neon Postgres (which Vercel Postgres transitioned to in Q4 2024–Q1 2025), Vercel Blob for file storage, Tailwind CSS 4 with CSS-first configuration, and shadcn/ui CLI v4 for components. The four-role system (Admin/Manager/Analyst/Viewer) maps directly to Better Auth's RBAC plugin. Total feature scope is estimated at 36–49 development days for the full platform, organized into six phases.
 
-The key risks are concentrated in two areas: (1) structured output schema design — making fields too rigid forces Claude to hallucinate values when source documents don't contain the information, so all extraction fields except `position` and `beschreibung` must be Optional; and (2) adversarial pass calibration — the second AI call that challenges matches must be tuned against known v1 data to hit a 15-30% rejection rate, otherwise it either rubber-stamps everything or blocks the pipeline entirely. Both risks are addressable through prompt engineering and empirical validation against existing v1 output data before deploying to production.
+The central technical risk is that Vercel serverless functions cannot host long-running AI analysis (2–10 minutes), have unreliable SSE streaming, and enforce a hard 4.5 MB request body limit. Each constraint has a concrete mitigation: an async job pattern for analysis dispatch, direct Python-to-browser SSE bypassing Vercel entirely, and client-side upload to Vercel Blob via presigned URLs. Defense-in-depth authentication is non-negotiable given CVE-2025-29927 (the March 2025 Next.js middleware authorization bypass).
 
 ## Key Findings
 
 ### Recommended Stack
 
-The v1 tech stack is sound and requires only targeted upgrades. The core runtime (Python 3.12+, FastAPI, uvicorn, Pydantic 2.x) stays unchanged. The critical upgrade is `anthropic>=0.84.0`, which enables `messages.parse()` — grammar-enforced structured outputs that make the model physically unable to produce invalid JSON. This eliminates the retry/parsing failure class of bugs that affected v1 AI calls. `pymupdf4llm>=0.3.4` provides materially better table detection for the construction tender PDFs that dominate the input format. For pre-filtering 891 catalog products to ~25 candidates before AI matching, `scikit-learn` TF-IDF is fast, sufficient, and already in the codebase. Technologies to explicitly avoid: LangChain/LlamaIndex (unnecessary abstraction for a 891-product catalog), sentence-transformers (GPU overhead, TF-IDF sufficient at current catalog size), Celery+Redis (overkill for 1-5 tenders/day), and Ollama (explicitly out of scope — Claude-only per project constraints).
+The stack is strongly opinionated toward the Vercel ecosystem to minimize operational overhead for a small internal team. Next.js 16 is the current stable release (October 2025), with Turbopack enabled by default, the React Compiler built in, and `proxy.ts` replacing the now-deprecated `middleware.ts`. Better Auth supersedes the NextAuth.js/Auth.js path; Auth.js receives security patches only going forward. Prisma 7 dropped its Rust engine and is now pure TypeScript with 3x faster queries and an official Better Auth adapter.
 
 **Core technologies:**
-- `anthropic>=0.84.0`: Claude API SDK — `messages.parse()` provides grammar-enforced Pydantic output, eliminates parsing failures
-- `pymupdf4llm>=0.3.4`: PDF-to-Markdown — major table detection improvement critical for construction tender formats
-- `pdfplumber>=0.11.9`: Table extraction fallback — best-in-class geometry-based table detection for edge cases
-- `scikit-learn>=1.6.0`: TF-IDF pre-filter — narrows 891 products to ~25 candidates per requirement before AI matching
-- `openpyxl==3.1.5`: Excel read + write — dual-purpose: reads product catalog AND generates 4-sheet output
-- `sse-starlette>=2.0.0`: SSE streaming — real-time progress during 2-10 minute analyses
-- `Claude Sonnet 4.6`: Primary model — extraction and initial matching passes (price/performance)
-- `Claude Opus 4.6`: Adversarial validator only — higher reasoning for the challenge pass; cost irrelevant per project constraints
+- Next.js 16 (App Router): Full-stack framework — Vercel-native, stable App Router, React 19, React Compiler
+- Better Auth: Authentication + 4-role RBAC — official successor to Auth.js, built-in Prisma adapter and RBAC plugin
+- Prisma 7: ORM + migrations — pure TypeScript engine, gold-standard migration tooling, official Better Auth adapter
+- Neon Postgres: Serverless PostgreSQL — Vercel Marketplace, scale-to-zero, database branching for preview deployments
+- Vercel Blob: File storage — presigned client uploads for large tender documents, server uploads for small files
+- Tailwind CSS 4: Utility CSS — CSS-first `@theme` configuration for FTAG Rot/Weiss design system (no tailwind.config.js)
+- shadcn/ui CLI v4: UI components — copies source into codebase for full FTAG brand control, built on Radix UI
+- Zustand 5: Client state only (wizard steps, UI toggles) — React Query owns all server state
+- React Query 5: Server state management — all API calls, caching, optimistic updates, background refetching
+- Railway.app: Python/FastAPI deployment — persistent volumes for SQLite and product catalog, no 60-second timeout
+
+Do NOT use: NextAuth.js/Auth.js, Next.js 15, `middleware.ts`, `tailwind.config.js`, Vercel Python Functions, Redux, moment.js, or tRPC.
 
 ### Expected Features
 
-The feature set has a clear three-tier structure. Foundation features address v1's critical weaknesses (missed positions, opaque matches). Validation layer features are the v2 differentiator (adversarial AI checking). Polish features complete the user experience but are not blocking.
+All v1.0 AI pipeline features (extraction, matching, gap analysis, Excel generation) are already built and are out of scope for v2.0. The platform adds a professional SaaS layer on top.
 
 **Must have (table stakes):**
-- Multi-pass document analysis (minimum 2 passes: structural + AI semantic) — this is the core v1 fix; single-pass misses 10-30% of positions
-- Complete requirement extraction with zero missed positions — one missed door position = lost revenue or compliance failure
-- Multi-dimensional product matching with explicit confidence scores (0-100%) — sales team cannot trust opaque AI decisions
-- Match traceability (chain-of-thought reasoning per match) — exported to Excel "Hinweise" column; audit trail for compliance
-- Categorized gap analysis (Masse/Material/Norm/Zertifizierung/Leistung) — sales team needs to know exactly WHY a product fails
-- 4-sheet Excel output (Overview, Details, Gap Analysis, Executive Summary) — replaces existing 2-sheet format
-- SSE real-time progress streaming — analyses take 2-10 minutes, users abandon without progress feedback
+- Email/password authentication with 4-role RBAC (Admin/Manager/Analyst/Viewer)
+- Role-based route protection enforced at proxy.ts, server component, API route, and Python backend levels
+- Dashboard with KPI status cards and recent activity feed
+- Project list with search and breadcrumb navigation
+- Analysis file upload with drag-and-drop (3–15 files per tender)
+- Analysis progress indicator via SSE streaming from the Python backend
+- Results table with sorting, filtering, and confidence color coding (green/yellow/red)
+- Match detail expansion showing AI reasoning and confidence breakdown
+- Excel download from the results view
+- Skeleton loaders, toast notifications, and error boundaries throughout
 
-**Should have (competitive differentiators):**
-- Adversarial double-check (second Claude Opus call that actively tries to disprove each match) — the primary v2 innovation, reduces false positives by an estimated 15-30%
-- Triple-check for low-confidence (<95%) matches — majority voting between three AI perspectives
-- Gap severity categorization (Critical/Major/Minor) — "no fire-rated product exists" vs "5mm too narrow" require different escalation paths
-- Alternative product suggestions for gaps — "Product X matches except fire rating is EI30 instead of required EI60"
-- Cross-document enrichment — merge specs from multiple files (Excel door list + PDF spec + Word requirements) into unified position data
-- Plausibility check — post-analysis sanity check (all positions accounted for, no suspicious duplicates, no anomalous match patterns)
+**Should have (differentiators):**
+- 5-step Analysis Wizard (Upload > Catalog Select > Config > Analysis > Results) with per-step Zod validation
+- Product Catalog management — upload Excel, browse 891 products, search, edit individual products
+- Product Catalog versioning with rollback; each analysis records the catalog version used
+- Project sharing between users and project archiving with full history
+- Gap analysis drill-down (interactive, beyond what the Excel shows)
+- Admin user management (create/edit/deactivate users, assign roles)
+- Admin audit log (who ran which analysis, when, with what parameters)
+- System settings panel (confidence thresholds, API key config)
+- FTAG Rot/Weiss design system applied consistently across all pages
 
-**Defer indefinitely:**
-- Embedding-based semantic search — TF-IDF sufficient at 891 products; revisit at 10K+
-- Frontend redesign — minimal React frontend is acceptable per project scope; no dashboards or charts
-- Automatic pricing — too much implicit business logic; wrong prices create legal liability
-- User authentication — out of scope per PROJECT.md; internal team only
-- Local LLM / Ollama fallback — explicitly out of scope; Claude-only
+**Defer to v3.0+:**
+- Multi-tenancy, 2FA/MFA, dark mode, German/English i18n, PDF export, mobile-optimized layout, real-time collaboration, email notifications, custom dashboard widgets, file preview in browser
 
 ### Architecture Approach
 
-The recommended architecture is a linear pipeline with 8 discrete stages, each consuming and producing typed Pydantic models. A coordinator class (`AnalysisPipeline`) orchestrates stages and emits SSE progress events at each boundary. This replaces the v1 monolithic analysis function and makes each stage independently testable. Matching is parallelizable at the requirement level (each requirement matched independently via batched calls); extraction must be sequential to enable cross-document enrichment. The key insight driving component design is that Pydantic models serve dual duty as data contracts between pipeline stages AND as Claude output schemas via `messages.parse()`, so investing in good schema design early pays dividends throughout.
+The system uses a BFF (Backend-for-Frontend) pattern. Next.js API routes act as the auth boundary and orchestration layer between the browser and the Python AI backend. The browser never calls the Python backend directly. Files upload to Vercel Blob first (persistent, CDN-backed), then blob URLs pass to the Python backend for processing. The Python backend requires minimal changes: a shared API key replaces its current JWT auth for service-to-service calls, and the analyze endpoint gains a `blob_urls` parameter to download files from Vercel Blob. All AI pipeline services remain untouched.
+
+Two databases serve distinct purposes with clear ownership: Prisma/Neon Postgres owns users, projects, file references (blob URLs), audit log, and analysis metadata; Python's local SQLAlchemy/SQLite owns analysis job state, feedback corrections, and the product catalog cache. No entity is written by both systems.
 
 **Major components:**
-1. `services/extraction_engine.py` (NEW) — Multi-pass extraction: structural column parsing + AI semantic pass + deduplication/normalization; produces `list[ExtractedRequirement]`
-2. `services/matching_pipeline.py` (NEW) — Orchestrates TF-IDF pre-filter + AI matching + adversarial validation + triple-check; produces `list[MatchResult]`
-3. `services/gap_analyzer.py` (NEW) — Categorizes gaps by dimension and severity; generates alternative product suggestions; produces `list[GapReport]`
-4. `services/plausibility_checker.py` (NEW) — Post-analysis validation: duplicate detection, coverage check, statistical anomaly detection
-5. `services/ai_service.py` (ENHANCED) — All Claude API calls via `messages.parse()` with Pydantic models; token tracking; exponential backoff
-6. `services/result_generator.py` (ENHANCED) — 4-sheet Excel generation with color-coding, reasoning column, style object reuse
+1. Next.js App Router (Vercel) — UI rendering, routing, server components, auth, CRUD via Server Actions and Prisma
+2. Next.js API Routes / BFF Layer (Vercel) — auth enforcement, request validation, async job dispatch to Python, SSE proxy or polling fallback
+3. Better Auth (Vercel) — session management, JWT issuance, 4-role RBAC enforcement
+4. Prisma + Neon Postgres (Vercel) — users, projects, file references, audit log, analysis metadata
+5. Vercel Blob — persistent CDN-backed storage for uploaded tender documents and generated Excel results
+6. Python/FastAPI (Railway) — AI pipeline execution: document parsing, Claude API matching, gap analysis, Excel generation; local SQLite for job state
 
 ### Critical Pitfalls
 
-1. **Context window overflow on large tenders** — stuffing all 891 products + all requirements into one prompt causes API errors and silent data loss. Prevention: TF-IDF pre-filter to ~25 candidates per requirement built into the pipeline from day 1; batch 5-10 requirements per call; monitor `input_tokens` per call and alert if >150K.
+1. **Vercel serverless timeout kills AI analysis** — Never proxy long-running analysis through a Vercel function. Use async job pattern: Next.js sends "start" to Python (returns immediately with a job ID), Python processes asynchronously, the frontend polls or subscribes to SSE for progress. Test with a real 50+ position tender in staging before launch.
 
-2. **Adversarial pass miscalibration** — too lenient and it rubber-stamps everything (useless); too strict and it blocks the entire pipeline. Prevention: calibrate against 20-30 known v1 matches before deploying; target 15-30% rejection rate; track `adversarial_rejection_rate` as a monitored metric and alert if <5% or >50%.
+2. **SSE streaming breaks on Vercel** — Do not proxy SSE through Next.js API routes on Vercel. Have the browser connect to the Python backend (Railway) directly for SSE. This requires CORS on the Python side and `NEXT_PUBLIC_PYTHON_API_URL` in the Next.js environment. Implement a polling fallback if direct SSE proves unreliable.
 
-3. **Structured output schema forcing hallucination** — grammar-enforced output means Claude MUST fill every required field; if the document doesn't contain the information, Claude invents plausible-looking values (e.g., fabricating fire ratings). Prevention: all extraction fields except `position` and `beschreibung` must be `Optional`; add `confidence_per_field: dict[str, float]` to track per-field uncertainty; cross-check extracted values against source text.
+3. **4.5 MB upload body limit on Vercel functions** — Route all file uploads through Vercel Blob client-side upload: Next.js API route generates a presigned URL, the browser uploads directly to Blob, then the blob URL is passed to Python. Test with a 10 MB PDF in staging.
 
-4. **Deduplication failures in multi-pass extraction** — "T1.01", "Tuer 1.01", "Position 1.01" all refer to the same door; treated as duplicates they inflate match counts and confuse the sales team. Prevention: robust position number normalization (strip prefixes, normalize separators, compare numeric components); flag requirement pairs with >80% text similarity for review.
+4. **Middleware authorization bypass (CVE-2025-29927)** — Never rely on `proxy.ts` as the sole auth check. Implement defense-in-depth: proxy.ts for redirects, server component session checks for page-level auth, API route validation for data access, and Python backend API key plus role verification for AI operations.
 
-5. **Excel memory blow-up for large tenders** — openpyxl stores each cell style as a separate object; 500 rows x 54 cols x 4 sheets = 108K styled cells, potentially 500MB+ RAM. Prevention: create style objects once and reuse across cells; use `write_only` mode for data-heavy sheets; log a warning at 1000 positions.
+5. **Auth token not reaching Python backend** — Use JWT strategy in Better Auth. Pass the signed JWT to Python as a Bearer token. For direct browser-to-Python calls (SSE), the frontend must include the token. Python validates using the shared AUTH_SECRET. Pass user role in the JWT so Python can enforce role checks independently of the Next.js layer.
 
 ## Implications for Roadmap
 
-The feature dependency graph from FEATURES.md mandates a strict ordering: extraction must precede matching, matching must precede gap analysis, and gap analysis must precede Excel generation. The adversarial validation integrates into the matching stage rather than being a separate downstream step. This maps cleanly to 4 phases.
+Based on combined research, the recommended structure has six phases with a clear dependency chain. Auth is a hard prerequisite for everything. The BFF layer must be validated before any analysis UI is built on top of it. The analysis wizard cannot exist without working projects and file uploads. The dashboard is a pure consumer of other data and comes last.
 
-### Phase 1: Pydantic Foundation + Multi-Pass Extraction
+### Phase 1: Foundation (Auth + Database + Design System)
 
-**Rationale:** Pydantic models are the contracts between ALL pipeline stages. Defining them first prevents rework when later stages reveal schema inadequacies. Multi-pass extraction is v1's most critical weakness and the prerequisite for all downstream features — you cannot match what you did not extract.
-**Delivers:** Complete, deduplicated requirement lists from multi-format documents (PDF, XLSX, DOCX); all Pydantic schemas for the entire pipeline; `extraction_engine.py` with structural + AI semantic passes; position normalization and deduplication logic
-**Addresses:** Complete requirement extraction (table stakes), structured requirement model (prerequisite for all other phases)
-**Avoids:** Schema rigidity pitfall (design with Optional fields from the start); deduplication failures (normalization built in during extraction, not patched later)
-**Needs research:** No — patterns are well-documented and partially implemented in v1. No additional research phase needed.
+**Rationale:** Authentication is a hard prerequisite for every other feature — routing, data access, and the admin panel all depend on knowing who the user is. Establishing the Prisma schema up front prevents costly migration headaches. This phase has no dependencies and the highest documentation quality of any phase in the project.
+**Delivers:** Working Next.js 16 app with login/logout, 4-role RBAC via Better Auth, Prisma schema and Neon Postgres connection, FTAG Rot/Weiss design system tokens via Tailwind CSS 4 `@theme`, base layout shell with sidebar and breadcrumbs.
+**Addresses:** Authentication, role-based route protection, responsive desktop-first layout, loading states (FEATURES.md table stakes).
+**Avoids:** Role not in JWT/session (use Better Auth JWT strategy with callbacks in auth.config.ts); middleware-only auth (defense-in-depth from day one); Prisma migration failures (configure pooled + direct connection strings before first deploy to Vercel).
 
-### Phase 2: Product Matching Pipeline + Adversarial Validation
+### Phase 2: Python Backend Integration (BFF + Service Auth)
 
-**Rationale:** Matching is the core value proposition. The adversarial double-check must be integrated into the matching pipeline (not added afterward) because its revised confidence scores feed into gap severity categorization in Phase 3. Building matching and adversarial validation together avoids a rework cycle.
-**Delivers:** TF-IDF pre-filter reducing 891 products to ~25 candidates; AI matching with multi-dimensional confidence scores; adversarial Claude Opus pass challenging all matches; triple-check for <95% confidence results; `matching_pipeline.py` with full validation chain
-**Uses:** `anthropic>=0.84.0` `messages.parse()` for both matching and adversarial calls; `scikit-learn` TF-IDF; `MatchResult` and `AdversarialResult` Pydantic models from Phase 1
-**Implements:** `matching_pipeline.py` (new); enhanced `ai_service.py`; adversarial validation with `AdversarialResult` Pydantic model
-**Avoids:** Context overflow (TF-IDF pre-filter is a gate, not an optimization); adversarial miscalibration (calibration sprint against v1 data is the first task of this phase, before implementation)
-**Needs research:** Adversarial prompt calibration strategy — requires empirical testing against real v1 match data before the main implementation begins. Recommend a dedicated calibration sub-task at phase start.
+**Rationale:** All user-facing features from Phase 3 onward require a working Next.js-to-Python connection. Establishing the BFF proxy layer and shared API key auth early means integration failures surface before any UI is built around them. SSE reliability is the highest-uncertainty question in the project — it must be answered here, not discovered during the analysis wizard build.
+**Delivers:** API key middleware on Python backend, Next.js API route proxy for every Python endpoint, SSE proxy validation or confirmed polling fallback, health check endpoint, service-to-service connectivity verified in staging with real domains.
+**Uses:** `PYTHON_API_KEY` shared secret, `NEXT_PUBLIC_PYTHON_API_URL` for client-side SSE, async job dispatch pattern (STACK.md patterns).
+**Implements:** BFF pattern, shared auth boundary, async job ID flow (ARCHITECTURE.md patterns).
+**Avoids:** Proxying long-running calls through Vercel functions; SSE buffering on Vercel (validate here, not later); CORS misconfiguration (configure Python CORS for production domains in this phase).
 
-### Phase 3: Gap Analysis + 4-Sheet Excel Output
+### Phase 3: File Handling + Project Management
 
-**Rationale:** Gap analysis consumes validated match results with finalized confidence scores from Phase 2. The 4-sheet Excel is the final deliverable and depends on requirements (Phase 1), matches (Phase 2), and gaps (Phase 3). Building the output format before all inputs are stable causes rework.
-**Delivers:** Categorized gap analysis (Masse/Material/Norm/Zertifizierung/Leistung dimensions); gap severity ratings (Critical/Major/Minor); alternative product suggestions for each gap; 4-sheet Excel with color-coding (green/yellow/red), reasoning column, and executive summary sheet; `gap_analyzer.py` (new); enhanced `result_generator.py`
-**Addresses:** Gap analysis (table stakes), 4-sheet output (table stakes), gap severity categorization (differentiator), alternative product suggestions (differentiator)
-**Avoids:** Excel memory blow-up (style object reuse and write_only mode implemented from the start, not added as an optimization after OOM)
-**Needs research:** No — openpyxl patterns are thoroughly documented; gap taxonomy is domain knowledge already present in the team.
+**Rationale:** Projects are the container for everything else. The analysis wizard (Phase 4) needs projects to exist before it can create analyses. File upload must be built before the wizard to validate the Vercel Blob client-side upload pattern against real tender documents before the wizard depends on it working.
+**Delivers:** Vercel Blob integration with client-side upload for files over 4.5 MB, project CRUD (create/list/search/archive), project detail page, project sharing between users, Python backend modified to accept `blob_urls` parameter.
+**Addresses:** Project list with search, drag-and-drop file upload, project archiving, project sharing (FEATURES.md).
+**Avoids:** 4.5 MB body limit — client-side Vercel Blob upload must be validated with real PDF/XLSX files here; file storage in Python filesystem — all files go to Vercel Blob, Python downloads from blob URLs.
 
-### Phase 4: Cross-Document Enrichment + Plausibility + Polish
+### Phase 4: Analysis Wizard + Results View
 
-**Rationale:** Cross-document enrichment is the highest-complexity item in the project (position-to-spec mapping across document types is genuinely ambiguous) and improves quality rather than enabling core functionality. Plausibility check and chain-of-thought export are low-effort polish. All Phase 4 work is additive — it enhances Phase 1-3 outputs without changing pipeline contracts.
-**Delivers:** Position-to-spec mapping that merges requirements across Excel door lists, PDF specifications, and Word documents; `plausibility_checker.py` with duplicate detection, coverage validation, and anomaly detection; chain-of-thought reasoning exported to Excel "Hinweise" column; per-position SSE progress updates (not just per-stage)
-**Addresses:** Cross-document enrichment (differentiator), plausibility check (differentiator), chain-of-thought export (differentiator)
-**Avoids:** SSE connection drops on long analyses (keepalive heartbeats every 15-20 seconds verified); unit normalization errors (AI explicitly extracts unit alongside value, normalizes to mm)
-**Needs research:** Cross-document position-to-spec mapping strategy is the highest-ambiguity design decision in the project. Sparse prior art for this specific domain combination. Recommend a focused design research task before Phase 4 implementation.
+**Rationale:** This is the core product workflow and delivers the primary user value. It depends on all three prior phases. The 5-step wizard with SSE progress and the results table with confidence color coding are the daily-use path for the sales team.
+**Delivers:** 5-step Analysis Wizard with per-step Zod validation (Upload > Catalog Select > Config > Analysis Start > Results), SSE progress display (or polling fallback confirmed in Phase 2), results table with sort/filter/confidence color coding, match detail expansion with AI reasoning, gap analysis drill-down, Excel download.
+**Uses:** Zustand wizard state store, React Query mutations for API calls, shadcn/ui Table and Dialog components, recharts for confidence distribution (STACK.md).
+**Addresses:** Analysis wizard, wizard validation, SSE progress, results table, match detail, gap drill-down, Excel download, confidence color coding (FEATURES.md).
+**Avoids:** Stale analysis status data (use `force-dynamic` on results pages; poll with React Query); `NEXT_PUBLIC_` prefix discipline for environment variables the browser needs; dual sources of truth for analysis status (Prisma owns status metadata, Python owns result data — Next.js polls Python for completion and writes the outcome back to Prisma).
+
+### Phase 5: Product Catalog Management
+
+**Rationale:** Catalog management is a lower-frequency workflow used by Managers and Admins. It depends on auth and the database schema but not on the analysis wizard. Building it after the wizard means catalog versioning can be shaped by what the wizard actually needs from a catalog record (catalog ID, version, blob URL).
+**Delivers:** Catalog upload from Excel, product browse/search across 891 products, product edit, catalog versioning with rollback, version displayed on each analysis result.
+**Addresses:** Catalog CRUD, catalog versioning, catalog search (FEATURES.md differentiators).
+**Avoids:** Dual sources of truth for catalog — Prisma owns version metadata and blob URL; Python owns the in-memory catalog and TF-IDF index. Define a clear reload trigger (a Next.js API call to a Python `/admin/reload-catalog` endpoint) so catalog version changes are reflected without a Railway restart.
+
+### Phase 6: Admin Panel + Dashboard + Polish
+
+**Rationale:** The dashboard is a consumer of all other data models and cannot show meaningful KPIs until analyses, projects, and users exist. The admin panel is standard CRUD and is low risk. Polish (keyboard shortcuts, activity feed, system settings) is additive and does not block shipping the product.
+**Delivers:** Dashboard with KPI status cards and activity feed, admin user management (create/edit/deactivate, role assignment), admin audit log viewer, system settings panel, keyboard shortcuts for power users.
+**Addresses:** Dashboard, status cards, activity feed, admin user management, audit log, system settings (FEATURES.md).
+**Avoids:** Audit log gaps — Python backend must emit audit events to Postgres; define this contract in Phase 2 even though the UI arrives in Phase 6. Role hierarchy not enforced in Python — verify Python checks roles from the JWT in Phase 2; Phase 6 only adds the management UI.
 
 ### Phase Ordering Rationale
 
-- Pydantic schemas before everything else: they define the contracts between all pipeline stages; schema changes after stages are built cause cascading rework
-- Extraction before matching: fundamental data dependency; incomplete extraction means permanently missed revenue
-- Adversarial validation with matching (Phase 2, not Phase 3): adversarial confidence scores feed into gap severity; splitting them creates a two-pass rework cycle
-- Gap analysis and Excel together (Phase 3): gap data is the missing input to the complete Excel format; building Excel structure before gap data is stable means rewriting the gap sheets
-- Phase 4 explicitly last and additive: each feature enhances existing outputs without changing pipeline contracts; Phase 3 can ship as a complete product while Phase 4 proceeds
+- Auth before everything: Better Auth + Prisma schema is a hard dependency for all data access and role-protected routing. No feature can be built without identity.
+- BFF before UI: Validating the Next.js-to-Python connection (including SSE reliability and the async job pattern) in isolation prevents discovering integration failures inside complex UI work. Phase 2 is a proof-of-concept phase.
+- Projects before wizard: The analysis wizard creates analyses that belong to projects; the data model dependency is direct.
+- File upload before wizard: The 4.5 MB Vercel body limit pitfall must be resolved with real tenant files before the wizard depends on working uploads. Discovering this in Phase 4 would cause a mid-wizard refactor.
+- Wizard before catalog management: The wizard is the daily-use path; catalog management is a low-frequency admin task. Build high-value paths first.
+- Dashboard last: It is a pure consumer of other data models. No other feature depends on it.
 
 ### Research Flags
 
-Phases needing deeper research during planning:
-- **Phase 2 (Adversarial Validation):** Adversarial prompt calibration requires empirical testing against v1 match data. The target rejection rate (15-30%) is a research-derived estimate; the actual baseline from v1 is unknown. Recommend a calibration sub-task as the first item in Phase 2 planning.
-- **Phase 4 (Cross-document Enrichment):** Position-to-spec mapping across document types is the highest-complexity item in the project. The core challenge — linking a requirement in a PDF to a door position in an Excel file by position number, room, or floor — has no well-documented solution for this domain. Needs a focused design research task.
+Phases needing deeper research or a spike task during planning:
 
-Phases with standard patterns (can skip research-phase):
-- **Phase 1 (Multi-Pass Extraction):** `messages.parse()` has official Anthropic SDK documentation; TF-IDF pre-filter already implemented in v1; Pydantic schema design is well-understood. No new technology bets.
-- **Phase 3 (Gap Analysis + Excel):** openpyxl is thoroughly documented including write_only mode and style reuse; gap taxonomy is domain knowledge; no external API dependencies introduced.
+- **Phase 2 (BFF + SSE):** SSE proxying through Vercel has known reliability issues documented in multiple community sources (2026 articles). The decision between SSE proxy, direct browser-to-Python SSE, or polling fallback needs a working proof-of-concept — not just a plan. Recommend a spike task as the first item in Phase 2 before any other work.
+- **Phase 4 (Analysis Wizard state shape):** Zustand wizard state across 5 steps with React Query mutations and SSE subscription is a non-trivial design problem. Underspecifying this leads to mid-phase refactors. Recommend a state design document at Phase 4 start before any component code is written.
+- **Phase 5 (Catalog reload trigger):** The interaction between Prisma catalog version records and the Python in-memory catalog reload is unspecified. The API contract for triggering a Python reload must be defined before Phase 5 implementation begins.
+
+Phases with well-documented standard patterns (skip research-phase):
+
+- **Phase 1 (Auth + DB):** Better Auth + Prisma + Neon is an officially documented, fully supported path with high-confidence sources. No technology bets.
+- **Phase 3 (Projects + File Upload):** Vercel Blob client upload is thoroughly documented in official Vercel docs; project CRUD with Prisma is standard. Low risk.
+- **Phase 6 (Admin + Dashboard):** User management CRUD and dashboard KPI cards are standard B2B SaaS patterns. recharts + Server Components is well-understood.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All technologies already in use in v1 or have official documentation. Version upgrades are minor SDK bumps. No new technology bets. |
-| Features | HIGH | Feature set derived from direct v1 codebase analysis + domain research + PROJECT.md requirements. The gaps are known and measurable from v1 error rates. |
-| Architecture | HIGH | Pipeline pattern is well-established for multi-stage AI processing. Pydantic-first is the official Claude SDK recommendation. Component boundaries derived from v1 service structure. |
-| Pitfalls | HIGH | Five critical pitfalls all derived from v1 failure modes or official documentation constraints (context limits, openpyxl memory, structured output grammar). Not theoretical — observed or documented risks with known mitigations. |
+| Stack | HIGH | All technology choices backed by official release notes and docs. Version pinning is specific with explicit rationale. One caveat: Next.js 16 is recent (stable Oct 2025); minor ecosystem library compatibility gaps may exist. |
+| Features | HIGH | Feature list derived from direct v1.0 codebase analysis plus PROJECT.md requirements. Table stakes and anti-features clearly scoped. Role permission matrix is complete and internally consistent. |
+| Architecture | HIGH | BFF pattern is well-established. All key constraints (Vercel timeouts, body limits, two-database split, file flow) are backed by official documentation and real Vercel platform limits. |
+| Pitfalls | HIGH | Every critical pitfall is sourced from official docs, CVE advisories, or verified community findings with detection criteria. The SSE reliability question (Pitfall 2) carries the most uncertainty and is the only item requiring empirical validation. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Adversarial rejection rate baseline:** Need to run v1 matches through a prototype adversarial prompt to establish the actual baseline rejection rate before tuning for the 15-30% target. Cannot be determined from research alone — requires empirical testing with real v1 data.
-- **Token cost per tender:** Research estimates $15-50 per tender (Sonnet + Opus combined) but this depends on actual tender sizes from FTAG customers. Validate with 3-5 real tenders from v1 before committing to the full validation pipeline cost model.
-- **Seed feedback data quality:** v1 has accumulated matching feedback in `data/matching_feedback.json` but its quality and coverage of edge cases is unknown. Audit at Phase 1 start to determine whether a curated seed set of 20-30 examples needs to be created manually.
-- **pymupdf4llm 0.3.4 table quality on FTAG documents:** Version 0.3.4 claims major table detection improvements over 0.0.17 but this needs verification on actual FTAG construction tender PDFs (Swiss/German market formatting conventions may differ from test datasets).
-- **GAEB/IFC parser scope confirmation:** Research flagged GAEB as low priority for v2 (most Swiss tenders are PDF/Excel). Confirm with FTAG before Phase 1 whether any specific customers require GAEB X83 support before scoping it out entirely.
+- **SSE reliability on Vercel:** Research is clear that Vercel serverless does not reliably sustain SSE. The exact solution (direct browser-to-Python SSE vs. polling fallback) needs a working proof-of-concept in Phase 2. Document the chosen pattern in the Phase 2 plan before any Phase 4 work begins.
+- **Python audit event emission:** How the Python backend emits audit events to the Postgres audit log (direct DB write vs. Next.js API callback) is unresolved. Define the contract during Phase 2 BFF design even though the audit log UI is Phase 6 work.
+- **Catalog reload trigger mechanism:** When a new catalog version is uploaded via the Next.js platform, Python's in-memory TF-IDF index and product catalog must reload. The reload mechanism (a Python admin endpoint, scheduled polling, or Railway restart) is unspecified. Address in Phase 5 planning.
+- **Railway persistent volume configuration:** The Python backend uses SQLite (analysis job state) and JSON files (feedback corrections). Confirm Railway persistent volume configuration before Phase 2 deployment to avoid data loss on container restarts.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Existing v1 codebase (direct analysis) — all service implementations, existing pitfall mitigations, current version numbers, known failure modes
-- [Anthropic Python SDK - PyPI](https://pypi.org/project/anthropic/) — version 0.84.0, `messages.parse()` availability confirmed
-- [Structured Outputs - Claude API Docs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) — schema constraints, grammar enforcement behavior, schema design requirements (no $ref, additionalProperties: false, all fields required or Optional pattern)
-- [pymupdf4llm - PyPI](https://pypi.org/project/pymupdf4llm/) — table detection improvements in 0.3.4 vs 0.0.17
-- [pdfplumber - PyPI](https://pypi.org/project/pdfplumber/) — version 0.11.9 bug fixes
-- [openpyxl documentation](https://openpyxl.readthedocs.io/) — write_only mode, style object reuse, memory optimization
-- [FastAPI SSE documentation](https://fastapi.tiangolo.com/tutorial/server-sent-events/) — native SSE since 0.135.0
+- Next.js 16 Release Blog and Upgrade Guide — stable features, proxy.ts migration, React Compiler
+- Better Auth documentation and Auth.js merger announcement (September 2025) — official successor status, RBAC plugin
+- Prisma 7 Release Blog — pure TypeScript engine, Neon adapter, Better Auth adapter
+- Neon Postgres Vercel transition guide — Vercel Postgres transitioned to Neon Q4 2024–Q1 2025
+- Vercel Blob documentation — client upload pattern, 4.5 MB API route limit, presigned URLs
+- Tailwind CSS v4.0 blog — CSS-first config, Oxide engine, `@theme` syntax
+- CVE-2025-29927 analysis (ProjectDiscovery) — middleware authorization bypass, detection, remediation
+- Vercel Functions Limitations documentation — timeout limits, body size limits, Fluid Compute
+- fastapi-nextauth-jwt PyPI — purpose-built JWT validation for FastAPI + NextAuth integration
+- Prisma deploy to Vercel documentation — directUrl for migrations, serverless connection pooling
+- Railway FastAPI deployment guide — persistent volumes, Nixpacks, gunicorn + uvicorn workers
+- Existing v1.0 codebase (direct analysis) — all service implementations, current patterns, known issues
+- PROJECT.md requirements specification (direct analysis) — scope boundaries, deferred features
 
 ### Secondary (MEDIUM confidence)
-- [Tenderbolt - Best AI solutions for tenders 2025](https://www.tenderbolt.ai/en/post/les-meilleures-solutions-ia-de-reponse-aux-appels-doffres-en-2025) — industry feature benchmarking for AI tender tools
-- [Altura - AI in tender and RFP management 2025](https://altura.io/en/blog/ai-tendermanagement) — feature expectations and trust requirements in AI tender tools
-- [iFieldSmart - AI Scope Gap Analysis for Construction](https://www.ifieldsmart.com/blogs/ai-scope-gap-analysis-for-construction-teams/) — gap severity taxonomy applicable to door/construction domain
-- [Multi-Agent Validation Architectures](https://collabnix.com/multi-agent-and-multi-llm-architecture-complete-guide-for-2025/) — adversarial validation pattern in multi-agent AI systems
-- [Anthropic SDK retry handling](https://github.com/anthropics/anthropic-sdk-python) — built-in 429 retry since v0.50+
+- SSE streaming on Vercel fix article (January 2026) — `X-Accel-Buffering: no` header, buffering workarounds
+- Drizzle vs. Prisma comparison (makerkit.dev) — ORM decision rationale, migration friction trade-offs
+- Better Auth vs. NextAuth comparison (betterstack.com) — auth library decision rationale
+- Next.js + FastAPI GitHub discussions (#43724) — community integration patterns
+- Prisma serverless connection pooling (dev.to) — PgBouncer, connection_limit=1 strategy
+- Auth.js RBAC guide — role callback configuration, JWT strategy requirements
 
-### Tertiary (LOW confidence — validate during implementation)
-- [arXiv - Confidence alignment with correctness for LLM error detection](https://arxiv.org/html/2603.06604) — theoretical basis for confidence score calibration; must be applied empirically against real FTAG tenders
-- [arXiv - Fact-checking with LLMs via probabilistic certainty](https://arxiv.org/html/2601.02574) — adversarial prompting theory; needs domain-specific adaptation for construction product matching
+### Tertiary (LOW confidence)
+- shadcn/ui CLI v4 changelog (March 2026) — very recent release, limited community validation time; verify component API before use
 
 ---
 *Research completed: 2026-03-10*
