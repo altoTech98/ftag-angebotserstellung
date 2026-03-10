@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Phase 2 context gathered
-last_updated: "2026-03-10T13:05:08.265Z"
-last_activity: 2026-03-10 — Completed 01-02 (Document Parsers)
+status: in-progress
+stopped_at: Completed 02-01 (Extraction Foundations)
+last_updated: "2026-03-10T13:28:24Z"
+last_activity: 2026-03-10 — Completed 02-01 (Extraction Foundations)
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 10
+  total_plans: 3
+  completed_plans: 3
+  percent: 15
 ---
 
 # Project State
@@ -21,29 +21,30 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** 100% korrekte Zuordnung jeder Anforderung zum richtigen Produkt — oder eine explizite, begründete Gap-Meldung.
-**Current focus:** Phase 1 - Document Parsing & Pipeline Schemas
+**Current focus:** Phase 2 - Multi-Pass Extraction
 
 ## Current Position
 
-Phase: 1 of 8 (Document Parsing & Pipeline Schemas) -- COMPLETE
-Plan: 2 of 2 in current phase
-Status: Phase 1 Complete
-Last activity: 2026-03-10 — Completed 01-02 (Document Parsers)
+Phase: 2 of 8 (Multi-Pass Extraction)
+Plan: 1 of 3 in current phase
+Status: Plan 02-01 Complete
+Last activity: 2026-03-10 — Completed 02-01 (Extraction Foundations)
 
-Progress: [█░░░░░░░░░] 10%
+Progress: [██░░░░░░░░] 15%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 5.5min
-- Total execution time: 0.18 hours
+- Total plans completed: 3
+- Average duration: 5.7min
+- Total execution time: 0.28 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 2/2 | 11min | 5.5min |
+| 02 | 1/3 | 6min | 6min |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -67,6 +68,9 @@ Recent decisions affecting current work:
 - 01-02: Imported conftest_v2 fixtures via wildcard import in conftest.py
 - 01-02: XLSX parser saves workbook after unmerge then re-reads with pandas
 - 01-02: Router uses lazy imports for parsers
+- 02-01: Pass 1 uses pipe-delimited text from XLSX parser (canonical field names)
+- 02-01: Dedup pre-filter uses exact positions_nr match; AI clustering separate
+- 02-01: All prompts in German matching domain language
 
 ### Pending Todos
 
@@ -79,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T13:05:08.259Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-multi-pass-extraction/02-CONTEXT.md
+Last session: 2026-03-10T13:28:24Z
+Stopped at: Completed 02-01 (Extraction Foundations)
+Resume file: .planning/phases/02-multi-pass-extraction/02-01-SUMMARY.md
