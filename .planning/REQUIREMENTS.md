@@ -1,0 +1,113 @@
+# Requirements: FTAG KI-Angebotserstellung v2
+
+**Defined:** 2026-03-10
+**Core Value:** 100% korrekte Zuordnung jeder Anforderung zum richtigen Produkt — oder eine explizite, begründete Gap-Meldung.
+
+## v1 Requirements
+
+Requirements for initial release. Each maps to roadmap phases.
+
+### Dokument-Analyse
+
+- [ ] **DOKA-01**: System parst PDF-Dateien und extrahiert vollständigen Text mit Tabellenstruktur
+- [ ] **DOKA-02**: System parst DOCX-Dateien und extrahiert Text mit Formatierung
+- [ ] **DOKA-03**: System parst XLSX-Dateien und erkennt Türlisten-Spaltenstruktur automatisch
+- [ ] **DOKA-04**: System akzeptiert mehrere Dateien pro Ausschreibung (PDF + Excel + DOCX gemischt)
+- [ ] **DOKA-05**: System führt Multi-Pass-Analyse durch (Pass 1: strukturell, Pass 2: AI-semantisch, Pass 3: Cross-Reference-Validierung)
+- [ ] **DOKA-06**: System extrahiert ALLE technischen Anforderungen als einzelne Datenpunkte (Maße, Material, Normen, Zertifizierungen, Leistungsdaten)
+- [ ] **DOKA-07**: System reichert Positionen mit Daten aus verschiedenen Dokumenten an (Cross-Document Enrichment: Excel-Türliste + PDF-Spezifikation + DOCX-Anforderungen)
+- [ ] **DOKA-08**: System erkennt und meldet Konflikte zwischen Dokumenten (z.B. unterschiedliche Brandschutzklassen in verschiedenen Dateien)
+
+### Produkt-Matching
+
+- [ ] **MATC-01**: System gleicht jede extrahierte Anforderung gegen den FTAG-Produktkatalog (~891 Produkte) ab
+- [ ] **MATC-02**: System bewertet jedes Match multi-dimensional (Maße, Brandschutz, Schallschutz, Material, Zertifizierung, Leistungsdaten)
+- [ ] **MATC-03**: System berechnet Konfidenz-Score (0-100%) pro Match mit Aufschlüsselung nach Dimension
+- [ ] **MATC-04**: System setzt Match-Schwellenwert bei 95%+ Konfidenz
+- [ ] **MATC-05**: System führt Adversarial Double-Check durch (zweiter AI-Call versucht aktiv jeden Match zu widerlegen)
+- [ ] **MATC-06**: System führt Triple-Check durch bei Konfidenz <95% (dritter AI-Durchlauf mit alternativem Prompt)
+- [ ] **MATC-07**: System begründet jeden Match mit Chain-of-Thought (Schritt-für-Schritt-Argumentation)
+- [ ] **MATC-08**: System listet bei mehreren möglichen Produkten alle auf mit Begründung
+- [ ] **MATC-09**: System integriert Feedback/Korrekturen aus früheren Analysen als Few-Shot-Examples
+
+### Gap-Analyse
+
+- [ ] **GAPA-01**: System erstellt detaillierte Gap-Analyse für jeden Nicht-Match (welche Eigenschaft weicht ab)
+- [ ] **GAPA-02**: System kategorisiert Gaps nach Dimension: Maße, Material, Norm, Zertifizierung, Leistung
+- [ ] **GAPA-03**: System bewertet Gap-Schweregrad: Kritisch (keine Lösung), Major (signifikante Abweichung), Minor (nahe am Match)
+- [ ] **GAPA-04**: System generiert AI-Vorschlag was sich ändern müsste damit ein Produkt passt
+- [ ] **GAPA-05**: System schlägt alternative Produkte vor die den Gap schließen könnten (mit Erklärung was noch abweicht)
+
+### Excel-Output
+
+- [ ] **EXEL-01**: System generiert Excel mit Sheet 1 "Übersicht" — alle Anforderungen mit Match-Status (Grün/Gelb/Rot)
+- [ ] **EXEL-02**: System generiert Excel mit Sheet 2 "Details" — Anforderung ↔ Produkt, Konfidenz, dimensionale Aufschlüsselung, Begründung
+- [ ] **EXEL-03**: System generiert Excel mit Sheet 3 "Gap-Analyse" — alle Nicht-Matches mit Gründen, Abweichungen, Schweregrad, Alternativen
+- [ ] **EXEL-04**: System generiert Excel mit Sheet 4 "Executive Summary" — Statistiken, Zusammenfassung, Empfehlungen
+- [ ] **EXEL-05**: System verwendet Farbcodierung: Grün = Match (95%+), Gelb = teilweise (60-95%), Rot = kein Match (<60%)
+- [ ] **EXEL-06**: Jede Entscheidungszelle enthält nachvollziehbare Begründung (WARUM so entschieden)
+
+### Qualitätssicherung
+
+- [ ] **QUAL-01**: System führt Ergebnis-Plausibilitätsprüfung am Ende durch (alle Positionen abgedeckt, keine Duplikate, keine verdächtigen Muster)
+- [ ] **QUAL-02**: System loggt jeden Analyseschritt (welche Anforderung, welcher Pass, welches Ergebnis)
+- [ ] **QUAL-03**: System zeigt Live-Fortschritt im Frontend (welcher Schritt läuft, welche Position wird verarbeitet)
+- [ ] **QUAL-04**: System gibt bei AI-Ausfall klare Fehlermeldung statt degradierter Ergebnisse
+
+### API & Integration
+
+- [ ] **APII-01**: POST /api/upload akzeptiert mehrere Dateien pro Ausschreibung
+- [ ] **APII-02**: POST /api/analyze startet Multi-Pass-Analyse mit SSE-Streaming für Fortschritt
+- [ ] **APII-03**: GET /api/analyze/status/{job_id} liefert detaillierten Fortschritt (Position X von Y, aktueller Pass)
+- [ ] **APII-04**: POST /api/offer/generate erstellt 4-Sheet Excel-Output
+- [ ] **APII-05**: GET /api/offer/{id}/download liefert generierte Excel-Datei
+- [ ] **APII-06**: POST /api/feedback speichert Matching-Korrekturen für zukünftige Analysen
+
+## v2 Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Erweiterte Dokument-Analyse
+
+- **DOKA-09**: GAEB/LV-Format Unterstützung (standardisiertes Leistungsverzeichnis)
+- **DOKA-10**: PDF-Plan/Zeichnungs-Analyse mit Computer Vision
+
+### Erweiterte Integration
+
+- **APII-07**: ERP-Anbindung (Bohr System) für Live-Preise
+- **APII-08**: Automatische Angebotserstellung mit Preiskalkulation
+
+### Frontend
+
+- **FRNT-01**: Modernes Dashboard mit Analyse-Historie
+- **FRNT-02**: Interaktive Ergebnis-Bearbeitung im Browser
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Ollama/Local-LLM Fallback | Nur Claude API — Genauigkeit vor Kosten |
+| Frontend-Redesign | Backend-Fokus, minimales UI reicht für Vertrieb |
+| Benutzer-Authentifizierung | Kleine interne Nutzung, kein externer Zugriff |
+| ERP-Integration | Separates Projekt, Excel reicht als Schnittstelle |
+| Embedding-basierte Suche | TF-IDF ausreichend bei 891 Produkten |
+| Automatische Preisfindung | Zu risikoreich, Vertrieb setzt Preise manuell |
+| Echtzeit-Kollaboration | Vertrieb arbeitet einzeln an Ausschreibungen |
+| PDF-Plan-Analyse | Erfordert spezialisierte CV-Modelle, unzuverlässig |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| (populated during roadmap creation) | | |
+
+**Coverage:**
+- v1 requirements: 28 total
+- Mapped to phases: 0
+- Unmapped: 28 ⚠️
+
+---
+*Requirements defined: 2026-03-10*
+*Last updated: 2026-03-10 after initial definition*
