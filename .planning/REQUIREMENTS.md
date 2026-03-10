@@ -51,14 +51,14 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **QUAL-01**: System führt Ergebnis-Plausibilitätsprüfung am Ende durch (alle Positionen abgedeckt, keine Duplikate, keine verdächtigen Muster)
 - [x] **QUAL-02**: System loggt jeden Analyseschritt (welche Anforderung, welcher Pass, welches Ergebnis)
-- [ ] **QUAL-03**: System zeigt Live-Fortschritt im Frontend (welcher Schritt läuft, welche Position wird verarbeitet)
+- [x] **QUAL-03**: System zeigt Live-Fortschritt im Frontend (welcher Schritt läuft, welche Position wird verarbeitet)
 - [x] **QUAL-04**: System gibt bei AI-Ausfall klare Fehlermeldung statt degradierter Ergebnisse
 
 ### API & Integration
 
 - [x] **APII-01**: POST /api/upload akzeptiert mehrere Dateien pro Ausschreibung
-- [ ] **APII-02**: POST /api/analyze startet Multi-Pass-Analyse mit SSE-Streaming für Fortschritt
-- [ ] **APII-03**: GET /api/analyze/status/{job_id} liefert detaillierten Fortschritt (Position X von Y, aktueller Pass)
+- [x] **APII-02**: POST /api/analyze startet Multi-Pass-Analyse mit SSE-Streaming für Fortschritt
+- [x] **APII-03**: GET /api/analyze/status/{job_id} liefert detaillierten Fortschritt (Position X von Y, aktueller Pass)
 - [x] **APII-04**: POST /api/offer/generate erstellt 4-Sheet Excel-Output
 - [x] **APII-05**: GET /api/offer/{id}/download liefert generierte Excel-Datei
 - [x] **APII-06**: POST /api/feedback speichert Matching-Korrekturen für zukünftige Analysen
@@ -129,11 +129,11 @@ Deferred to future release. Tracked but not in current roadmap.
 | EXEL-06 | Phase 7 | Complete |
 | QUAL-01 | Phase 8 | Complete |
 | QUAL-02 | Phase 8 | Complete |
-| QUAL-03 | Phase 8 | Pending |
+| QUAL-03 | Phase 8 | Complete |
 | QUAL-04 | Phase 8 | Complete |
 | APII-01 | Phase 2 | Complete |
-| APII-02 | Phase 8 | Pending |
-| APII-03 | Phase 8 | Pending |
+| APII-02 | Phase 8 | Complete |
+| APII-03 | Phase 8 | Complete |
 | APII-04 | Phase 7 | Complete |
 | APII-05 | Phase 7 | Complete |
 | APII-06 | Phase 4 | Complete |
