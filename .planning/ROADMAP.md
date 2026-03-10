@@ -48,11 +48,12 @@ Plans:
   3. Every technical requirement (dimensions, materials, fire ratings, certifications, performance data) is extracted as an individual data point with its source location
   4. Duplicate requirements from multiple passes are merged (e.g., "T1.01", "Tuer 1.01", "Position 1.01" resolve to one entry)
   5. POST /api/upload accepts multiple files per tender
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md — Pass 1 structural extraction, page chunking, dedup module, and prompt templates
+- [ ] 02-02-PLAN.md — V2 upload and analyze API endpoints with tender_id session management
+- [ ] 02-03-PLAN.md — Pass 2 AI semantic, Pass 3 cross-reference validation, pipeline orchestrator, and API wiring
 
 ### Phase 3: Cross-Document Intelligence
 **Goal**: Requirements are enriched with data from all uploaded documents, and contradictions between documents are surfaced before matching begins
@@ -154,7 +155,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Document Parsing & Pipeline Schemas | 2/2 | Complete   | 2026-03-10 |
-| 2. Multi-Pass Extraction | 0/2 | Not started | - |
+| 2. Multi-Pass Extraction | 0/3 | Not started | - |
 | 3. Cross-Document Intelligence | 0/1 | Not started | - |
 | 4. Product Matching Engine | 0/2 | Not started | - |
 | 5. Adversarial Validation | 0/2 | Not started | - |
