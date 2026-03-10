@@ -10,8 +10,8 @@ progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 10
-  completed_plans: 11
-  percent: 58
+  completed_plans: 12
+  percent: 65
 ---
 
 # Project State
@@ -25,19 +25,19 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 
 ## Current Position
 
-Phase: 5 of 8 (Adversarial Validation) - IN PROGRESS
-Plan: 1 of 2 in current phase
-Status: 05-01 Complete (Adversarial Debate Engine)
-Last activity: 2026-03-10 — Completed 05-01 (Adversarial Debate Engine)
+Phase: 5 of 8 (Adversarial Validation) - COMPLETED
+Plan: 2 of 2 in current phase
+Status: 05-02 Complete (Triple-Check Ensemble and Pipeline Wiring)
+Last activity: 2026-03-10 — Completed 05-02 (Triple-Check Ensemble and Pipeline Wiring)
 
-Progress: [██████░░░░] 58%
+Progress: [██████░░░░] 65%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
-- Average duration: 5.2min
-- Total execution time: 0.9 hours
+- Total plans completed: 12
+- Average duration: 5.3min
+- Total execution time: 1.0 hours
 
 **By Phase:**
 
@@ -47,7 +47,7 @@ Progress: [██████░░░░] 58%
 | 02 | 3/3 | 13min | 4.3min |
 | 03 | 3/3 | 16min | 5.3min |
 | 04 | 2/3 | 13min | 6.5min |
-| 05 | 1/2 | 7min | 7.0min |
+| 05 | 2/2 | 14min | 7.0min |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -100,6 +100,9 @@ Recent decisions affecting current work:
 - 05-01: Safety-critical weighting: Brandschutz 2x, Masse/Schallschutz 1.5x, Leistung 0.8x
 - 05-01: FOR+AGAINST parallel within semaphore slot, Semaphore(3) for Opus rate limits
 - 05-01: Adaptive verbosity CoT: hoch (>0.9, brief) vs niedrig (<=0.9, detailed)
+- 05-02: Triple-check reuses ForArgument schema for wider pool and inverted prompt outputs
+- 05-02: Wider pool top_k=80 for expanded candidate coverage beyond standard 50
+- 05-02: Candidates deduplicated by produkt_id, higher score preserved across approaches
 
 ### Pending Todos
 
@@ -112,6 +115,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T18:04:33Z
-Stopped at: Completed 05-01-PLAN.md
-Resume file: .planning/phases/05-adversarial-validation/05-01-SUMMARY.md
+Last session: 2026-03-10T18:14:20Z
+Stopped at: Completed 05-02-PLAN.md
+Resume file: .planning/phases/05-adversarial-validation/05-02-SUMMARY.md

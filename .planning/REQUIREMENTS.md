@@ -25,7 +25,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **MATC-03**: System berechnet Konfidenz-Score (0-100%) pro Match mit Aufschlüsselung nach Dimension
 - [x] **MATC-04**: System setzt Match-Schwellenwert bei 95%+ Konfidenz
 - [x] **MATC-05**: System führt Adversarial Double-Check durch (zweiter AI-Call versucht aktiv jeden Match zu widerlegen)
-- [ ] **MATC-06**: System führt Triple-Check durch bei Konfidenz <95% (dritter AI-Durchlauf mit alternativem Prompt)
+- [x] **MATC-06**: System führt Triple-Check durch bei Konfidenz <95% (dritter AI-Durchlauf mit alternativem Prompt)
 - [x] **MATC-07**: System begründet jeden Match mit Chain-of-Thought (Schritt-für-Schritt-Argumentation)
 - [x] **MATC-08**: System listet bei mehreren möglichen Produkten alle auf mit Begründung
 - [x] **MATC-09**: System integriert Feedback/Korrekturen aus früheren Analysen als Few-Shot-Examples
@@ -112,7 +112,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | MATC-03 | Phase 4 | Complete |
 | MATC-04 | Phase 4 | Complete |
 | MATC-05 | Phase 5 | Complete |
-| MATC-06 | Phase 5 | Pending |
+| MATC-06 | Phase 5 | Complete |
 | MATC-07 | Phase 5 | Complete |
 | MATC-08 | Phase 5 | Complete |
 | MATC-09 | Phase 4 | Complete |
