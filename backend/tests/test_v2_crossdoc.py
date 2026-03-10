@@ -484,7 +484,8 @@ class TestEnrichment:
 class TestConflictDetector:
     """Tests for cross-document conflict detection."""
 
-    def test_exact_conflict(self, conflicting_positions):
+    @pytest.mark.asyncio
+    async def test_exact_conflict(self, conflicting_positions):
         """Different values for same field -> FieldConflict created."""
         from v2.extraction.cross_doc_matcher import match_positions_across_docs
         from v2.extraction.conflict_detector import detect_and_resolve_conflicts
@@ -510,8 +511,8 @@ class TestConflictDetector:
         )]
 
         with patch("v2.extraction.conflict_detector._resolve_conflicts_with_ai",
-                    return_value=mock_resolution):
-            conflicts = detect_and_resolve_conflicts(
+                    new_callable=AsyncMock, return_value=mock_resolution):
+            conflicts = await detect_and_resolve_conflicts(
                 matches, conflicting_positions, client=None
             )
 
@@ -532,12 +533,13 @@ class TestConflictDetector:
         assert _classify_severity("farbe_ral") == ConflictSeverity.MINOR
         assert _classify_severity("oberflaeche") == ConflictSeverity.MINOR
 
-    def test_no_conflict_when_same_value(self):
+    @pytest.mark.asyncio
+    async def test_no_conflict_when_same_value(self):
         """Identical values -> no conflict."""
         from v2.extraction.cross_doc_matcher import match_positions_across_docs
         from v2.extraction.conflict_detector import detect_and_resolve_conflicts
         from v2.schemas.common import BrandschutzKlasse
-        from unittest.mock import patch
+        from unittest.mock import AsyncMock, patch
 
         pos_a = [ExtractedDoorPosition(
             positions_nr="1.01",
@@ -552,8 +554,8 @@ class TestConflictDetector:
         matches = match_positions_across_docs({"a.xlsx": pos_a, "b.pdf": pos_b})
 
         with patch("v2.extraction.conflict_detector._resolve_conflicts_with_ai",
-                    return_value=[]):
-            conflicts = detect_and_resolve_conflicts(
+                    new_callable=AsyncMock, return_value=[]):
+            conflicts = await detect_and_resolve_conflicts(
                 matches, pos_a + pos_b, client=None
             )
 
@@ -561,12 +563,13 @@ class TestConflictDetector:
         fire_conflicts = [c for c in conflicts if c.field_name == "brandschutz_klasse"]
         assert len(fire_conflicts) == 0
 
-    def test_no_conflict_when_one_none(self):
+    @pytest.mark.asyncio
+    async def test_no_conflict_when_one_none(self):
         """None vs value -> enrichment opportunity, not conflict."""
         from v2.extraction.cross_doc_matcher import match_positions_across_docs
         from v2.extraction.conflict_detector import detect_and_resolve_conflicts
         from v2.schemas.common import BrandschutzKlasse
-        from unittest.mock import patch
+        from unittest.mock import AsyncMock, patch
 
         pos_a = [ExtractedDoorPosition(
             positions_nr="1.01",
@@ -580,8 +583,8 @@ class TestConflictDetector:
         matches = match_positions_across_docs({"a.xlsx": pos_a, "b.pdf": pos_b})
 
         with patch("v2.extraction.conflict_detector._resolve_conflicts_with_ai",
-                    return_value=[]):
-            conflicts = detect_and_resolve_conflicts(
+                    new_callable=AsyncMock, return_value=[]):
+            conflicts = await detect_and_resolve_conflicts(
                 matches, pos_a + pos_b, client=None
             )
 

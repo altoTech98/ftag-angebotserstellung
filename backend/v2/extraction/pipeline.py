@@ -121,7 +121,7 @@ async def run_cross_doc_intelligence(
     possible_matches = [m for m in matches if not m.auto_merge]
 
     # Step 3: Detect and resolve conflicts on auto-merge matches
-    conflicts = detect_and_resolve_conflicts(
+    conflicts = await detect_and_resolve_conflicts(
         auto_merge_matches, all_positions, client=client
     )
 
