@@ -20,10 +20,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Produkt-Matching
 
-- [ ] **MATC-01**: System gleicht jede extrahierte Anforderung gegen den FTAG-Produktkatalog (~891 Produkte) ab
-- [ ] **MATC-02**: System bewertet jedes Match multi-dimensional (Maße, Brandschutz, Schallschutz, Material, Zertifizierung, Leistungsdaten)
-- [ ] **MATC-03**: System berechnet Konfidenz-Score (0-100%) pro Match mit Aufschlüsselung nach Dimension
-- [ ] **MATC-04**: System setzt Match-Schwellenwert bei 95%+ Konfidenz
+- [x] **MATC-01**: System gleicht jede extrahierte Anforderung gegen den FTAG-Produktkatalog (~891 Produkte) ab
+- [x] **MATC-02**: System bewertet jedes Match multi-dimensional (Maße, Brandschutz, Schallschutz, Material, Zertifizierung, Leistungsdaten)
+- [x] **MATC-03**: System berechnet Konfidenz-Score (0-100%) pro Match mit Aufschlüsselung nach Dimension
+- [x] **MATC-04**: System setzt Match-Schwellenwert bei 95%+ Konfidenz
 - [ ] **MATC-05**: System führt Adversarial Double-Check durch (zweiter AI-Call versucht aktiv jeden Match zu widerlegen)
 - [ ] **MATC-06**: System führt Triple-Check durch bei Konfidenz <95% (dritter AI-Durchlauf mit alternativem Prompt)
 - [ ] **MATC-07**: System begründet jeden Match mit Chain-of-Thought (Schritt-für-Schritt-Argumentation)
@@ -107,10 +107,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | DOKA-06 | Phase 2 | Complete |
 | DOKA-07 | Phase 3 | Complete |
 | DOKA-08 | Phase 3 | Complete |
-| MATC-01 | Phase 4 | Pending |
-| MATC-02 | Phase 4 | Pending |
-| MATC-03 | Phase 4 | Pending |
-| MATC-04 | Phase 4 | Pending |
+| MATC-01 | Phase 4 | Complete |
+| MATC-02 | Phase 4 | Complete |
+| MATC-03 | Phase 4 | Complete |
+| MATC-04 | Phase 4 | Complete |
 | MATC-05 | Phase 5 | Pending |
 | MATC-06 | Phase 5 | Pending |
 | MATC-07 | Phase 5 | Pending |

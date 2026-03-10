@@ -9,9 +9,9 @@ last_activity: 2026-03-10 — Completed 03-03 (AI Conflict Resolution)
 progress:
   total_phases: 8
   completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
-  percent: 42
+  total_plans: 9
+  completed_plans: 9
+  percent: 47
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 
 ## Current Position
 
-Phase: 3 of 8 (Cross-Document Intelligence) - COMPLETE
-Plan: 3 of 3 in current phase (all done)
-Status: Phase 03 Complete (including gap closure)
-Last activity: 2026-03-10 — Completed 03-03 (AI Conflict Resolution)
+Phase: 4 of 8 (Product Matching Engine) - IN PROGRESS
+Plan: 1 of 3 in current phase
+Status: 04-01 Complete (TF-IDF + AI Matching Engine)
+Last activity: 2026-03-10 — Completed 04-01 (TF-IDF + AI Matching)
 
-Progress: [████░░░░░░] 42%
+Progress: [█████░░░░░] 47%
 
 ## Performance Metrics
 
@@ -46,6 +46,7 @@ Progress: [████░░░░░░] 42%
 | 01 | 2/2 | 11min | 5.5min |
 | 02 | 3/3 | 13min | 4.3min |
 | 03 | 3/3 | 16min | 5.3min |
+| 04 | 1/3 | 8min | 8.0min |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -88,6 +89,9 @@ Recent decisions affecting current work:
 - 03-03: ConflictResolutionItem/Result models internal to conflict_detector.py (not in schemas)
 - 03-03: AI resolution maps back to raw conflicts by field_name matching
 - 03-03: Rule-based fallback for unresolved individual conflicts from AI response
+- 04-01: Broad fallback query for sparse positions (no empty results)
+- 04-01: Category boost via fuzzy substring match on category name (1.3x)
+- 04-01: Safety cap pipeline: apply_safety_caps -> set_hat_match -> limit_alternatives
 
 ### Pending Todos
 
@@ -100,6 +104,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T16:24:04.960Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-product-matching-engine/04-CONTEXT.md
+Last session: 2026-03-10T16:48:01Z
+Stopped at: Completed 04-01-PLAN.md
+Resume file: .planning/phases/04-product-matching-engine/04-01-SUMMARY.md
