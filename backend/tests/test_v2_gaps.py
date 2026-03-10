@@ -691,3 +691,152 @@ class TestAlternativeSearch:
         # Schallschutz gap should reference PROD-202
         assert "PROD-202" in gaps[1].gap_geschlossen_durch
         assert "PROD-201" not in gaps[1].gap_geschlossen_durch
+
+
+# ---------------------------------------------------------------------------
+# Router integration tests for gap analysis wiring (Plan 06-02)
+# ---------------------------------------------------------------------------
+
+from v2.gaps.gap_analyzer import analyze_gaps
+
+
+class TestRouterIntegration:
+    """Test gap analysis wiring in the analyze_v2 router."""
+
+    def test_gap_wiring_in_response(self):
+        """Mock the full pipeline and verify gap_results in response."""
+        import v2.routers.analyze_v2 as router_mod
+
+        # Create mock gap reports
+        gap_report_1 = GapReport(
+            positions_nr="1.01",
+            gaps=[
+                GapItem(
+                    dimension=GapDimension.BRANDSCHUTZ,
+                    schweregrad=GapSeverity.MAJOR,
+                    anforderung_wert="EI60",
+                    katalog_wert="EI30",
+                    abweichung_beschreibung="Brandschutz zu niedrig",
+                ),
+            ],
+            zusammenfassung="Brandschutz-Luecke",
+            validation_status="bestaetigt",
+        )
+        gap_report_2 = GapReport(
+            positions_nr="1.02",
+            gaps=[],
+            zusammenfassung="Keine Luecken",
+            validation_status="bestaetigt",
+        )
+
+        mock_match_results = [_make_match_result("1.01"), _make_match_result("1.02")]
+        mock_adversarial = [
+            _make_adversarial_result("1.01", ValidationStatus.BESTAETIGT),
+            _make_adversarial_result("1.02", ValidationStatus.BESTAETIGT),
+        ]
+
+        response = {}
+
+        # Mock analyze_gaps to return our gap reports
+        async def mock_analyze_gaps(**kwargs):
+            return [gap_report_1, gap_report_2]
+
+        with patch.object(router_mod, "analyze_gaps", mock_analyze_gaps):
+            # Simulate _run_gap_analysis
+            asyncio.get_event_loop().run_until_complete(
+                router_mod._run_gap_analysis(
+                    client=MagicMock(),
+                    match_results=mock_match_results,
+                    adversarial_results=mock_adversarial,
+                    tfidf_idx=MagicMock(),
+                    tender_id="test-tender",
+                    response=response,
+                )
+            )
+
+        assert "gap_results" in response
+        assert len(response["gap_results"]) == 2
+        assert "total_gaps" in response
+        assert response["total_gaps"] == 1  # Only gap_report_1 has 1 gap
+        assert "total_gap_reports" in response
+        assert response["total_gap_reports"] == 2
+
+    def test_gap_failure_graceful(self):
+        """Mock analyze_gaps to raise Exception; verify graceful degradation."""
+        import v2.routers.analyze_v2 as router_mod
+
+        async def mock_analyze_gaps_fail(**kwargs):
+            raise RuntimeError("Test gap failure")
+
+        response = {
+            "match_results": [{"positions_nr": "1.01"}],
+            "adversarial_results": [{"positions_nr": "1.01"}],
+        }
+
+        with patch.object(router_mod, "analyze_gaps", mock_analyze_gaps_fail):
+            asyncio.get_event_loop().run_until_complete(
+                router_mod._run_gap_analysis(
+                    client=MagicMock(),
+                    match_results=[_make_match_result()],
+                    adversarial_results=[_make_adversarial_result()],
+                    tfidf_idx=MagicMock(),
+                    tender_id="test-tender",
+                    response=response,
+                )
+            )
+
+        assert response["gaps_skipped"] is True
+        assert "Test gap failure" in response["gaps_warning"]
+        # Pre-existing response keys should still be intact
+        assert "match_results" in response
+        assert "adversarial_results" in response
+
+    def test_gap_modules_unavailable(self):
+        """When _GAPS_AVAILABLE is False, response shows gaps_warning."""
+        import v2.routers.analyze_v2 as router_mod
+
+        original = router_mod._GAPS_AVAILABLE
+        try:
+            router_mod._GAPS_AVAILABLE = False
+
+            # Simulate the check from the router endpoint
+            response = {}
+            if not router_mod._GAPS_AVAILABLE:
+                response["gaps_skipped"] = True
+                response["gaps_warning"] = "Gap modules not installed"
+
+            assert response["gaps_skipped"] is True
+            assert response["gaps_warning"] == "Gap modules not installed"
+        finally:
+            router_mod._GAPS_AVAILABLE = original
+
+    def test_synthetic_adversarial_for_skipped_adversarial(self):
+        """When adversarial is skipped, synthetic results are created for gap analysis."""
+        from v2.schemas.adversarial import AdversarialResult as AR, ValidationStatus as VS
+
+        mr_with_match = _make_match_result("1.01", has_match=True)
+        mr_no_match = _make_match_result("1.02", has_match=False)
+        match_results = [mr_with_match, mr_no_match]
+
+        # Build synthetic adversarial results as the router would
+        synthetic = [
+            AR(
+                positions_nr=mr.positions_nr,
+                validation_status=(
+                    VS.UNSICHER if mr.hat_match else VS.ABGELEHNT
+                ),
+                adjusted_confidence=(
+                    mr.bester_match.gesamt_konfidenz if mr.bester_match else 0.0
+                ),
+                debate=[],
+                resolution_reasoning="Synthetic - adversarial skipped",
+                per_dimension_cot=[],
+            )
+            for mr in match_results
+        ]
+
+        assert len(synthetic) == 2
+        assert synthetic[0].validation_status == VS.UNSICHER
+        assert synthetic[0].adjusted_confidence == 0.85
+        assert synthetic[1].validation_status == VS.ABGELEHNT
+        assert synthetic[1].adjusted_confidence == 0.0

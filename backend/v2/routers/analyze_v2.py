@@ -39,6 +39,14 @@ except ImportError as _adv_import_err:
     _ADVERSARIAL_AVAILABLE = False
     logger.warning(f"[V2 Analyze] Adversarial modules not available: {_adv_import_err}")
 
+# Lazy imports for gap analysis (may not be available)
+try:
+    from v2.gaps import analyze_gaps
+    _GAPS_AVAILABLE = True
+except ImportError as _gap_import_err:
+    _GAPS_AVAILABLE = False
+    logger.warning(f"[V2 Analyze] Gap modules not available: {_gap_import_err}")
+
 router = APIRouter(prefix="/api/v2", tags=["V2 Analysis"])
 
 # Lazy singleton for TF-IDF index
@@ -51,6 +59,31 @@ def _get_tfidf_index():
     if _tfidf_index is None and CatalogTfidfIndex is not None:
         _tfidf_index = CatalogTfidfIndex()
     return _tfidf_index
+
+
+async def _run_gap_analysis(client, match_results, adversarial_results, tfidf_idx, tender_id, response):
+    """Run gap analysis and populate response dict.
+
+    Extracted as helper to avoid duplication between real and synthetic
+    adversarial result paths.
+    """
+    try:
+        gap_results = await analyze_gaps(
+            client=client,
+            match_results=match_results,
+            adversarial_results=adversarial_results,
+            tfidf_index=tfidf_idx,
+        )
+        response["gap_results"] = [gr.model_dump() for gr in gap_results]
+        response["total_gaps"] = sum(len(gr.gaps) for gr in gap_results)
+        response["total_gap_reports"] = len(gap_results)
+    except Exception as e:
+        logger.error(
+            f"[V2 Analyze] Gap analysis failed for tender {tender_id}: {e}\n"
+            f"{traceback.format_exc()}"
+        )
+        response["gaps_skipped"] = True
+        response["gaps_warning"] = f"Gap analysis failed: {str(e)}"
 
 
 class AnalyzeRequest(BaseModel):
@@ -187,6 +220,40 @@ async def analyze_tender(request: AnalyzeRequest):
                     elif not _ADVERSARIAL_AVAILABLE:
                         response["adversarial_skipped"] = True
                         response["adversarial_warning"] = "Adversarial modules not installed"
+
+                    # --- Gap Analysis Phase ---
+                    adversarial_results_for_gaps = locals().get("adversarial_results", [])
+                    if _GAPS_AVAILABLE and adversarial_results_for_gaps:
+                        await _run_gap_analysis(
+                            client, match_results, adversarial_results_for_gaps,
+                            tfidf_idx, tender_id, response,
+                        )
+                    elif _GAPS_AVAILABLE and match_results and not adversarial_results_for_gaps:
+                        # Adversarial was skipped — create synthetic results for gap analysis
+                        from v2.schemas.adversarial import AdversarialResult, ValidationStatus
+                        synthetic_adversarial = [
+                            AdversarialResult(
+                                positions_nr=mr.positions_nr,
+                                validation_status=(
+                                    ValidationStatus.UNSICHER if mr.hat_match
+                                    else ValidationStatus.ABGELEHNT
+                                ),
+                                adjusted_confidence=(
+                                    mr.bester_match.gesamt_konfidenz if mr.bester_match else 0.0
+                                ),
+                                debate=[],
+                                resolution_reasoning="Synthetic - adversarial skipped",
+                                per_dimension_cot=[],
+                            )
+                            for mr in match_results
+                        ]
+                        await _run_gap_analysis(
+                            client, match_results, synthetic_adversarial,
+                            tfidf_idx, tender_id, response,
+                        )
+                    elif not _GAPS_AVAILABLE:
+                        response["gaps_skipped"] = True
+                        response["gaps_warning"] = "Gap modules not installed"
 
                 else:
                     response["matching_skipped"] = True
