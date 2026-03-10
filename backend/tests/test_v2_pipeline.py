@@ -379,3 +379,205 @@ class TestPipelineReturnsExtractionResult:
             assert isinstance(result.dokument_zusammenfassung, str)
             assert isinstance(result.warnungen, list)
             assert result.dokument_typ == DokumentTyp.XLSX
+
+
+# ---------------------------------------------------------------------------
+# Test: Multi-file triggers cross-doc intelligence
+# ---------------------------------------------------------------------------
+
+class TestMultiFileTriggersCrossDoc:
+    """Cross-doc intelligence runs automatically for multi-file tenders."""
+
+    def test_multi_file_triggers_crossdoc(self):
+        """Pipeline with 2+ ParseResults triggers cross-doc intelligence."""
+        mock_client = _make_mock_client()
+
+        parse_results = [
+            _make_parse_result("tuerliste.xlsx", "xlsx", text="tuer_nr: 1.01"),
+            _make_parse_result("spec.pdf", "pdf", text="Pos. 1.01 T30"),
+        ]
+
+        with patch("v2.extraction.pipeline.extract_structural") as mock_p1, \
+             patch("v2.extraction.pipeline.extract_semantic") as mock_p2, \
+             patch("v2.extraction.pipeline.validate_and_enrich") as mock_p3, \
+             patch("v2.extraction.pipeline.run_cross_doc_intelligence") as mock_crossdoc:
+
+            mock_p1.return_value = [
+                ExtractedDoorPosition(positions_nr="1.01", quellen={})
+            ]
+
+            async def async_p2(*args, **kwargs):
+                return [ExtractedDoorPosition(positions_nr="1.01", breite_mm=1000, quellen={})]
+            mock_p2.side_effect = async_p2
+
+            async def async_p3(*args, **kwargs):
+                return args[0]
+            mock_p3.side_effect = async_p3
+
+            # Cross-doc returns enriched positions + report + conflicts
+            from v2.schemas.extraction import EnrichmentReport
+            mock_report = EnrichmentReport(
+                total_positionen=2,
+                positionen_matched_cross_doc=1,
+                felder_enriched=3,
+                konflikte_total=0,
+                konflikte_critical=0,
+                konflikte_major=0,
+                konflikte_minor=0,
+                general_specs_applied=0,
+                dokument_stats=[],
+                zusammenfassung="1 Position matched",
+            )
+
+            async def async_crossdoc(*args, **kwargs):
+                return (
+                    [ExtractedDoorPosition(positions_nr="1.01", breite_mm=1000, quellen={})],
+                    mock_report,
+                    [],
+                )
+            mock_crossdoc.side_effect = async_crossdoc
+
+            from v2.extraction.pipeline import run_extraction_pipeline
+            result = asyncio.get_event_loop().run_until_complete(
+                run_extraction_pipeline(parse_results, "multi-tender", client=mock_client)
+            )
+
+            # Cross-doc was called
+            assert mock_crossdoc.called
+            assert mock_crossdoc.call_count == 1
+
+    def test_single_file_skips_crossdoc(self):
+        """Pipeline with 1 ParseResult does NOT trigger cross-doc."""
+        mock_client = _make_mock_client()
+
+        parse_results = [
+            _make_parse_result("tuerliste.xlsx", "xlsx"),
+        ]
+
+        with patch("v2.extraction.pipeline.extract_structural") as mock_p1, \
+             patch("v2.extraction.pipeline.extract_semantic") as mock_p2, \
+             patch("v2.extraction.pipeline.validate_and_enrich") as mock_p3, \
+             patch("v2.extraction.pipeline.run_cross_doc_intelligence") as mock_crossdoc:
+
+            mock_p1.return_value = [
+                ExtractedDoorPosition(positions_nr="1.01", quellen={})
+            ]
+
+            async def async_p2(*args, **kwargs):
+                return [ExtractedDoorPosition(positions_nr="1.01", quellen={})]
+            mock_p2.side_effect = async_p2
+
+            async def async_p3(*args, **kwargs):
+                return args[0]
+            mock_p3.side_effect = async_p3
+
+            from v2.extraction.pipeline import run_extraction_pipeline
+            result = asyncio.get_event_loop().run_until_complete(
+                run_extraction_pipeline(parse_results, "single-tender", client=mock_client)
+            )
+
+            # Cross-doc was NOT called
+            assert not mock_crossdoc.called
+
+    def test_crossdoc_result_in_extraction_result(self):
+        """ExtractionResult includes enrichment_report and conflicts for multi-file."""
+        mock_client = _make_mock_client()
+
+        parse_results = [
+            _make_parse_result("tuerliste.xlsx", "xlsx"),
+            _make_parse_result("spec.pdf", "pdf"),
+        ]
+
+        with patch("v2.extraction.pipeline.extract_structural") as mock_p1, \
+             patch("v2.extraction.pipeline.extract_semantic") as mock_p2, \
+             patch("v2.extraction.pipeline.validate_and_enrich") as mock_p3, \
+             patch("v2.extraction.pipeline.run_cross_doc_intelligence") as mock_crossdoc:
+
+            mock_p1.return_value = [
+                ExtractedDoorPosition(positions_nr="1.01", quellen={})
+            ]
+
+            async def async_p2(*args, **kwargs):
+                return [ExtractedDoorPosition(positions_nr="1.01", quellen={})]
+            mock_p2.side_effect = async_p2
+
+            async def async_p3(*args, **kwargs):
+                return args[0]
+            mock_p3.side_effect = async_p3
+
+            from v2.schemas.extraction import EnrichmentReport, FieldConflict, ConflictSeverity
+            mock_report = EnrichmentReport(
+                total_positionen=2,
+                positionen_matched_cross_doc=1,
+                felder_enriched=5,
+                konflikte_total=1,
+                konflikte_critical=1,
+                konflikte_major=0,
+                konflikte_minor=0,
+                general_specs_applied=0,
+                dokument_stats=[],
+                zusammenfassung="Test summary",
+            )
+            mock_conflict = FieldConflict(
+                positions_nr="1.01",
+                field_name="brandschutz_klasse",
+                wert_a="T30",
+                quelle_a=FieldSource(dokument="a.xlsx", konfidenz=0.9),
+                wert_b="T90",
+                quelle_b=FieldSource(dokument="b.pdf", konfidenz=0.95),
+                severity=ConflictSeverity.CRITICAL,
+                resolution="T90",
+                resolution_reason="Higher confidence",
+                resolved_by="rule",
+            )
+
+            async def async_crossdoc(*args, **kwargs):
+                return (
+                    [ExtractedDoorPosition(positions_nr="1.01", quellen={})],
+                    mock_report,
+                    [mock_conflict],
+                )
+            mock_crossdoc.side_effect = async_crossdoc
+
+            from v2.extraction.pipeline import run_extraction_pipeline
+            result = asyncio.get_event_loop().run_until_complete(
+                run_extraction_pipeline(parse_results, "crossdoc-result-tender", client=mock_client)
+            )
+
+            # ExtractionResult has enrichment report and conflicts
+            assert result.enrichment_report is not None
+            assert result.enrichment_report.felder_enriched == 5
+            assert len(result.conflicts) == 1
+            assert result.conflicts[0].field_name == "brandschutz_klasse"
+
+    def test_single_file_no_enrichment_in_result(self):
+        """Single-file ExtractionResult has enrichment_report=None, conflicts=[]."""
+        mock_client = _make_mock_client()
+
+        parse_results = [
+            _make_parse_result("tuerliste.xlsx", "xlsx"),
+        ]
+
+        with patch("v2.extraction.pipeline.extract_structural") as mock_p1, \
+             patch("v2.extraction.pipeline.extract_semantic") as mock_p2, \
+             patch("v2.extraction.pipeline.validate_and_enrich") as mock_p3:
+
+            mock_p1.return_value = [
+                ExtractedDoorPosition(positions_nr="1.01", quellen={})
+            ]
+
+            async def async_p2(*args, **kwargs):
+                return [ExtractedDoorPosition(positions_nr="1.01", quellen={})]
+            mock_p2.side_effect = async_p2
+
+            async def async_p3(*args, **kwargs):
+                return args[0]
+            mock_p3.side_effect = async_p3
+
+            from v2.extraction.pipeline import run_extraction_pipeline
+            result = asyncio.get_event_loop().run_until_complete(
+                run_extraction_pipeline(parse_results, "single-tender", client=mock_client)
+            )
+
+            assert result.enrichment_report is None
+            assert result.conflicts == []

@@ -10,13 +10,21 @@ from typing import Optional
 
 import anthropic
 
+from v2.extraction.conflict_detector import detect_and_resolve_conflicts
+from v2.extraction.cross_doc_matcher import match_positions_across_docs
 from v2.extraction.dedup import merge_positions
+from v2.extraction.enrichment import enrich_positions
 from v2.extraction.pass1_structural import extract_structural
 from v2.extraction.pass2_semantic import extract_semantic
 from v2.extraction.pass3_validation import validate_and_enrich
 from v2.parsers.base import ParseResult
 from v2.schemas.common import DokumentTyp
-from v2.schemas.extraction import ExtractionResult, ExtractedDoorPosition
+from v2.schemas.extraction import (
+    EnrichmentReport,
+    ExtractionResult,
+    ExtractedDoorPosition,
+    FieldConflict,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +69,87 @@ def _detect_dokument_typ(parse_results: list[ParseResult]) -> DokumentTyp:
         "txt": DokumentTyp.TXT,
     }
     return mapping.get(fmt, DokumentTyp.UNKNOWN)
+
+
+async def run_cross_doc_intelligence(
+    all_positions: list[ExtractedDoorPosition],
+    sorted_results: list[ParseResult],
+    client: Optional[anthropic.Anthropic] = None,
+) -> tuple[list[ExtractedDoorPosition], Optional[EnrichmentReport], list[FieldConflict]]:
+    """Run cross-document intelligence on positions from multiple files.
+
+    Groups positions by source document, matches across documents,
+    detects/resolves conflicts, and enriches positions.
+
+    Args:
+        all_positions: Flat list of all extracted positions.
+        sorted_results: ParseResult objects (used for source file names).
+        client: Anthropic client for AI-powered resolution.
+
+    Returns:
+        Tuple of (enriched positions, enrichment report, conflicts).
+    """
+    # Group positions by source document using quellen
+    positions_by_doc: dict[str, list[ExtractedDoorPosition]] = {}
+    source_filenames = {r.source_file for r in sorted_results}
+
+    for pos in all_positions:
+        # Determine source doc from quellen
+        doc_name = None
+        for source in pos.quellen.values():
+            if source.dokument and source.dokument in source_filenames:
+                doc_name = source.dokument
+                break
+
+        if doc_name is None:
+            # Fallback: assign to first source file
+            doc_name = sorted_results[0].source_file
+
+        if doc_name not in positions_by_doc:
+            positions_by_doc[doc_name] = []
+        positions_by_doc[doc_name].append(pos)
+
+    # Step 1: Match positions across documents
+    matches = match_positions_across_docs(positions_by_doc)
+
+    if not matches:
+        logger.info("Cross-doc: No matches found across documents")
+        return all_positions, None, []
+
+    # Step 2: Separate auto-merge from possible matches
+    auto_merge_matches = [m for m in matches if m.auto_merge]
+    possible_matches = [m for m in matches if not m.auto_merge]
+
+    # Step 3: Detect and resolve conflicts on auto-merge matches
+    conflicts = detect_and_resolve_conflicts(
+        auto_merge_matches, all_positions, client=client
+    )
+
+    # Step 4: Enrich positions using auto-merge matches
+    enriched_positions, enrichment_report = enrich_positions(
+        auto_merge_matches, all_positions, general_specs=None
+    )
+
+    # Update enrichment report with conflict counts
+    enrichment_report = enrichment_report.model_copy(update={
+        "konflikte_total": len(conflicts),
+        "konflikte_critical": sum(
+            1 for c in conflicts if c.severity.value == "critical"
+        ),
+        "konflikte_major": sum(
+            1 for c in conflicts if c.severity.value == "major"
+        ),
+        "konflikte_minor": sum(
+            1 for c in conflicts if c.severity.value == "minor"
+        ),
+    })
+
+    logger.info(
+        f"Cross-doc: {len(auto_merge_matches)} auto-merge, "
+        f"{len(possible_matches)} possible, {len(conflicts)} conflicts"
+    )
+
+    return enriched_positions, enrichment_report, conflicts
 
 
 async def run_extraction_pipeline(
@@ -138,6 +227,24 @@ async def run_extraction_pipeline(
             f"Pipeline [{tender_id}]: Pass 3 -> {len(all_positions)} final positions"
         )
 
+    # Cross-document intelligence (multi-file only)
+    enrichment_report = None
+    conflicts: list[FieldConflict] = []
+
+    if len(sorted_results) >= 2:
+        logger.info(
+            f"Pipeline [{tender_id}]: Cross-document intelligence on "
+            f"{len(all_positions)} positions from {len(sorted_results)} files"
+        )
+        all_positions, enrichment_report, conflicts = await run_cross_doc_intelligence(
+            all_positions, sorted_results, client=client
+        )
+        logger.info(
+            f"Pipeline [{tender_id}]: Cross-doc complete - "
+            f"{enrichment_report.felder_enriched if enrichment_report else 0} fields enriched, "
+            f"{len(conflicts)} conflicts"
+        )
+
     # Build summary
     file_summary = ", ".join(
         f"{r.source_file} ({r.format})" for r in sorted_results
@@ -154,4 +261,6 @@ async def run_extraction_pipeline(
         dokument_zusammenfassung=summary,
         warnungen=all_warnings,
         dokument_typ=dokument_typ,
+        enrichment_report=enrichment_report,
+        conflicts=conflicts,
     )
