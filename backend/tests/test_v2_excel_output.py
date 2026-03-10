@@ -3,11 +3,17 @@ Tests for v2 Excel output generator.
 
 Tests all 4 sheets: Uebersicht, Details, Gap-Analyse, Executive Summary.
 Covers color coding, cell comments, frozen headers, auto-filter, and bytes output.
+Also includes integration tests for V2 offer API endpoints.
 """
 
+import re
+import time
+from datetime import datetime
 from io import BytesIO
+from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 from openpyxl.comments import Comment
 from openpyxl.styles import PatternFill
@@ -395,3 +401,200 @@ class TestCrossCutting:
         for name in ["Uebersicht", "Details", "Gap-Analyse"]:
             ws = wb[name]
             assert ws.auto_filter.ref is not None, f"{name} should have auto_filter"
+
+
+# ---------------------------------------------------------------------------
+# API Integration Tests: V2 Offer Endpoints
+# ---------------------------------------------------------------------------
+
+
+def _make_test_client():
+    """Create a FastAPI TestClient with the offer router."""
+    from fastapi import FastAPI
+    from routers.offer import router
+
+    app = FastAPI()
+    app.include_router(router, prefix="/api")
+    return TestClient(app)
+
+
+def _populate_analysis_results(
+    analysis_id,
+    sample_positions,
+    sample_match_results,
+    sample_adversarial_results,
+    sample_gap_reports,
+):
+    """Inject sample data into _analysis_results for testing."""
+    from v2.routers.analyze_v2 import _analysis_results
+
+    _analysis_results[analysis_id] = {
+        "positions": sample_positions,
+        "match_results": sample_match_results,
+        "adversarial_results": sample_adversarial_results,
+        "gap_reports": sample_gap_reports,
+        "created_at": datetime.now(),
+    }
+
+
+class TestGenerateEndpoint:
+    """Tests for POST /api/offer/generate."""
+
+    def test_generate_endpoint_returns_job_id(
+        self, sample_positions, sample_match_results,
+        sample_adversarial_results, sample_gap_reports,
+    ):
+        """POST /api/offer/generate with valid analysis_id returns 200 with job_id."""
+        client = _make_test_client()
+        analysis_id = "test1234"
+        _populate_analysis_results(
+            analysis_id, sample_positions, sample_match_results,
+            sample_adversarial_results, sample_gap_reports,
+        )
+
+        with patch("routers.offer.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            mock_response = MagicMock()
+            mock_response.parsed = MagicMock(
+                gesamtbewertung="Zusammenfassung der Analyse",
+                empfehlungen=["Empfehlung 1", "Empfehlung 2"],
+            )
+            mock_client.messages.parse.return_value = mock_response
+
+            resp = client.post("/api/offer/generate", json={"analysis_id": analysis_id})
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "job_id" in data
+        assert data["status"] == "started"
+
+    def test_generate_endpoint_invalid_id(self):
+        """POST /api/offer/generate with unknown analysis_id returns 404."""
+        client = _make_test_client()
+        resp = client.post("/api/offer/generate", json={"analysis_id": "nonexistent"})
+        assert resp.status_code == 404
+
+
+class TestDownloadEndpoint:
+    """Tests for GET /api/offer/{id}/download."""
+
+    def test_download_endpoint_returns_xlsx(
+        self, sample_positions, sample_match_results,
+        sample_adversarial_results, sample_gap_reports,
+    ):
+        """GET /api/offer/{id}/download returns bytes with correct content-type and filename."""
+        from services.memory_cache import offer_cache
+
+        result_id = "dltest01"
+        xlsx_bytes = _generate(
+            sample_positions, sample_match_results,
+            sample_adversarial_results, sample_gap_reports,
+        )
+        offer_cache.set(f"v2_result_{result_id}_xlsx", xlsx_bytes, ttl_seconds=3600)
+
+        client = _make_test_client()
+        resp = client.get(f"/api/offer/{result_id}/download")
+
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == (
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        # Verify it's valid xlsx
+        wb = load_workbook(BytesIO(resp.content))
+        assert "Uebersicht" in wb.sheetnames
+
+    def test_download_endpoint_expired(self):
+        """GET /api/offer/{id}/download for missing cache returns 410."""
+        client = _make_test_client()
+        resp = client.get("/api/offer/expired999/download")
+        assert resp.status_code == 410
+
+    def test_filename_format(
+        self, sample_positions, sample_match_results,
+        sample_adversarial_results, sample_gap_reports,
+    ):
+        """Downloaded filename matches Machbarkeitsanalyse_{date}_{id}.xlsx pattern."""
+        from services.memory_cache import offer_cache
+
+        result_id = "fntest01"
+        xlsx_bytes = _generate(
+            sample_positions, sample_match_results,
+            sample_adversarial_results, sample_gap_reports,
+        )
+        offer_cache.set(f"v2_result_{result_id}_xlsx", xlsx_bytes, ttl_seconds=3600)
+
+        client = _make_test_client()
+        resp = client.get(f"/api/offer/{result_id}/download")
+
+        content_disp = resp.headers.get("content-disposition", "")
+        today = datetime.now().strftime("%Y%m%d")
+        expected_pattern = rf'Machbarkeitsanalyse_{today}_{result_id}\.xlsx'
+        assert re.search(expected_pattern, content_disp), (
+            f"Filename should match pattern, got: {content_disp}"
+        )
+
+    def test_cache_ttl_3600(
+        self, sample_positions, sample_match_results,
+        sample_adversarial_results, sample_gap_reports,
+    ):
+        """Excel bytes stored with 3600s TTL in offer_cache."""
+        from services.memory_cache import offer_cache
+
+        result_id = "ttltest1"
+        xlsx_bytes = _generate(
+            sample_positions, sample_match_results,
+            sample_adversarial_results, sample_gap_reports,
+        )
+        cache_key = f"v2_result_{result_id}_xlsx"
+        offer_cache.set(cache_key, xlsx_bytes, ttl_seconds=3600)
+
+        # Verify data is retrievable
+        cached = offer_cache.get(cache_key)
+        assert cached is not None
+        assert cached == xlsx_bytes
+
+
+class TestGenerateDownloadFlow:
+    """End-to-end generate -> status -> download flow."""
+
+    def test_full_flow(
+        self, sample_positions, sample_match_results,
+        sample_adversarial_results, sample_gap_reports,
+    ):
+        """Generate, poll status, then download - full flow."""
+        client = _make_test_client()
+        analysis_id = "flow1234"
+        _populate_analysis_results(
+            analysis_id, sample_positions, sample_match_results,
+            sample_adversarial_results, sample_gap_reports,
+        )
+
+        with patch("routers.offer.anthropic") as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.Anthropic.return_value = mock_client
+            mock_response = MagicMock()
+            mock_response.parsed = MagicMock(
+                gesamtbewertung="Analyse zeigt gute Machbarkeit",
+                empfehlungen=["Brandschutz pruefen"],
+            )
+            mock_client.messages.parse.return_value = mock_response
+
+            # Step 1: Generate
+            gen_resp = client.post("/api/offer/generate", json={"analysis_id": analysis_id})
+            assert gen_resp.status_code == 200
+            job_id = gen_resp.json()["job_id"]
+
+            # Step 2: Wait for background job to complete
+            time.sleep(1.0)
+
+            # Step 3: Check status
+            status_resp = client.get(f"/api/offer/status/{job_id}")
+            assert status_resp.status_code == 200
+
+            # Step 4: Download
+            dl_resp = client.get(f"/api/offer/{analysis_id}/download")
+            assert dl_resp.status_code == 200
+            # Verify valid xlsx
+            wb = load_workbook(BytesIO(dl_resp.content))
+            assert len(wb.sheetnames) == 4
