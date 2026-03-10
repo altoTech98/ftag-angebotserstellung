@@ -127,6 +127,12 @@ export function createV2SSE(jobId) {
 export const getV2JobStatus = (jobId) =>
   request(`/v2/analyze/status/${jobId}`)
 
+export const uploadFolderV2 = (files) => {
+  const form = new FormData()
+  for (const f of files) form.append('files', f)
+  return request('/v2/upload', { method: 'POST', body: form })
+}
+
 // Result generation
 export const generateResult = (requirements, matching) =>
   request('/result/generate', {

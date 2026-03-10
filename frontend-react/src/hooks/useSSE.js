@@ -27,6 +27,29 @@ export function useSSE() {
     })
   }, [])
 
+  const pollV2SSE = useCallback((jobId, onProgress) => {
+    return new Promise((resolve, reject) => {
+      const es = api.createV2SSE(jobId)
+      esRef.current = es
+      let settled = false
+      const settle = (fn, val) => {
+        if (!settled) { settled = true; es.close(); fn(val) }
+      }
+      es.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data)
+          if (data.type === 'keepalive') return
+          if (data.progress && onProgress) onProgress(data.progress)
+          if (data.status === 'completed') settle(resolve, data.result)
+          if (data.status === 'failed') settle(reject, new Error(data.error || 'Analyse fehlgeschlagen'))
+        } catch (err) {
+          console.warn('SSE parse error:', err)
+        }
+      }
+      es.onerror = () => settle(reject, new Error('SSE connection error'))
+    })
+  }, [])
+
   const pollFallback = useCallback(async (jobId, onProgress, statusPath = '/analyze/status/') => {
     const POLL_INTERVAL = 2000
     const MAX_POLLS = 450
@@ -41,7 +64,14 @@ export function useSSE() {
   }, [])
 
   const pollJob = useCallback(async (jobId, onProgress, statusPath = '/analyze/status/') => {
-    if (statusPath === '/analyze/status/') {
+    const isV2 = statusPath.startsWith('/v2/')
+    if (isV2) {
+      try {
+        return await pollV2SSE(jobId, onProgress)
+      } catch (e) {
+        console.warn('V2 SSE fallback to polling:', e.message)
+      }
+    } else if (statusPath === '/analyze/status/') {
       try {
         return await pollSSE(jobId, onProgress)
       } catch (e) {
@@ -49,7 +79,7 @@ export function useSSE() {
       }
     }
     return await pollFallback(jobId, onProgress, statusPath)
-  }, [pollSSE, pollFallback])
+  }, [pollSSE, pollV2SSE, pollFallback])
 
   const cleanup = useCallback(() => {
     if (esRef.current) { esRef.current.close(); esRef.current = null }
