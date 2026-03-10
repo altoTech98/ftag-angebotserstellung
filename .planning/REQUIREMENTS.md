@@ -32,11 +32,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Gap-Analyse
 
-- [ ] **GAPA-01**: System erstellt detaillierte Gap-Analyse für jeden Nicht-Match (welche Eigenschaft weicht ab)
-- [ ] **GAPA-02**: System kategorisiert Gaps nach Dimension: Maße, Material, Norm, Zertifizierung, Leistung
-- [ ] **GAPA-03**: System bewertet Gap-Schweregrad: Kritisch (keine Lösung), Major (signifikante Abweichung), Minor (nahe am Match)
-- [ ] **GAPA-04**: System generiert AI-Vorschlag was sich ändern müsste damit ein Produkt passt
-- [ ] **GAPA-05**: System schlägt alternative Produkte vor die den Gap schließen könnten (mit Erklärung was noch abweicht)
+- [x] **GAPA-01**: System erstellt detaillierte Gap-Analyse für jeden Nicht-Match (welche Eigenschaft weicht ab)
+- [x] **GAPA-02**: System kategorisiert Gaps nach Dimension: Maße, Material, Norm, Zertifizierung, Leistung
+- [x] **GAPA-03**: System bewertet Gap-Schweregrad: Kritisch (keine Lösung), Major (signifikante Abweichung), Minor (nahe am Match)
+- [x] **GAPA-04**: System generiert AI-Vorschlag was sich ändern müsste damit ein Produkt passt
+- [x] **GAPA-05**: System schlägt alternative Produkte vor die den Gap schließen könnten (mit Erklärung was noch abweicht)
 
 ### Excel-Output
 
@@ -116,11 +116,11 @@ Deferred to future release. Tracked but not in current roadmap.
 | MATC-07 | Phase 5 | Complete |
 | MATC-08 | Phase 5 | Complete |
 | MATC-09 | Phase 4 | Complete |
-| GAPA-01 | Phase 6 | Pending |
-| GAPA-02 | Phase 6 | Pending |
-| GAPA-03 | Phase 6 | Pending |
-| GAPA-04 | Phase 6 | Pending |
-| GAPA-05 | Phase 6 | Pending |
+| GAPA-01 | Phase 6 | Complete |
+| GAPA-02 | Phase 6 | Complete |
+| GAPA-03 | Phase 6 | Complete |
+| GAPA-04 | Phase 6 | Complete |
+| GAPA-05 | Phase 6 | Complete |
 | EXEL-01 | Phase 7 | Pending |
 | EXEL-02 | Phase 7 | Pending |
 | EXEL-03 | Phase 7 | Pending |
