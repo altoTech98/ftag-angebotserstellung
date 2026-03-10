@@ -67,3 +67,71 @@ class PipelineError(V2Error):
 
     def __init__(self, message: str, details: dict = None):
         super().__init__(message, code="PIPELINE_ERROR", details=details)
+
+
+class AIServiceError(PipelineError):
+    """AI service failure with German user-facing message.
+
+    Used by raise_ai_error() to convert anthropic SDK exceptions
+    into user-friendly errors with stage context.
+    """
+
+    def __init__(self, message: str, stage: str, api_error: str = ""):
+        super().__init__(
+            message=message,
+            details={"stage": stage, "api_error": api_error},
+        )
+        self.code = "AI_SERVICE_ERROR"
+
+
+def _is_anthropic_error(exception: Exception, class_name: str) -> bool:
+    """Check if an exception is a specific anthropic error type by class name.
+
+    Uses class name matching to avoid hard dependency on anthropic SDK.
+    """
+    for cls in type(exception).__mro__:
+        if cls.__name__ == class_name:
+            return True
+    return False
+
+
+def raise_ai_error(exception: Exception, stage: str) -> None:
+    """Convert an exception to AIServiceError with German message.
+
+    Maps common anthropic SDK exceptions to user-friendly German messages.
+    Always raises AIServiceError - never returns.
+
+    Args:
+        exception: The caught exception (typically from anthropic SDK).
+        stage: Pipeline stage where the error occurred.
+
+    Raises:
+        AIServiceError: Always raised with appropriate German message.
+    """
+    api_error_str = str(exception)
+
+    if _is_anthropic_error(exception, "APIConnectionError"):
+        raise AIServiceError(
+            message="KI-Service nicht erreichbar. Bitte Internetverbindung pruefen.",
+            stage=stage,
+            api_error=api_error_str,
+        )
+    elif _is_anthropic_error(exception, "RateLimitError"):
+        raise AIServiceError(
+            message="KI-Service ueberlastet. Bitte in einigen Minuten erneut versuchen.",
+            stage=stage,
+            api_error=api_error_str,
+        )
+    elif _is_anthropic_error(exception, "APIStatusError"):
+        status_code = getattr(exception, "status_code", "unbekannt")
+        raise AIServiceError(
+            message=f"KI-Service Fehler ({status_code}). Bitte spaeter erneut versuchen.",
+            stage=stage,
+            api_error=api_error_str,
+        )
+    else:
+        raise AIServiceError(
+            message=f"KI-Service nicht verfuegbar: {exception}. Bitte spaeter erneut versuchen.",
+            stage=stage,
+            api_error=api_error_str,
+        )
