@@ -473,6 +473,179 @@ class TestMatchSinglePosition:
         assert result.hat_match is False  # 0.88 < 0.95
 
 
+# ---------------------------------------------------------------------------
+# Task 1 (Plan 02): Feedback V2 Store Tests
+# ---------------------------------------------------------------------------
+
+
+class TestFeedbackSaveAndLoad:
+    def test_feedback_save_and_load(self, tmp_path):
+        """Save a correction, reload store, correction persists in JSON file."""
+        store_path = str(tmp_path / "feedback_v2.json")
+        from v2.matching.feedback_v2 import FeedbackStoreV2, FeedbackEntry
+
+        store = FeedbackStoreV2(store_path=store_path)
+        entry = FeedbackEntry(
+            positions_nr="1.01",
+            requirement_summary="Brandschutztuere EI30 einflg",
+            original_match={"produkt_id": "KT-001", "gesamt_konfidenz": 0.7},
+            corrected_match={"produkt_id": "KT-005", "produkt_name": "Prestige EI30"},
+            correction_reason="Falsche Brandschutzklasse",
+        )
+        store.save_correction(entry)
+
+        # Reload from disk
+        store2 = FeedbackStoreV2(store_path=store_path)
+        assert len(store2.get_all()) == 1
+        loaded = store2.get_all()[0]
+        assert loaded.positions_nr == "1.01"
+        assert loaded.corrected_match["produkt_id"] == "KT-005"
+
+    def test_feedback_find_relevant(self, tmp_path):
+        """Save 3 corrections, query with similar text, returns most similar first."""
+        store_path = str(tmp_path / "feedback_v2.json")
+        from v2.matching.feedback_v2 import FeedbackStoreV2, FeedbackEntry
+
+        store = FeedbackStoreV2(store_path=store_path)
+
+        entries = [
+            FeedbackEntry(
+                positions_nr="1.01",
+                requirement_summary="Brandschutztuere EI30 Rahmentuere",
+                original_match={"produkt_id": "KT-001", "gesamt_konfidenz": 0.6},
+                corrected_match={"produkt_id": "KT-010", "produkt_name": "Prestige EI30"},
+                correction_reason="Falsches Produkt",
+            ),
+            FeedbackEntry(
+                positions_nr="2.01",
+                requirement_summary="Schiebetuer Schallschutz 37dB",
+                original_match={"produkt_id": "KT-006", "gesamt_konfidenz": 0.5},
+                corrected_match={"produkt_id": "KT-007", "produkt_name": "Schiebe EI60"},
+                correction_reason="Schallschutz nicht ausreichend",
+            ),
+            FeedbackEntry(
+                positions_nr="3.01",
+                requirement_summary="Holztuer Innentuer ohne Brandschutz",
+                original_match={"produkt_id": "KT-004", "gesamt_konfidenz": 0.8},
+                corrected_match={"produkt_id": "KT-003", "produkt_name": "Confort 51"},
+                correction_reason="Holztuer besser",
+            ),
+        ]
+        for e in entries:
+            store.save_correction(e)
+
+        # Query for Brandschutz-related text
+        results = store.find_relevant_feedback("Brandschutztuere EI30 Rahmentuere Standard")
+        assert len(results) > 0
+        # Most similar should be the Brandschutz entry
+        assert results[0]["corrected_match"]["produkt_id"] == "KT-010"
+
+    def test_feedback_tfidf_similarity(self, tmp_path):
+        """Corrections with matching Brandschutz/Schallschutz terms score higher."""
+        store_path = str(tmp_path / "feedback_v2.json")
+        from v2.matching.feedback_v2 import FeedbackStoreV2, FeedbackEntry
+
+        store = FeedbackStoreV2(store_path=store_path)
+
+        store.save_correction(FeedbackEntry(
+            positions_nr="1.01",
+            requirement_summary="Brandschutz EI60 Stahltuer Widerstandsklasse RC2",
+            original_match={"produkt_id": "KT-001", "gesamt_konfidenz": 0.5},
+            corrected_match={"produkt_id": "KT-002", "produkt_name": "Prestige EI60"},
+            correction_reason="Brandschutz korrekt",
+        ))
+        store.save_correction(FeedbackEntry(
+            positions_nr="2.01",
+            requirement_summary="Pendeltuere ohne Brandschutz ohne Schallschutz",
+            original_match={"produkt_id": "KT-009", "gesamt_konfidenz": 0.4},
+            corrected_match={"produkt_id": "KT-008", "produkt_name": "Pendel 51"},
+            correction_reason="Falscher Typ",
+        ))
+
+        results = store.find_relevant_feedback("Brandschutz EI60 Stahltuer")
+        assert len(results) >= 1
+        # The Brandschutz entry should score highest
+        assert results[0]["corrected_match"]["produkt_name"] == "Prestige EI60"
+
+    def test_feedback_injection_in_prompt(self, tmp_path):
+        """Feedback examples formatted correctly for prompt injection."""
+        store_path = str(tmp_path / "feedback_v2.json")
+        from v2.matching.feedback_v2 import FeedbackStoreV2, FeedbackEntry
+        from v2.matching.prompts import format_feedback_section
+
+        store = FeedbackStoreV2(store_path=store_path)
+        store.save_correction(FeedbackEntry(
+            positions_nr="1.01",
+            requirement_summary="Brandschutztuere EI30",
+            original_match={"produkt_id": "KT-001", "gesamt_konfidenz": 0.6},
+            corrected_match={"produkt_id": "KT-005", "produkt_name": "Prestige EI30"},
+            correction_reason="Falsche Zuordnung",
+        ))
+
+        results = store.find_relevant_feedback("Brandschutztuere EI30")
+        formatted = format_feedback_section(results)
+        assert "Korrekturen" in formatted
+        assert "Prestige EI30" in formatted
+
+
+class TestFeedbackEndpoint:
+    def test_feedback_endpoint_save(self, tmp_path):
+        """POST /api/v2/feedback with valid body returns 200 and saves correction."""
+        from fastapi.testclient import TestClient
+        from unittest.mock import patch
+
+        # Need to patch the singleton to use tmp_path
+        from v2.matching import feedback_v2 as fb_module
+
+        test_store_path = str(tmp_path / "feedback_v2.json")
+        test_store = fb_module.FeedbackStoreV2(store_path=test_store_path)
+
+        with patch.object(fb_module, "_feedback_store", test_store):
+            with patch.object(fb_module, "get_feedback_store", return_value=test_store):
+                # Import app after patching
+                from v2.routers.feedback_v2 import router as feedback_router
+                from fastapi import FastAPI
+
+                test_app = FastAPI()
+                test_app.include_router(feedback_router)
+                client = TestClient(test_app)
+
+                response = client.post(
+                    "/api/v2/feedback",
+                    json={
+                        "positions_nr": "1.01",
+                        "requirement_summary": "Brandschutztuere EI30",
+                        "original_produkt_id": "KT-001",
+                        "original_konfidenz": 0.7,
+                        "corrected_produkt_id": "KT-005",
+                        "corrected_produkt_name": "Prestige EI30",
+                        "correction_reason": "Falsche Brandschutzklasse",
+                    },
+                )
+
+                assert response.status_code == 200
+                data = response.json()
+                assert data["status"] == "saved"
+                assert data["feedback_id"].startswith("fb_v2_")
+
+    def test_feedback_endpoint_validation(self):
+        """POST /api/v2/feedback with missing fields returns 422."""
+        from fastapi.testclient import TestClient
+        from v2.routers.feedback_v2 import router as feedback_router
+        from fastapi import FastAPI
+
+        test_app = FastAPI()
+        test_app.include_router(feedback_router)
+        client = TestClient(test_app)
+
+        response = client.post(
+            "/api/v2/feedback",
+            json={"positions_nr": "1.01"},  # Missing required fields
+        )
+
+        assert response.status_code == 422
+
+
 class TestMatchPositionsConcurrent:
     @pytest.mark.asyncio
     async def test_match_positions_concurrent(self, tfidf_index):

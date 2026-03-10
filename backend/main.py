@@ -424,6 +424,13 @@ try:
 except Exception as e:
     logger.warning(f"[WARN] V2 routers not loaded: {e}")
 
+try:
+    from v2.routers import feedback_v2
+    app.include_router(feedback_v2.router)
+    logger.info("[OK] V2 feedback router registered")
+except Exception as e:
+    logger.warning(f"[WARN] V2 feedback router not loaded: {e}")
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HEALTH & INFO ENDPOINTS (must be registered BEFORE SPA catch-all)
