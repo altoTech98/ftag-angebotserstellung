@@ -32,7 +32,29 @@ Ein KI-gestütztes System für Frank Türen AG, das Ausschreibungsunterlagen (PD
 
 ### Active
 
-(No active requirements — start next milestone with `/gsd:new-milestone`)
+- [ ] Next.js App Router Frontend mit Tailwind CSS (Rot/Weiß Design-System)
+- [ ] NextAuth.js Authentifizierung mit Rollen-System (Admin/Manager/Analyst/Viewer)
+- [ ] Dashboard mit Status-Karten, Aktivitäten, Statistiken
+- [ ] Analyse-Wizard (5-Schritt: Upload → Katalog → Konfiguration → Start → Ergebnis)
+- [ ] Ergebnis-Ansicht mit Filter, Sortierung, Detail-Aufklappung, Excel-Export
+- [ ] Produktkatalog-Verwaltung (Upload, Suche, Versionen, CRUD)
+- [ ] Projektverwaltung (CRUD, Historie, Archivierung, Sharing)
+- [ ] Admin-Bereich (Benutzerverwaltung, Audit-Log, Systemeinstellungen, API-Keys)
+- [ ] Vercel Postgres (Prisma ORM) + Vercel Blob Storage
+- [ ] Python/FastAPI AI-Pipeline Integration (bestehend, als Backend-Service)
+- [ ] Vercel Deployment mit GitHub Auto-Deploy
+
+## Current Milestone: v2.0 AI Tender Matcher — Web-Oberfläche & Platform
+
+**Goal:** Professionelle SaaS-Web-Applikation (Next.js) um die bestehende AI-Matching-Engine — minimalistisch, übersichtlich, B2B-tauglich.
+
+**Target features:**
+- Next.js Frontend mit Rot/Weiß Design-System (Linear/Notion-Style)
+- Auth + 4-Stufen Rollen-System
+- Dashboard, Analyse-Wizard, Ergebnis-Ansicht
+- Produktkatalog- und Projektverwaltung
+- Admin-Bereich mit Audit-Trail
+- Vercel-Stack (Postgres, Blob, Deployment)
 
 ### Out of Scope
 
@@ -44,6 +66,11 @@ Ein KI-gestütztes System für Frank Türen AG, das Ausschreibungsunterlagen (PD
 - Ollama/Local-LLM Fallback — nur Claude API, Genauigkeit vor Kosten
 - Mobile App — Web-only
 - Echtzeit-Kollaboration — Vertrieb arbeitet einzeln
+- 2FA — v3.0+, nicht kritisch für internen Einsatz
+- PDF-Export — v3.0+, Excel reicht vorerst
+- Dunkelmodus — v3.0+, Nice-to-Have
+- Mehrsprachigkeit (DE/EN) — v3.0+, FTAG arbeitet auf Deutsch
+- Multi-Tenancy — v3.0+, Architektur vorbereiten aber nicht implementieren
 
 ## Context
 
@@ -79,4 +106,4 @@ Ein KI-gestütztes System für Frank Türen AG, das Ausschreibungsunterlagen (PD
 | Enum+Freitext pattern | All domain classifications have enum + freetext fallback | ✓ Good — handles non-standard values gracefully |
 
 ---
-*Last updated: 2026-03-10 after v1.0 milestone*
+*Last updated: 2026-03-10 after v2.0 milestone start*
