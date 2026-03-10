@@ -32,11 +32,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. User uploads a DOCX file and receives text with formatting context intact
   3. User uploads an XLSX door list and the system automatically detects column structure without manual configuration
   4. All pipeline Pydantic schemas (ExtractedRequirement, MatchResult, AdversarialResult, GapReport) are defined and importable by downstream services
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — V2 project scaffolding, Pydantic schemas, exceptions, and test infrastructure
+- [ ] 01-02-PLAN.md — PDF, DOCX, and XLSX parsers with format-detection router
 
 ### Phase 2: Multi-Pass Extraction
 **Goal**: Users can upload multiple files per tender and get a complete, deduplicated list of every technical requirement extracted through multiple analysis passes
@@ -149,11 +149,11 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Document Parsing & Pipeline Schemas | 0/2 | Not started | - |
+| 1. Document Parsing & Pipeline Schemas | 0/2 | Planning complete | - |
 | 2. Multi-Pass Extraction | 0/2 | Not started | - |
 | 3. Cross-Document Intelligence | 0/1 | Not started | - |
 | 4. Product Matching Engine | 0/2 | Not started | - |
