@@ -180,6 +180,92 @@ class TestAnalyzeNoFiles:
         assert resp.status_code == 400
 
 
+class TestAnalyzeMultiFileResponse:
+    """Multi-file response includes enrichment_report and conflicts."""
+
+    def test_analyze_multi_file_response(self):
+        """Response includes enrichment_report and conflicts when pipeline returns them."""
+        from v2.schemas.extraction import EnrichmentReport, FieldConflict, ConflictSeverity
+        from v2.schemas.common import FieldSource
+
+        tender_id = _make_sample_tender_with_parse_results()
+        report = EnrichmentReport(
+            total_positionen=2,
+            positionen_matched_cross_doc=1,
+            felder_enriched=5,
+            konflikte_total=1,
+            konflikte_critical=1,
+            konflikte_major=0,
+            konflikte_minor=0,
+            general_specs_applied=0,
+            dokument_stats=[],
+            zusammenfassung="1 Position matched, 5 Felder ergaenzt",
+        )
+        conflict = FieldConflict(
+            positions_nr="1.01",
+            field_name="brandschutz_klasse",
+            wert_a="T30",
+            quelle_a=FieldSource(dokument="a.xlsx", konfidenz=0.9),
+            wert_b="T90",
+            quelle_b=FieldSource(dokument="b.pdf", konfidenz=0.95),
+            severity=ConflictSeverity.CRITICAL,
+            resolution="T90",
+            resolution_reason="Higher confidence",
+            resolved_by="rule",
+        )
+        mock_result = ExtractionResult(
+            positionen=[
+                ExtractedDoorPosition(positions_nr="1.01", breite_mm=1000, quellen={}),
+            ],
+            dokument_zusammenfassung="Multi-file test",
+            warnungen=[],
+            dokument_typ=DokumentTyp.XLSX,
+            enrichment_report=report,
+            conflicts=[conflict],
+        )
+
+        async def mock_pipeline(*args, **kwargs):
+            return mock_result
+
+        with patch("v2.routers.analyze_v2.run_extraction_pipeline", side_effect=mock_pipeline):
+            resp = client.post(
+                "/api/v2/analyze",
+                json={"tender_id": tender_id},
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+
+            # Enrichment report present
+            assert data["enrichment_report"] is not None
+            assert data["enrichment_report"]["felder_enriched"] == 5
+            assert data["enrichment_report"]["konflikte_critical"] == 1
+
+            # Conflicts present
+            assert len(data["conflicts"]) == 1
+            assert data["conflicts"][0]["field_name"] == "brandschutz_klasse"
+            assert data["total_conflicts"] == 1
+
+    def test_analyze_single_file_no_enrichment(self):
+        """Single-file response has enrichment_report=null, conflicts=[]."""
+        tender_id = _make_sample_tender_with_parse_results()
+        mock_result = _make_mock_extraction_result()
+
+        async def mock_pipeline(*args, **kwargs):
+            return mock_result
+
+        with patch("v2.routers.analyze_v2.run_extraction_pipeline", side_effect=mock_pipeline):
+            resp = client.post(
+                "/api/v2/analyze",
+                json={"tender_id": tender_id},
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+
+            assert data["enrichment_report"] is None
+            assert data["conflicts"] == []
+            assert data["total_conflicts"] == 0
+
+
 class TestV2RoutesRegistered:
     """V2 routes are accessible (registered correctly)."""
 

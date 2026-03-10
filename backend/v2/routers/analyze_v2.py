@@ -74,14 +74,23 @@ async def analyze_tender(request: AnalyzeRequest):
         # Update tender status to completed
         tender["status"] = "completed"
 
-        return {
+        response = {
             "tender_id": tender_id,
             "status": "completed",
             "positionen": [pos.model_dump() for pos in result.positionen],
             "zusammenfassung": result.dokument_zusammenfassung,
             "warnungen": result.warnungen,
             "total_positionen": len(result.positionen),
+            "enrichment_report": (
+                result.enrichment_report.model_dump()
+                if result.enrichment_report
+                else None
+            ),
+            "conflicts": [c.model_dump() for c in result.conflicts],
+            "total_conflicts": len(result.conflicts),
         }
+
+        return response
 
     except Exception as e:
         logger.error(

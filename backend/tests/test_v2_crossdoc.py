@@ -599,3 +599,144 @@ def _normalize_nr(nr: str) -> str:
     import re
     nr = re.sub(r"^(Tuer|Pos\.|Element|T-|Nr\.)\s*", "", nr.strip())
     return nr.strip()
+
+
+# ---------------------------------------------------------------------------
+# Pipeline Integration Tests (Plan 03-02)
+# ---------------------------------------------------------------------------
+
+
+class TestPipelineIntegration:
+    """Integration tests for cross-doc intelligence in the pipeline."""
+
+    def test_api_response_extended(self):
+        """Verify response JSON includes enrichment_report and conflicts keys."""
+        import uuid
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from v2.parsers.base import ParseResult
+        from v2.routers.upload_v2 import router as upload_router, _tenders
+        from v2.routers.analyze_v2 import router as analyze_router
+        from v2.schemas.common import DokumentTyp
+
+        app = FastAPI()
+        app.include_router(upload_router)
+        app.include_router(analyze_router)
+        test_client = TestClient(app)
+
+        tender_id = str(uuid.uuid4())
+        pr = ParseResult(
+            text="tuer_nr: 1.01",
+            format="xlsx",
+            page_count=1,
+            warnings=[],
+            metadata={},
+            source_file="test.xlsx",
+            tables=[],
+        )
+        _tenders[tender_id] = {
+            "files": [pr],
+            "status": "uploading",
+            "created_at": datetime.now(timezone.utc),
+        }
+
+        report = EnrichmentReport(
+            total_positionen=2,
+            positionen_matched_cross_doc=1,
+            felder_enriched=3,
+            konflikte_total=0,
+            konflikte_critical=0,
+            konflikte_major=0,
+            konflikte_minor=0,
+            general_specs_applied=0,
+            dokument_stats=[],
+            zusammenfassung="Test",
+        )
+        mock_result = ExtractionResult(
+            positionen=[ExtractedDoorPosition(positions_nr="1.01", quellen={})],
+            dokument_zusammenfassung="Test",
+            warnungen=[],
+            dokument_typ=DokumentTyp.XLSX,
+            enrichment_report=report,
+            conflicts=[],
+        )
+
+        async def mock_pipeline(*args, **kwargs):
+            return mock_result
+
+        with patch("v2.routers.analyze_v2.run_extraction_pipeline", side_effect=mock_pipeline):
+            resp = test_client.post(
+                "/api/v2/analyze",
+                json={"tender_id": tender_id},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "enrichment_report" in data
+        assert "conflicts" in data
+        assert "total_conflicts" in data
+        assert data["enrichment_report"] is not None
+        assert data["enrichment_report"]["felder_enriched"] == 3
+
+        _tenders.clear()
+
+    def test_backward_compat_single_file(self):
+        """Single-file response has enrichment_report=null, conflicts=[]."""
+        import uuid
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from v2.parsers.base import ParseResult
+        from v2.routers.upload_v2 import router as upload_router, _tenders
+        from v2.routers.analyze_v2 import router as analyze_router
+        from v2.schemas.common import DokumentTyp
+
+        app = FastAPI()
+        app.include_router(upload_router)
+        app.include_router(analyze_router)
+        test_client = TestClient(app)
+
+        tender_id = str(uuid.uuid4())
+        pr = ParseResult(
+            text="tuer_nr: 1.01",
+            format="xlsx",
+            page_count=1,
+            warnings=[],
+            metadata={},
+            source_file="test.xlsx",
+            tables=[],
+        )
+        _tenders[tender_id] = {
+            "files": [pr],
+            "status": "uploading",
+            "created_at": datetime.now(timezone.utc),
+        }
+
+        mock_result = ExtractionResult(
+            positionen=[ExtractedDoorPosition(positions_nr="1.01", quellen={})],
+            dokument_zusammenfassung="Test",
+            warnungen=[],
+            dokument_typ=DokumentTyp.XLSX,
+        )
+
+        async def mock_pipeline(*args, **kwargs):
+            return mock_result
+
+        with patch("v2.routers.analyze_v2.run_extraction_pipeline", side_effect=mock_pipeline):
+            resp = test_client.post(
+                "/api/v2/analyze",
+                json={"tender_id": tender_id},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["enrichment_report"] is None
+        assert data["conflicts"] == []
+        assert data["total_conflicts"] == 0
+
+        _tenders.clear()
