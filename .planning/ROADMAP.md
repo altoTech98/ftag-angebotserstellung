@@ -80,11 +80,11 @@ Plans:
   3. Matches scoring 95%+ are flagged as confirmed; below 95% are flagged for further validation or gap analysis
   4. Previous matching corrections (feedback) are injected as few-shot examples in AI matching calls
   5. POST /api/feedback saves corrections that improve future analyses
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
+- [ ] 04-01-PLAN.md — TF-IDF weighted index, AI matcher with structured output, domain knowledge, and safety caps
+- [ ] 04-02-PLAN.md — Feedback V2 store with TF-IDF retrieval, feedback API endpoint, and pipeline wiring
 
 ### Phase 5: Adversarial Validation
 **Goal**: Every match is challenged by an independent AI pass that actively tries to disprove it, with transparent chain-of-thought reasoning for all decisions
