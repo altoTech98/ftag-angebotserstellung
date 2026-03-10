@@ -105,8 +105,27 @@ export const getJobStatus = (jobId, statusPath = '/analyze/status/') =>
   request(`${statusPath}${jobId}`)
 
 export function createSSE(jobId) {
-  return new EventSource(`${API_BASE}/analyze/stream/${jobId}`)
+  const token = getToken()
+  const url = `${API_BASE}/analyze/stream/${jobId}${token ? `?token=${encodeURIComponent(token)}` : ''}`
+  return new EventSource(url)
 }
+
+// V2 Analysis
+export const startV2Analysis = (tenderId) =>
+  request('/v2/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tender_id: tenderId }),
+  })
+
+export function createV2SSE(jobId) {
+  const token = getToken()
+  const url = `${API_BASE}/v2/analyze/stream/${jobId}${token ? `?token=${encodeURIComponent(token)}` : ''}`
+  return new EventSource(url)
+}
+
+export const getV2JobStatus = (jobId) =>
+  request(`/v2/analyze/status/${jobId}`)
 
 // Result generation
 export const generateResult = (requirements, matching) =>
@@ -121,6 +140,30 @@ export const getResultStatus = (jobId) =>
 
 export const getResultDownloadUrl = (resultId) =>
   `${API_BASE}/result/${resultId}/download`
+
+export const downloadResult = async (resultId, filename) => {
+  const token = getToken()
+  const res = await fetch(`${API_BASE}/result/${resultId}/download`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    throw new ApiError(
+      res.status === 410
+        ? 'Ergebnis abgelaufen – bitte erneut generieren.'
+        : `Download fehlgeschlagen (HTTP ${res.status})`,
+      res.status,
+    )
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || `FTAG_Machbarkeit_${resultId}.xlsx`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
 
 // Catalog
 export const getCatalogInfo = () => request('/catalog/info')
@@ -150,7 +193,7 @@ export const searchProducts = (query, limit = 15) =>
 
 // Health
 export const checkHealth = async () => {
-  const res = await fetch('/health')
+  const res = await fetch(`${API_BASE}/health`)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
 }

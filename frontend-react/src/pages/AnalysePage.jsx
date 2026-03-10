@@ -7,7 +7,7 @@ import * as api from '../services/api'
 import styles from '../styles/AnalysePage.module.css'
 import corrStyles from '../styles/CorrectionModal.module.css'
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024
+const MAX_FILE_SIZE = 200 * 1024 * 1024
 
 const STEP_NAMES_SINGLE = ['Datei hochladen', 'Tuerliste parsen', 'Produkt-Matching', 'Machbarkeitsanalyse erstellen']
 const STEP_NAMES_FOLDER = ['Dateien hochladen & klassifizieren', 'Tuerlisten parsen & zusammenfuehren', 'Produkt-Matching', 'Machbarkeitsanalyse erstellen']
@@ -29,7 +29,7 @@ function StepIndicator({ step }) {
   )
 }
 
-function ProcessingPanel({ steps, subtitle }) {
+function ProcessingPanel({ steps, subtitle, positionProgress }) {
   return (
     <div className={styles.processingCard}>
       <div className={styles.processingHeader}>
@@ -39,6 +39,17 @@ function ProcessingPanel({ steps, subtitle }) {
           <p className={styles.cardDesc}>{subtitle}</p>
         </div>
       </div>
+      {positionProgress && positionProgress.total > 0 && (
+        <div style={{ padding: '0 1.25rem .75rem', fontSize: '.8125rem', color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.25rem' }}>
+            <span>Position {positionProgress.current || '...'}</span>
+            <span>{positionProgress.done}/{positionProgress.total}</span>
+          </div>
+          <div style={{ background: 'var(--bg-hover)', borderRadius: '4px', height: '6px', overflow: 'hidden' }}>
+            <div style={{ background: 'var(--primary)', height: '100%', width: `${(positionProgress.done / positionProgress.total) * 100}%`, transition: 'width .3s ease' }} />
+          </div>
+        </div>
+      )}
       <div className={styles.stepsList}>
         {steps.map(s => (
           <div key={s.id} className={styles.stepItem}>
@@ -262,9 +273,12 @@ function ResultsPanel({ analysis, offer, onReset }) {
           <div className={styles.downloadGrid}>
             <div className={styles.dlGroup}>
               <div className={styles.dlGroupTitle}>Machbarkeitsanalyse + GAP-Report</div>
-              <a href={api.getResultDownloadUrl(offer.result_id)} className={`${styles.dlBtn} ${styles.dlExcel}`} download>
+              <button
+                className={`${styles.dlBtn} ${styles.dlExcel}`}
+                onClick={() => api.downloadResult(offer.result_id)}
+              >
                 <span>Excel herunterladen</span>
-              </a>
+              </button>
             </div>
           </div>
         </div>
@@ -362,6 +376,7 @@ export default function AnalysePage() {
   const [filesData, setFilesData] = useState(null)
   const [analysis, setAnalysis] = useState(null)
   const [offer, setOffer] = useState(null)
+  const [positionProgress, setPositionProgress] = useState(null)
   const [steps, setSteps] = useState(
     STEP_IDS.map((id, i) => ({ id, name: STEP_NAMES_SINGLE[i], state: 'pending', status: 'Warte...' }))
   )
@@ -373,11 +388,11 @@ export default function AnalysePage() {
   const startUpload = async () => {
     if (!filesData) return
     if (filesData.type === 'single') {
-      if (filesData.file.size > MAX_FILE_SIZE) { showToast('Datei ist zu gross (max. 100 MB)'); return }
+      if (filesData.file.size > MAX_FILE_SIZE) { showToast('Datei ist zu gross (max. 200 MB)'); return }
       await runSingleWorkflow(filesData.file)
     } else {
       const tooBig = filesData.files.find(f => f.size > MAX_FILE_SIZE)
-      if (tooBig) { showToast(`Datei "${tooBig.name}" ist zu gross (max. 100 MB)`); return }
+      if (tooBig) { showToast(`Datei "${tooBig.name}" ist zu gross (max. 200 MB)`); return }
       await runFolderWorkflow(filesData.files)
     }
   }
@@ -397,7 +412,20 @@ export default function AnalysePage() {
       updateStep('ai', 'running', 'Tuerliste wird geparst...')
       setSubtitle('Tuerliste wird analysiert...')
       const { job_id } = await api.startAnalysis(up.file_id)
-      const result = await pollJob(job_id, (p) => setSubtitle(p || 'Analyse laeuft...'))
+      const result = await pollJob(job_id, (progressStr) => {
+        try {
+          const info = JSON.parse(progressStr)
+          setSubtitle(info.message || 'Analyse laeuft...')
+          if (info.positions_total) {
+            setPositionProgress({ done: info.positions_done, total: info.positions_total, current: info.current_position })
+          } else {
+            setPositionProgress(null)
+          }
+        } catch {
+          setSubtitle(progressStr || 'Analyse laeuft...')
+          setPositionProgress(null)
+        }
+      })
       setAnalysis(result)
 
       const pos = result.requirements?.positionen?.length || 0
@@ -447,11 +475,30 @@ export default function AnalysePage() {
       updateStep('ai', 'running', 'Tuerlisten werden geparst...')
       setSubtitle('Projekt wird analysiert...')
       const { job_id } = await api.startProjectAnalysis(uploadResult.project_id)
-      const result = await pollJob(job_id, (progress) => {
-        setSubtitle(progress || 'Analyse laeuft...')
-        if (progress?.includes('Matching')) {
-          updateStep('ai', 'done', 'Tuerlisten geparst')
-          updateStep('match', 'running', progress)
+      const result = await pollJob(job_id, (progressStr) => {
+        // Try parsing as structured JSON progress (v2 pipeline)
+        try {
+          const info = JSON.parse(progressStr)
+          const stageMap = { extraction: 1, matching: 2, adversarial: 2, gap_analyse: 2, plausibility: 3 }
+          setCurrentStep(stageMap[info.stage] || 2)
+          setSubtitle(info.message || 'Analyse laeuft...')
+          if (info.positions_total) {
+            setPositionProgress({ done: info.positions_done, total: info.positions_total, current: info.current_position })
+          } else {
+            setPositionProgress(null)
+          }
+          if (info.stage === 'matching' || info.stage === 'adversarial' || info.stage === 'gap_analyse') {
+            updateStep('ai', 'done', 'Tuerlisten geparst')
+            updateStep('match', 'running', info.message)
+          }
+        } catch {
+          // Plain string progress (v1 style)
+          setSubtitle(progressStr || 'Analyse laeuft...')
+          setPositionProgress(null)
+          if (progressStr?.includes('Matching')) {
+            updateStep('ai', 'done', 'Tuerlisten geparst')
+            updateStep('match', 'running', progressStr)
+          }
         }
       })
       setAnalysis(result)
@@ -486,6 +533,7 @@ export default function AnalysePage() {
     setAnalysis(null)
     setOffer(null)
     setErrorMsg('')
+    setPositionProgress(null)
     setSteps(STEP_IDS.map((id, i) => ({ id, name: STEP_NAMES_SINGLE[i], state: 'pending', status: 'Warte...' })))
   }
 
@@ -504,7 +552,7 @@ export default function AnalysePage() {
         </div>
       )}
 
-      {panel === 'processing' && <ProcessingPanel steps={steps} subtitle={subtitle} />}
+      {panel === 'processing' && <ProcessingPanel steps={steps} subtitle={subtitle} positionProgress={positionProgress} />}
 
       {panel === 'results' && analysis && <ResultsPanel analysis={analysis} offer={offer} onReset={resetAll} />}
 
