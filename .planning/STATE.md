@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
-status: completed
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-03-10T21:57:54.458Z"
-last_activity: 2026-03-10 — Completed 09-02 (Detail Modal Adversarial + Dimensional Breakdown)
+milestone_name: KI-Angebotserstellung v2 Pipeline
+status: milestone_complete
+stopped_at: v1.0 milestone archived
+last_updated: "2026-03-10T23:30:00.000Z"
+last_activity: 2026-03-10 — Milestone v1.0 completed and archived
 progress:
   total_phases: 9
   completed_phases: 9
@@ -21,136 +21,31 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** 100% korrekte Zuordnung jeder Anforderung zum richtigen Produkt — oder eine explizite, begründete Gap-Meldung.
-**Current focus:** Phase 8 - Quality, Observability & End-to-End
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 9 of 9 (Frontend V2 Offer & Feedback Wiring)
-Plan: 2 of 2 in current phase
-Status: 09-02 Complete (Detail Modal & CorrectionModal v2 Wiring)
-Last activity: 2026-03-10 — Completed 09-02 (Detail Modal Adversarial + Dimensional Breakdown)
+Milestone v1.0 complete and archived.
+Next: `/gsd:new-milestone` to start next version.
 
 Progress: [██████████] 100%
-
-## Performance Metrics
-
-**Velocity:**
-- Total plans completed: 14
-- Average duration: 5.1min
-- Total execution time: 1.2 hours
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 01 | 2/2 | 11min | 5.5min |
-| 02 | 3/3 | 13min | 4.3min |
-| 03 | 3/3 | 16min | 5.3min |
-| 04 | 2/3 | 13min | 6.5min |
-| 05 | 2/2 | 14min | 7.0min |
-| 06 | 2/2 | 11min | 5.5min |
-| 07 | 2/2 | 10min | 5.0min |
-
-**Recent Trend:**
-- Last 5 plans: -
-- Trend: -
-
-*Updated after each plan completion*
-| Phase 08 P01 | 5min | 2 tasks | 6 files |
-| Phase 08 P02 | 6min | 2 tasks | 6 files |
-| Phase 08 P03 | 2min | 2 tasks | 3 files |
-| Phase 09 P01 | 5min | 2 tasks | 6 files |
-| Phase 09 P02 | 2min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
-
-- Roadmap: 8 phases derived from 38 requirements at fine granularity
-- Roadmap: Phase 4 (Matching) can start after Phase 2 (does not need Phase 3 Cross-Document)
-- Research: Use anthropic>=0.84.0 messages.parse() for structured outputs throughout
-- Research: Use Claude Opus for adversarial pass only, Sonnet for everything else
-- 01-01: Extended enum values from product catalog (SchallschutzKlasse +7 dB values, OeffnungsArt +5 types, MaterialTyp +4 wood species)
-- 01-01: Enum+freitext pattern established for all domain classifications
-- 01-02: Imported conftest_v2 fixtures via wildcard import in conftest.py
-- 01-02: XLSX parser saves workbook after unmerge then re-reads with pandas
-- 01-02: Router uses lazy imports for parsers
-- 02-01: Pass 1 uses pipe-delimited text from XLSX parser (canonical field names)
-- 02-01: Dedup pre-filter uses exact positions_nr match; AI clustering separate
-- 02-01: All prompts in German matching domain language
-- 02-02: tender_id as query param (not Form) to avoid multipart complexity
-- 02-02: In-memory dict for tender storage (single-process dev)
-- 02-02: Format priority sorting: xlsx=0, pdf=1, docx=2
-- 02-02: Lazy try/except import for v2 routers in main.py
-- 02-03: asyncio.to_thread wrapping sync Anthropic for messages.parse() async compat
-- 02-03: Pass 2 konfidenz=0.9, Pass 3 konfidenz=0.95 for provenance hierarchy
-- 02-03: Position batching at 25 per batch for Pass 3 context limits
-- 02-03: Compact position summaries (key fields only) sent to Pass 3
-- 03-01: Tiered matching: exact_id(1.0) > normalized_id(0.92) > room_floor_type(0.7), auto_merge at 0.9+
-- 03-01: Severity classification deterministic via SAFETY_FIELDS/MAJOR_FIELDS sets (not AI)
-- 03-01: Enrichment never downgrades: gap_fill and confidence_upgrade only
-- 03-01: General specs use scope matching (field==value) at konfidenz=0.7, empty fields only
-- [Phase 03]: Cross-doc groups positions by quellen source doc, only auto_merge matches processed
-- 03-03: ConflictResolutionItem/Result models internal to conflict_detector.py (not in schemas)
-- 03-03: AI resolution maps back to raw conflicts by field_name matching
-- 03-03: Rule-based fallback for unresolved individual conflicts from AI response
-- 04-01: Broad fallback query for sparse positions (no empty results)
-- 04-01: Category boost via fuzzy substring match on category name (1.3x)
-- 04-01: Safety cap pipeline: apply_safety_caps -> set_hat_match -> limit_alternatives
-- 04-02: FeedbackStoreV2 uses same German token pattern as CatalogTfidfIndex for consistent tokenization
-- 04-02: Lazy TF-IDF rebuild on next find_relevant_feedback call after correction added
-- 04-02: Matching gracefully skipped with matching_skipped flag when modules unavailable
-- 05-01: Deterministic resolution (weighted avg) instead of third Opus call for cost efficiency
-- 05-01: Safety-critical weighting: Brandschutz 2x, Masse/Schallschutz 1.5x, Leistung 0.8x
-- 05-01: FOR+AGAINST parallel within semaphore slot, Semaphore(3) for Opus rate limits
-- 05-01: Adaptive verbosity CoT: hoch (>0.9, brief) vs niedrig (<=0.9, detailed)
-- 05-02: Triple-check reuses ForArgument schema for wider pool and inverted prompt outputs
-- 05-02: Wider pool top_k=80 for expanded candidate coverage beyond standard 50
-- 05-02: Candidates deduplicated by produkt_id, higher score preserved across approaches
-- 06-01: GapDimension replaces NORM with BRANDSCHUTZ+SCHALLSCHUTZ for 1:1 MatchDimension parity
-- 06-01: Dual suggestions: kundenvorschlag (sales) + technischer_hinweis (engineering)
-- 06-01: Three-track gap processing: bestaetigt (filtered), unsicher (full), abgelehnt (text only)
-- 06-01: Safety auto-escalation as deterministic post-processing (MINOR->MAJOR for safety dims)
-- 06-01: Gap-weighted TF-IDF with 2x boost multiplier for gap dimensions
-- 06-01: Abgelehnt alternatives filtered to >30% gap coverage minimum
-- [Phase 06]: Extracted _run_gap_analysis helper for DRY gap invocation across real and synthetic adversarial paths
-- [Phase 06]: Synthetic adversarial results use UNSICHER for hat_match=True and ABGELEHNT for hat_match=False
-- 07-01: Adversarial adjusted_confidence used for all color coding, not match gesamt_konfidenz
-- 07-01: _run_gap_analysis returns raw GapReport objects for storage (not just serialized dicts)
-- 07-01: Comment truncation at 2000 chars to prevent Excel corruption
-- 07-01: analysis_id as 8-char UUID prefix for compact storage keys
-- 07-02: Lazy try/except import for anthropic SDK (graceful degradation)
-- 07-02: ExecutiveSummaryResponse Pydantic model for Claude messages.parse() structured output
-- 07-02: Statistics-only fallback summary when Claude API fails or SDK unavailable
-- 07-02: v2_result_{analysis_id}_xlsx cache key pattern with 3600s TTL
-- [Phase 08]: Duck-typed check_plausibility inputs for flexibility
-- [Phase 08]: _is_anthropic_error uses class name matching to avoid hard SDK dependency
-- [Phase 08]: Size-aware thresholds: >10 for match patterns, >5 for confidence checks
-- [Phase 08]: Progress throttle at 500ms to prevent SSE flooding
-- [Phase 08]: Fail-fast via raise_ai_error: no partial results on AI failure
-- [Phase 08]: Extraction progress scaled to 0-30% of total pipeline percent
-- [Phase 08]: V2 path detection via statusPath.startsWith('/v2/') for SSE routing
-- [Phase 08]: Removed tuerliste_count guard since v2 handles classification internally
-- [Phase 09]: Removed v1 SSE polling from useSSE.js since createSSE was removed
-- [Phase 09]: Extracted shared handleV2Progress callback for DRY progress handling
-- [Phase 09]: CorrectionModal switched to v2 feedback schema with positions_nr, produkt_id, konfidenz fields
-- [Phase 09]: IIFE pattern for adversarial section JSX with local const bindings
-- [Phase 09]: CorrectionModal v2 feedback already done in 09-01; only dimensional display added in 09-02
+Archived to PROJECT.md Key Decisions table. Full decision log in `.planning/milestones/v1.0-ROADMAP.md`.
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-- Research flag: Adversarial prompt calibration (Phase 5) needs empirical testing against v1 data
-- Research flag: Cross-document position-to-spec mapping (Phase 3) is highest-ambiguity design decision
+None — clean slate for next milestone.
 
 ## Session Continuity
 
-Last session: 2026-03-10T21:54:16.147Z
-Stopped at: Completed 09-02-PLAN.md
+Last session: 2026-03-10
+Stopped at: v1.0 milestone archived
 Resume file: None

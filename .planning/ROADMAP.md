@@ -1,185 +1,38 @@
 # Roadmap: FTAG KI-Angebotserstellung v2
 
-## Overview
+## Milestones
 
-Rebuild the core analysis engine from document parsing through Excel output, replacing v1's single-pass approach with a multi-pass, adversarially-validated pipeline. The journey moves from robust document extraction (Phases 1-3), through AI-powered matching with adversarial validation (Phases 4-5), gap analysis (Phase 6), structured Excel output (Phase 7), and finally end-to-end quality assurance with live observability (Phase 8). Each phase delivers a verifiable capability that builds on the previous.
+- ✅ **v1.0 KI-Angebotserstellung v2 Pipeline** — Phases 1-9 (shipped 2026-03-10)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+<details>
+<summary>✅ v1.0 KI-Angebotserstellung v2 Pipeline (Phases 1-9) — SHIPPED 2026-03-10</summary>
 
-Decimal phases appear between their surrounding integers in numeric order.
+- [x] Phase 1: Document Parsing & Pipeline Schemas (2/2 plans) — completed 2026-03-10
+- [x] Phase 2: Multi-Pass Extraction (3/3 plans) — completed 2026-03-10
+- [x] Phase 3: Cross-Document Intelligence (3/3 plans) — completed 2026-03-10
+- [x] Phase 4: Product Matching Engine (2/2 plans) — completed 2026-03-10
+- [x] Phase 5: Adversarial Validation (2/2 plans) — completed 2026-03-10
+- [x] Phase 6: Gap Analysis (2/2 plans) — completed 2026-03-10
+- [x] Phase 7: Excel Output Generation (2/2 plans) — completed 2026-03-10
+- [x] Phase 8: Quality, Observability & End-to-End (3/3 plans) — completed 2026-03-10
+- [x] Phase 9: Frontend V2 Offer & Feedback Wiring (2/2 plans) — completed 2026-03-10
 
-- [x] **Phase 1: Document Parsing & Pipeline Schemas** - Robust per-format parsers (PDF/DOCX/XLSX) plus Pydantic data contracts for the entire pipeline (completed 2026-03-10)
-- [x] **Phase 2: Multi-Pass Extraction** - Multi-file upload with structural + AI semantic + cross-reference validation passes (completed 2026-03-10)
-- [x] **Phase 3: Cross-Document Intelligence** - Merge requirements across document types and detect inter-document conflicts (completed 2026-03-10)
-- [x] **Phase 4: Product Matching Engine** - TF-IDF pre-filter + AI matching with multi-dimensional confidence scores and feedback integration (completed 2026-03-10)
-- [x] **Phase 5: Adversarial Validation** - Double-check and triple-check passes that actively challenge matches with chain-of-thought reasoning (completed 2026-03-10)
-- [x] **Phase 6: Gap Analysis** - Categorized gap reports with severity ratings and alternative product suggestions (completed 2026-03-10)
-- [x] **Phase 7: Excel Output Generation** - 4-sheet Excel with color-coding, reasoning columns, and executive summary (completed 2026-03-10)
-- [x] **Phase 8: Quality, Observability & End-to-End** - Plausibility checks, step logging, live progress streaming, and full pipeline integration (completed 2026-03-10)
-- [ ] **Phase 9: Frontend V2 Offer & Feedback Wiring** - Wire frontend folder workflow to v2 result shape, v2 offer generation, v2 Excel download, and v2 feedback endpoint (Gap Closure)
+Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
-## Phase Details
-
-### Phase 1: Document Parsing & Pipeline Schemas
-**Goal**: Every document format (PDF, DOCX, XLSX) is reliably parsed into structured text, and all Pydantic models for the entire pipeline are defined as data contracts between stages
-**Depends on**: Nothing (first phase)
-**Requirements**: DOKA-01, DOKA-02, DOKA-03
-**Success Criteria** (what must be TRUE):
-  1. User uploads a PDF containing tables and receives complete text with table structure preserved
-  2. User uploads a DOCX file and receives text with formatting context intact
-  3. User uploads an XLSX door list and the system automatically detects column structure without manual configuration
-  4. All pipeline Pydantic schemas (ExtractedRequirement, MatchResult, AdversarialResult, GapReport) are defined and importable by downstream services
-**Plans**: 2 plans
-
-Plans:
-- [ ] 01-01-PLAN.md — V2 project scaffolding, Pydantic schemas, exceptions, and test infrastructure
-- [ ] 01-02-PLAN.md — PDF, DOCX, and XLSX parsers with format-detection router
-
-### Phase 2: Multi-Pass Extraction
-**Goal**: Users can upload multiple files per tender and get a complete, deduplicated list of every technical requirement extracted through multiple analysis passes
-**Depends on**: Phase 1
-**Requirements**: DOKA-04, DOKA-05, DOKA-06, APII-01
-**Success Criteria** (what must be TRUE):
-  1. User can upload a mixed set of PDF + Excel + DOCX files in a single analysis request
-  2. System performs at least 3 passes per document (structural, AI semantic, cross-reference validation) and extracts requirements missed by any single pass
-  3. Every technical requirement (dimensions, materials, fire ratings, certifications, performance data) is extracted as an individual data point with its source location
-  4. Duplicate requirements from multiple passes are merged (e.g., "T1.01", "Tuer 1.01", "Position 1.01" resolve to one entry)
-  5. POST /api/upload accepts multiple files per tender
-**Plans**: 3 plans
-
-Plans:
-- [ ] 02-01-PLAN.md — Pass 1 structural extraction, page chunking, dedup module, and prompt templates
-- [ ] 02-02-PLAN.md — V2 upload and analyze API endpoints with tender_id session management
-- [ ] 02-03-PLAN.md — Pass 2 AI semantic, Pass 3 cross-reference validation, pipeline orchestrator, and API wiring
-
-### Phase 3: Cross-Document Intelligence
-**Goal**: Requirements are enriched with data from all uploaded documents, and contradictions between documents are surfaced before matching begins
-**Depends on**: Phase 2
-**Requirements**: DOKA-07, DOKA-08
-**Success Criteria** (what must be TRUE):
-  1. When a door position appears in both an Excel door list and a PDF specification, the system merges all attributes into one enriched requirement record
-  2. When documents contain conflicting specifications (e.g., different fire ratings for the same position), the system flags the conflict with both values and their source documents
-  3. Cross-document enrichment results are visible in the final output (user can see which data came from which document)
-**Plans**: 3 plans
-
-Plans:
-- [ ] 03-01-PLAN.md — Schemas, cross-doc matcher, enrichment engine, conflict detector, and prompt templates
-- [ ] 03-02-PLAN.md — Pipeline integration, API response extension, and end-to-end wiring
-- [ ] 03-03-PLAN.md — Gap closure: wire AI conflict resolution in conflict_detector.py
-
-### Phase 4: Product Matching Engine
-**Goal**: Every extracted requirement is matched against the FTAG product catalog with multi-dimensional confidence scoring and learning from past corrections
-**Depends on**: Phase 2
-**Requirements**: MATC-01, MATC-02, MATC-03, MATC-04, MATC-09, APII-06
-**Success Criteria** (what must be TRUE):
-  1. Every extracted requirement is compared against the full FTAG catalog (~891 products) using TF-IDF pre-filtering followed by AI evaluation
-  2. Each match includes a confidence score (0-100%) broken down by dimension (dimensions, fire protection, sound insulation, material, certification, performance)
-  3. Matches scoring 95%+ are flagged as confirmed; below 95% are flagged for further validation or gap analysis
-  4. Previous matching corrections (feedback) are injected as few-shot examples in AI matching calls
-  5. POST /api/feedback saves corrections that improve future analyses
-**Plans**: 2 plans
-
-Plans:
-- [ ] 04-01-PLAN.md — TF-IDF weighted index, AI matcher with structured output, domain knowledge, and safety caps
-- [ ] 04-02-PLAN.md — Feedback V2 store with TF-IDF retrieval, feedback API endpoint, and pipeline wiring
-
-### Phase 5: Adversarial Validation
-**Goal**: Every match is challenged by an independent AI pass that actively tries to disprove it, with transparent chain-of-thought reasoning for all decisions
-**Depends on**: Phase 4
-**Requirements**: MATC-05, MATC-06, MATC-07, MATC-08
-**Success Criteria** (what must be TRUE):
-  1. Every match undergoes a second AI call (adversarial pass) that attempts to find reasons the match is wrong
-  2. Matches with post-adversarial confidence below 95% trigger a third AI call with an alternative prompt strategy
-  3. Every match decision includes step-by-step chain-of-thought reasoning explaining why the product was selected
-  4. When multiple products could match a requirement, all candidates are listed with individual confidence scores and reasoning
-**Plans**: 2 plans
-
-Plans:
-- [ ] 05-01-PLAN.md — AdversarialResult schemas, German FOR/AGAINST debate prompts, and concurrent adversarial validation engine
-- [ ] 05-02-PLAN.md — Triple-check ensemble (wider pool + inverted prompt) and analyze endpoint integration
-
-### Phase 6: Gap Analysis
-**Goal**: Every non-match or partial match gets a detailed, categorized gap report with severity and actionable suggestions
-**Depends on**: Phase 5
-**Requirements**: GAPA-01, GAPA-02, GAPA-03, GAPA-04, GAPA-05
-**Success Criteria** (what must be TRUE):
-  1. Every non-match includes a detailed analysis of which specific properties deviate from the requirement
-  2. Gaps are categorized by dimension (dimensions, material, norm, certification, performance)
-  3. Each gap has a severity rating: Critical (no solution exists), Major (significant deviation), Minor (close to matching)
-  4. System generates a suggestion for what would need to change for a product to match the requirement
-  5. Alternative products that could partially close the gap are suggested with explanation of remaining deviations
-**Plans**: 2 plans
-
-Plans:
-- [ ] 06-01-PLAN.md — Gap schemas expansion, gap analyzer engine with Opus calls, German prompts, and test suite
-- [ ] 06-02-PLAN.md — Wire gap analysis into analyze endpoint with graceful degradation
-
-### Phase 7: Excel Output Generation
-**Goal**: The complete analysis (matches, gaps, reasoning) is exported as a professional 4-sheet Excel file that the sales team can use directly for customer offers
-**Depends on**: Phase 6
-**Requirements**: EXEL-01, EXEL-02, EXEL-03, EXEL-04, EXEL-05, EXEL-06, APII-04, APII-05
-**Success Criteria** (what must be TRUE):
-  1. Generated Excel contains Sheet 1 "Uebersicht" with all requirements and their match status at a glance
-  2. Generated Excel contains Sheet 2 "Details" with requirement-to-product mapping, confidence scores, dimensional breakdown, and reasoning
-  3. Generated Excel contains Sheet 3 "Gap-Analyse" with all non-matches, gap reasons, deviations, severity, and alternative suggestions
-  4. Generated Excel contains Sheet 4 "Executive Summary" with statistics, overall assessment, and recommendations
-  5. Cells are color-coded: green (95%+ match), yellow (60-95% partial), red (<60% no match) and every decision cell explains WHY
-**Plans**: 2 plans
-
-Plans:
-- [ ] 07-01-PLAN.md — 4-sheet Excel generator with color coding, cell comments, and test suite
-- [ ] 07-02-PLAN.md — API endpoints (offer/generate + offer/download) with Executive Summary AI call
-
-### Phase 8: Quality, Observability & End-to-End
-**Goal**: The full pipeline runs reliably end-to-end with real-time progress visibility, plausibility validation, and clear error reporting
-**Depends on**: Phase 7
-**Requirements**: QUAL-01, QUAL-02, QUAL-03, QUAL-04, APII-02, APII-03
-**Success Criteria** (what must be TRUE):
-  1. After analysis completes, a plausibility check validates that all positions are covered, no duplicates exist, and no suspicious patterns are present
-  2. Every analysis step is logged with detail (which requirement, which pass, which result) for post-hoc debugging
-  3. User sees live progress in the frontend showing which step is running and which position is being processed
-  4. If the AI service fails, the user receives a clear error message instead of partial or degraded results
-  5. POST /api/analyze triggers the full pipeline with SSE streaming for real-time progress, and GET /api/analyze/status/{job_id} returns detailed position-level progress
-**Plans**: 3 plans
-
-Plans:
-- [x] 08-01-PLAN.md — PlausibilityChecker, structured step logging, and fail-fast AI error handling
-- [x] 08-02-PLAN.md — Background job execution with SSE streaming, progress callbacks, and frontend integration
-- [ ] 08-03-PLAN.md — Gap closure: wire frontend folder workflow to v2 upload + analyze endpoints
-
-### Phase 9: Frontend V2 Offer & Feedback Wiring
-**Goal**: Frontend folder workflow consumes v2 pipeline response correctly, generates v2 4-sheet Excel via POST /api/offer/generate, downloads via GET /api/offer/{id}/download, and sends corrections to POST /api/v2/feedback
-**Depends on**: Phase 7, Phase 8
-**Requirements**: EXEL-01, EXEL-02, EXEL-03, EXEL-04, EXEL-05, EXEL-06, APII-04, APII-05, MATC-09, GAPA-05
-**Gap Closure**: Closes all frontend-backend integration gaps from v1.0 audit
-**Success Criteria** (what must be TRUE):
-  1. After v2 analysis completes, runFolderWorkflow reads positionen, match_results, adversarial_results, gap_results from the v2 response (not v1-shaped keys)
-  2. Frontend calls POST /api/offer/generate with analysis_id from v2 response, polls status, and downloads the 4-sheet Excel file
-  3. CorrectionModal detects v2 analysis context and sends corrections to POST /api/v2/feedback with v2 schema (positions_nr, original_produkt_id, corrected_produkt_id, etc.)
-  4. Downloaded Excel contains all 4 sheets (Uebersicht, Details, Gap-Analyse, Executive Summary) with color coding and reasoning
-**Plans**: 2 plans
-
-Plans:
-- [ ] 09-01-PLAN.md — Backend single-file endpoint, v2 result mapper, v2 API functions, and workflow rewiring
-- [ ] 09-02-PLAN.md — PositionDetailModal adversarial/gap sections and CorrectionModal v2 feedback wiring
+</details>
 
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
-
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Document Parsing & Pipeline Schemas | 2/2 | Complete   | 2026-03-10 |
-| 2. Multi-Pass Extraction | 3/3 | Complete   | 2026-03-10 |
-| 3. Cross-Document Intelligence | 3/3 | Complete   | 2026-03-10 |
-| 4. Product Matching Engine | 2/2 | Complete   | 2026-03-10 |
-| 5. Adversarial Validation | 2/2 | Complete   | 2026-03-10 |
-| 6. Gap Analysis | 2/2 | Complete   | 2026-03-10 |
-| 7. Excel Output Generation | 2/2 | Complete   | 2026-03-10 |
-| 8. Quality, Observability & End-to-End | 3/3 | Complete   | 2026-03-10 |
-| 9. Frontend V2 Offer & Feedback Wiring | 0/2 | Not started | - |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Document Parsing & Pipeline Schemas | v1.0 | 2/2 | Complete | 2026-03-10 |
+| 2. Multi-Pass Extraction | v1.0 | 3/3 | Complete | 2026-03-10 |
+| 3. Cross-Document Intelligence | v1.0 | 3/3 | Complete | 2026-03-10 |
+| 4. Product Matching Engine | v1.0 | 2/2 | Complete | 2026-03-10 |
+| 5. Adversarial Validation | v1.0 | 2/2 | Complete | 2026-03-10 |
+| 6. Gap Analysis | v1.0 | 2/2 | Complete | 2026-03-10 |
+| 7. Excel Output Generation | v1.0 | 2/2 | Complete | 2026-03-10 |
+| 8. Quality, Observability & End-to-End | v1.0 | 3/3 | Complete | 2026-03-10 |
+| 9. Frontend V2 Offer & Feedback Wiring | v1.0 | 2/2 | Complete | 2026-03-10 |
