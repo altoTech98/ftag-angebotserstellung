@@ -575,3 +575,350 @@ class TestValidatePositions:
         # Check different position numbers preserved
         pos_nrs = {r.positions_nr for r in results}
         assert pos_nrs == {"1.01", "2.01", "3.01"}
+
+
+# ---------------------------------------------------------------------------
+# Plan 02 Task 1: Triple-Check Ensemble Tests
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_tfidf_index(num_results: int = 80):
+    """Create a mock TF-IDF index that returns dummy search results."""
+    mock_idx = MagicMock()
+    mock_idx.search = MagicMock(
+        return_value=[(i, 0.9 - i * 0.01) for i in range(num_results)]
+    )
+    # Mock catalog_rows for product data lookup
+    mock_idx.catalog_rows = [
+        {"produkt_id": f"KT-{i:03d}", "produkt_name": f"Product {i}"}
+        for i in range(num_results)
+    ]
+    return mock_idx
+
+
+def _make_mock_triple_check_client(
+    wider_konfidenz: float = 0.96,
+    inverted_konfidenz: float = 0.93,
+    wider_dim_scores: dict[str, float] | None = None,
+    inverted_dim_scores: dict[str, float] | None = None,
+):
+    """Mock client that returns FOR/AGAINST for debate, then wider pool + inverted for triple-check.
+
+    Call sequence:
+      1. FOR debate call -> ForArgument
+      2. AGAINST debate call -> AgainstArgument
+      3. Wider pool triple-check -> ForArgument (reused as structured match)
+      4. Inverted prompt triple-check -> ForArgument (reused as structured match)
+    """
+    default_wider = {
+        "Masse": 0.97, "Brandschutz": 0.96, "Schallschutz": 0.95,
+        "Material": 0.96, "Zertifizierung": 0.95, "Leistung": 0.97,
+    }
+    default_inverted = {
+        "Masse": 0.94, "Brandschutz": 0.93, "Schallschutz": 0.92,
+        "Material": 0.93, "Zertifizierung": 0.91, "Leistung": 0.94,
+    }
+    w_scores = wider_dim_scores or default_wider
+    i_scores = inverted_dim_scores or default_inverted
+
+    # Debate: FOR response (low scores to trigger triple-check)
+    low_debate = {
+        "Masse": 0.80, "Brandschutz": 0.75, "Schallschutz": 0.70,
+        "Material": 0.75, "Zertifizierung": 0.72, "Leistung": 0.80,
+    }
+    for_response = MagicMock()
+    for_response.parsed = _make_mock_for_response(konfidenz=0.75, dim_scores=low_debate)
+
+    against_response = MagicMock()
+    against_response.parsed = _make_mock_against_response(konfidenz=0.60, dim_scores=low_debate)
+
+    # Triple-check: wider pool response
+    wider_response = MagicMock()
+    wider_response.parsed = _make_mock_for_response(konfidenz=wider_konfidenz, dim_scores=w_scores)
+
+    # Triple-check: inverted prompt response
+    inverted_response = MagicMock()
+    inverted_response.parsed = _make_mock_for_response(konfidenz=inverted_konfidenz, dim_scores=i_scores)
+
+    mock_client = MagicMock()
+    mock_client.messages = MagicMock()
+    mock_client.messages.parse = MagicMock(
+        side_effect=[for_response, against_response, wider_response, inverted_response] * 5
+    )
+    return mock_client
+
+
+class TestTripleCheckTrigger:
+    """Tests that triple-check is triggered when adjusted_confidence < 0.95."""
+
+    @pytest.mark.asyncio
+    async def test_triple_check_triggered_below_95(self):
+        """triple_check_position is called when adjusted_confidence < 0.95 after debate."""
+        from v2.matching.adversarial import validate_single_position
+
+        mock_client = _make_mock_triple_check_client()
+        match_result = _make_test_match_result(gesamt_konfidenz=0.80)
+        semaphore = asyncio.Semaphore(3)
+        mock_tfidf = _make_mock_tfidf_index()
+
+        result = await validate_single_position(
+            client=mock_client,
+            match_result=match_result,
+            semaphore=semaphore,
+            tfidf_index=mock_tfidf,
+        )
+
+        assert result.triple_check_used is True
+
+    @pytest.mark.asyncio
+    async def test_triple_check_NOT_triggered_above_95(self):
+        """triple_check_position is NOT called when adjusted_confidence >= 0.95."""
+        from v2.matching.adversarial import validate_single_position
+
+        high_scores = {
+            "Masse": 0.98, "Brandschutz": 0.97, "Schallschutz": 0.96,
+            "Material": 0.97, "Zertifizierung": 0.96, "Leistung": 0.98,
+        }
+        mock_client = _make_mock_opus_client(
+            for_konfidenz=0.98,
+            against_konfidenz=0.05,
+            for_dim_scores=high_scores,
+            against_dim_scores=high_scores,
+        )
+        match_result = _make_test_match_result(gesamt_konfidenz=0.97)
+        semaphore = asyncio.Semaphore(3)
+        mock_tfidf = _make_mock_tfidf_index()
+
+        result = await validate_single_position(
+            client=mock_client,
+            match_result=match_result,
+            semaphore=semaphore,
+            tfidf_index=mock_tfidf,
+        )
+
+        assert result.triple_check_used is False
+        assert result.validation_status == ValidationStatus.BESTAETIGT
+
+
+class TestTripleCheckApproaches:
+    """Tests for wider pool and inverted prompt approaches."""
+
+    @pytest.mark.asyncio
+    async def test_wider_pool_uses_top_k_80(self):
+        """wider pool approach uses tfidf_index.search with top_k=80."""
+        from v2.matching.adversarial import validate_single_position
+
+        mock_client = _make_mock_triple_check_client()
+        match_result = _make_test_match_result(gesamt_konfidenz=0.80)
+        semaphore = asyncio.Semaphore(3)
+        mock_tfidf = _make_mock_tfidf_index()
+
+        result = await validate_single_position(
+            client=mock_client,
+            match_result=match_result,
+            semaphore=semaphore,
+            tfidf_index=mock_tfidf,
+        )
+
+        # Verify tfidf_index.search was called with top_k=80
+        search_calls = mock_tfidf.search.call_args_list
+        assert any(
+            call.kwargs.get("top_k") == 80 or (len(call.args) > 1 and call.args[1] == 80)
+            for call in search_calls
+        ), f"Expected search with top_k=80, got calls: {search_calls}"
+
+    @pytest.mark.asyncio
+    async def test_inverted_prompt_uses_different_prompt(self):
+        """inverted prompt approach uses requirement-centric prompt (INVERTED_SYSTEM_PROMPT)."""
+        from v2.matching.adversarial_prompts import INVERTED_SYSTEM_PROMPT
+        assert "INVERTED_SYSTEM_PROMPT" is not None
+        assert len(INVERTED_SYSTEM_PROMPT) > 50
+        # Check it's requirement-centric, not product-centric
+        assert "Anforderung" in INVERTED_SYSTEM_PROMPT or "anforderung" in INVERTED_SYSTEM_PROMPT.lower()
+
+    @pytest.mark.asyncio
+    async def test_higher_confidence_result_selected(self):
+        """higher-confidence result from the two triple-check approaches is selected."""
+        from v2.matching.adversarial import validate_single_position
+
+        # wider_konfidenz=0.96 > inverted_konfidenz=0.93 -> wider wins
+        mock_client = _make_mock_triple_check_client(
+            wider_konfidenz=0.96, inverted_konfidenz=0.93,
+        )
+        match_result = _make_test_match_result(gesamt_konfidenz=0.80)
+        semaphore = asyncio.Semaphore(3)
+        mock_tfidf = _make_mock_tfidf_index()
+
+        result = await validate_single_position(
+            client=mock_client,
+            match_result=match_result,
+            semaphore=semaphore,
+            tfidf_index=mock_tfidf,
+        )
+
+        assert result.triple_check_used is True
+        assert result.triple_check_method == "wider_pool"
+
+    @pytest.mark.asyncio
+    async def test_inverted_wins_when_higher(self):
+        """inverted prompt wins when its confidence is higher."""
+        from v2.matching.adversarial import validate_single_position
+
+        high_inverted = {
+            "Masse": 0.98, "Brandschutz": 0.98, "Schallschutz": 0.97,
+            "Material": 0.98, "Zertifizierung": 0.97, "Leistung": 0.98,
+        }
+        low_wider = {
+            "Masse": 0.90, "Brandschutz": 0.88, "Schallschutz": 0.87,
+            "Material": 0.89, "Zertifizierung": 0.86, "Leistung": 0.90,
+        }
+        mock_client = _make_mock_triple_check_client(
+            wider_konfidenz=0.88, inverted_konfidenz=0.98,
+            wider_dim_scores=low_wider, inverted_dim_scores=high_inverted,
+        )
+        match_result = _make_test_match_result(gesamt_konfidenz=0.80)
+        semaphore = asyncio.Semaphore(3)
+        mock_tfidf = _make_mock_tfidf_index()
+
+        result = await validate_single_position(
+            client=mock_client,
+            match_result=match_result,
+            semaphore=semaphore,
+            tfidf_index=mock_tfidf,
+        )
+
+        assert result.triple_check_used is True
+        assert result.triple_check_method == "inverted_prompt"
+
+
+class TestTripleCheckOutcomes:
+    """Tests for triple-check outcome handling."""
+
+    @pytest.mark.asyncio
+    async def test_still_unsicher_below_95_after_triple_check(self):
+        """If still below 95% after triple-check, validation_status is 'unsicher'."""
+        from v2.matching.adversarial import validate_single_position
+
+        low_scores = {
+            "Masse": 0.85, "Brandschutz": 0.80, "Schallschutz": 0.78,
+            "Material": 0.82, "Zertifizierung": 0.79, "Leistung": 0.85,
+        }
+        mock_client = _make_mock_triple_check_client(
+            wider_konfidenz=0.82, inverted_konfidenz=0.80,
+            wider_dim_scores=low_scores, inverted_dim_scores=low_scores,
+        )
+        match_result = _make_test_match_result(gesamt_konfidenz=0.75)
+        semaphore = asyncio.Semaphore(3)
+        mock_tfidf = _make_mock_tfidf_index()
+
+        result = await validate_single_position(
+            client=mock_client,
+            match_result=match_result,
+            semaphore=semaphore,
+            tfidf_index=mock_tfidf,
+        )
+
+        assert result.triple_check_used is True
+        assert result.validation_status == ValidationStatus.UNSICHER
+
+    @pytest.mark.asyncio
+    async def test_bestaetigt_after_triple_check_raises_above_95(self):
+        """If triple-check raises confidence to 95%+, validation_status is 'bestaetigt'."""
+        from v2.matching.adversarial import validate_single_position
+
+        mock_client = _make_mock_triple_check_client(
+            wider_konfidenz=0.96, inverted_konfidenz=0.93,
+        )
+        match_result = _make_test_match_result(gesamt_konfidenz=0.80)
+        semaphore = asyncio.Semaphore(3)
+        mock_tfidf = _make_mock_tfidf_index()
+
+        result = await validate_single_position(
+            client=mock_client,
+            match_result=match_result,
+            semaphore=semaphore,
+            tfidf_index=mock_tfidf,
+        )
+
+        assert result.triple_check_used is True
+        assert result.validation_status == ValidationStatus.BESTAETIGT
+
+    @pytest.mark.asyncio
+    async def test_api_calls_count_includes_triple_check(self):
+        """api_calls_count includes triple-check calls: 2 base + 2 triple-check = 4."""
+        from v2.matching.adversarial import validate_single_position
+
+        mock_client = _make_mock_triple_check_client()
+        match_result = _make_test_match_result(gesamt_konfidenz=0.80)
+        semaphore = asyncio.Semaphore(3)
+        mock_tfidf = _make_mock_tfidf_index()
+
+        result = await validate_single_position(
+            client=mock_client,
+            match_result=match_result,
+            semaphore=semaphore,
+            tfidf_index=mock_tfidf,
+        )
+
+        assert result.api_calls_count == 4  # 2 debate + 2 triple-check
+
+    @pytest.mark.asyncio
+    async def test_triple_check_method_records_winning_approach(self):
+        """triple_check_method records which approach won."""
+        from v2.matching.adversarial import validate_single_position
+
+        mock_client = _make_mock_triple_check_client(
+            wider_konfidenz=0.96, inverted_konfidenz=0.93,
+        )
+        match_result = _make_test_match_result(gesamt_konfidenz=0.80)
+        semaphore = asyncio.Semaphore(3)
+        mock_tfidf = _make_mock_tfidf_index()
+
+        result = await validate_single_position(
+            client=mock_client,
+            match_result=match_result,
+            semaphore=semaphore,
+            tfidf_index=mock_tfidf,
+        )
+
+        assert result.triple_check_method in ("wider_pool", "inverted_prompt")
+
+    @pytest.mark.asyncio
+    async def test_triple_check_reasoning_from_winning_approach(self):
+        """triple_check_reasoning contains explanation from winning approach."""
+        from v2.matching.adversarial import validate_single_position
+
+        mock_client = _make_mock_triple_check_client()
+        match_result = _make_test_match_result(gesamt_konfidenz=0.80)
+        semaphore = asyncio.Semaphore(3)
+        mock_tfidf = _make_mock_tfidf_index()
+
+        result = await validate_single_position(
+            client=mock_client,
+            match_result=match_result,
+            semaphore=semaphore,
+            tfidf_index=mock_tfidf,
+        )
+
+        assert result.triple_check_reasoning is not None
+        assert len(result.triple_check_reasoning) > 0
+
+    @pytest.mark.asyncio
+    async def test_triple_check_candidates_in_alternatives(self):
+        """All candidates from triple-check are included in alternative_candidates."""
+        from v2.matching.adversarial import validate_single_position
+
+        mock_client = _make_mock_triple_check_client()
+        match_result = _make_test_match_result(gesamt_konfidenz=0.80, num_alternatives=1)
+        semaphore = asyncio.Semaphore(3)
+        mock_tfidf = _make_mock_tfidf_index()
+
+        result = await validate_single_position(
+            client=mock_client,
+            match_result=match_result,
+            semaphore=semaphore,
+            tfidf_index=mock_tfidf,
+        )
+
+        # Should have alternatives from debate + triple-check
+        assert len(result.alternative_candidates) >= 1
