@@ -10,8 +10,8 @@ progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 10
-  completed_plans: 10
-  percent: 53
+  completed_plans: 11
+  percent: 58
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** 100% korrekte Zuordnung jeder Anforderung zum richtigen Produkt — oder eine explizite, begründete Gap-Meldung.
-**Current focus:** Phase 4 - Product Matching (next)
+**Current focus:** Phase 5 - Adversarial Validation (in progress)
 
 ## Current Position
 
-Phase: 4 of 8 (Product Matching Engine) - IN PROGRESS
-Plan: 2 of 3 in current phase
-Status: 04-02 Complete (Feedback Integration + Pipeline Wiring)
-Last activity: 2026-03-10 — Completed 04-02 (Feedback + Pipeline Wiring)
+Phase: 5 of 8 (Adversarial Validation) - IN PROGRESS
+Plan: 1 of 2 in current phase
+Status: 05-01 Complete (Adversarial Debate Engine)
+Last activity: 2026-03-10 — Completed 05-01 (Adversarial Debate Engine)
 
-Progress: [██████░░░░] 53%
+Progress: [██████░░░░] 58%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
-- Average duration: 5.0min
-- Total execution time: 0.8 hours
+- Total plans completed: 11
+- Average duration: 5.2min
+- Total execution time: 0.9 hours
 
 **By Phase:**
 
@@ -47,6 +47,7 @@ Progress: [██████░░░░] 53%
 | 02 | 3/3 | 13min | 4.3min |
 | 03 | 3/3 | 16min | 5.3min |
 | 04 | 2/3 | 13min | 6.5min |
+| 05 | 1/2 | 7min | 7.0min |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -95,6 +96,10 @@ Recent decisions affecting current work:
 - 04-02: FeedbackStoreV2 uses same German token pattern as CatalogTfidfIndex for consistent tokenization
 - 04-02: Lazy TF-IDF rebuild on next find_relevant_feedback call after correction added
 - 04-02: Matching gracefully skipped with matching_skipped flag when modules unavailable
+- 05-01: Deterministic resolution (weighted avg) instead of third Opus call for cost efficiency
+- 05-01: Safety-critical weighting: Brandschutz 2x, Masse/Schallschutz 1.5x, Leistung 0.8x
+- 05-01: FOR+AGAINST parallel within semaphore slot, Semaphore(3) for Opus rate limits
+- 05-01: Adaptive verbosity CoT: hoch (>0.9, brief) vs niedrig (<=0.9, detailed)
 
 ### Pending Todos
 
@@ -107,6 +112,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T17:21:50.659Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-adversarial-validation/05-CONTEXT.md
+Last session: 2026-03-10T18:04:33Z
+Stopped at: Completed 05-01-PLAN.md
+Resume file: .planning/phases/05-adversarial-validation/05-01-SUMMARY.md
