@@ -143,11 +143,11 @@ Plans:
   3. User sees live progress in the frontend showing which step is running and which position is being processed
   4. If the AI service fails, the user receives a clear error message instead of partial or degraded results
   5. POST /api/analyze triggers the full pipeline with SSE streaming for real-time progress, and GET /api/analyze/status/{job_id} returns detailed position-level progress
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 08-01: TBD
-- [ ] 08-02: TBD
+- [ ] 08-01-PLAN.md — PlausibilityChecker, structured step logging, and fail-fast AI error handling
+- [ ] 08-02-PLAN.md — Background job execution with SSE streaming, progress callbacks, and frontend integration
 
 ## Progress
 
