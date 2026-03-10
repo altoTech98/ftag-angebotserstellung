@@ -12,7 +12,7 @@ Rebuild the core analysis engine from document parsing through Excel output, rep
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Document Parsing & Pipeline Schemas** - Robust per-format parsers (PDF/DOCX/XLSX) plus Pydantic data contracts for the entire pipeline
+- [x] **Phase 1: Document Parsing & Pipeline Schemas** - Robust per-format parsers (PDF/DOCX/XLSX) plus Pydantic data contracts for the entire pipeline (completed 2026-03-10)
 - [ ] **Phase 2: Multi-Pass Extraction** - Multi-file upload with structural + AI semantic + cross-reference validation passes
 - [ ] **Phase 3: Cross-Document Intelligence** - Merge requirements across document types and detect inter-document conflicts
 - [ ] **Phase 4: Product Matching Engine** - TF-IDF pre-filter + AI matching with multi-dimensional confidence scores and feedback integration
@@ -153,7 +153,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Document Parsing & Pipeline Schemas | 1/2 | In Progress|  |
+| 1. Document Parsing & Pipeline Schemas | 2/2 | Complete   | 2026-03-10 |
 | 2. Multi-Pass Extraction | 0/2 | Not started | - |
 | 3. Cross-Document Intelligence | 0/1 | Not started | - |
 | 4. Product Matching Engine | 0/2 | Not started | - |
