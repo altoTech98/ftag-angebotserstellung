@@ -19,6 +19,25 @@ from v2.schemas.common import (
     ZargenTyp,
 )
 from v2.schemas.extraction import ExtractedDoorPosition
+from v2.schemas.matching import (
+    DimensionScore,
+    MatchCandidate,
+    MatchDimension,
+    MatchResult,
+)
+from v2.schemas.adversarial import (
+    AdversarialCandidate,
+    AdversarialResult,
+    DimensionCoT,
+    ValidationStatus,
+)
+from v2.schemas.gaps import (
+    AlternativeProduct,
+    GapDimension,
+    GapItem,
+    GapReport,
+    GapSeverity,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -291,3 +310,297 @@ def sample_door_position() -> ExtractedDoorPosition:
             ),
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 7: Excel output generation fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def sample_positions() -> list[ExtractedDoorPosition]:
+    """3 sample positions for Excel output tests."""
+    return [
+        ExtractedDoorPosition(
+            positions_nr="1.01",
+            positions_bezeichnung="Buerotuere EG",
+            quellen={
+                "breite_mm": FieldSource(dokument="tuerliste.xlsx", zeile=2, konfidenz=0.95),
+            },
+        ),
+        ExtractedDoorPosition(
+            positions_nr="1.02",
+            positions_bezeichnung="Flurtuere OG",
+            quellen={
+                "breite_mm": FieldSource(dokument="spec.pdf", seite=3, konfidenz=0.9),
+            },
+        ),
+        ExtractedDoorPosition(
+            positions_nr="1.03",
+            positions_bezeichnung="Kellertuere UG",
+            quellen={},
+        ),
+    ]
+
+
+def _make_dimension_scores(scores: dict[str, float]) -> list[DimensionScore]:
+    """Helper to create DimensionScore list from {dim_name: score} dict."""
+    return [
+        DimensionScore(
+            dimension=MatchDimension(dim),
+            score=score,
+            begruendung=f"Bewertung fuer {dim}: {score:.0%} Uebereinstimmung",
+        )
+        for dim, score in scores.items()
+    ]
+
+
+@pytest.fixture
+def sample_match_results() -> list[MatchResult]:
+    """3 MatchResult objects: high-confidence, partial, no-match."""
+    return [
+        MatchResult(
+            positions_nr="1.01",
+            bester_match=MatchCandidate(
+                produkt_id="P-100",
+                produkt_name="Buerotuere Standard EI30",
+                gesamt_konfidenz=0.95,
+                dimension_scores=_make_dimension_scores({
+                    "Masse": 0.98, "Brandschutz": 0.95, "Schallschutz": 0.90,
+                    "Material": 0.97, "Zertifizierung": 0.92, "Leistung": 0.88,
+                }),
+                begruendung="Sehr gute Uebereinstimmung bei allen Dimensionen",
+            ),
+            alternative_matches=[],
+            hat_match=True,
+            match_methode="tfidf_ai",
+        ),
+        MatchResult(
+            positions_nr="1.02",
+            bester_match=MatchCandidate(
+                produkt_id="P-200",
+                produkt_name="Flurtuere Brandschutz EI60",
+                gesamt_konfidenz=0.72,
+                dimension_scores=_make_dimension_scores({
+                    "Masse": 0.85, "Brandschutz": 0.60, "Schallschutz": 0.70,
+                    "Material": 0.80, "Zertifizierung": 0.65, "Leistung": 0.72,
+                }),
+                begruendung="Teilweise Uebereinstimmung, Brandschutz abweichend",
+            ),
+            alternative_matches=[],
+            hat_match=True,
+            match_methode="tfidf_ai",
+        ),
+        MatchResult(
+            positions_nr="1.03",
+            bester_match=MatchCandidate(
+                produkt_id="P-300",
+                produkt_name="Kellertuere Basis",
+                gesamt_konfidenz=0.35,
+                dimension_scores=_make_dimension_scores({
+                    "Masse": 0.40, "Brandschutz": 0.20, "Schallschutz": 0.30,
+                    "Material": 0.50, "Zertifizierung": 0.25, "Leistung": 0.45,
+                }),
+                begruendung="Keine passende Uebereinstimmung",
+            ),
+            alternative_matches=[],
+            hat_match=False,
+            match_methode="tfidf_ai",
+        ),
+    ]
+
+
+def _make_dimension_cot(scores: dict[str, tuple[float, str]]) -> list[DimensionCoT]:
+    """Helper: {dim_name: (score, reasoning)} -> list[DimensionCoT]."""
+    return [
+        DimensionCoT(
+            dimension=dim,
+            score=score,
+            reasoning=reasoning,
+            confidence_level="hoch" if score > 0.9 else "niedrig",
+        )
+        for dim, (score, reasoning) in scores.items()
+    ]
+
+
+@pytest.fixture
+def sample_adversarial_results() -> list[AdversarialResult]:
+    """3 AdversarialResult objects: bestaetigt (0.97), unsicher (0.75), abgelehnt (0.40)."""
+    return [
+        AdversarialResult(
+            positions_nr="1.01",
+            validation_status=ValidationStatus.BESTAETIGT,
+            adjusted_confidence=0.97,
+            bester_match=AdversarialCandidate(
+                produkt_id="P-100",
+                produkt_name="Buerotuere Standard EI30",
+                adjusted_confidence=0.97,
+                dimension_scores=_make_dimension_cot({
+                    "Masse": (0.98, "Breite und Hoehe stimmen exakt ueberein"),
+                    "Brandschutz": (0.96, "EI30 Anforderung vollstaendig erfuellt"),
+                    "Schallschutz": (0.92, "32 dB Anforderung erfuellt"),
+                    "Material": (0.97, "Holz wie gefordert"),
+                    "Zertifizierung": (0.95, "CE Kennzeichnung vorhanden"),
+                    "Leistung": (0.90, "Alle Leistungsmerkmale erfuellt"),
+                }),
+                reasoning_summary="Produkt erfuellt alle Anforderungen vollstaendig",
+            ),
+            debate=[],
+            resolution_reasoning="FOR und AGAINST stimmen ueberein: optimale Zuordnung",
+            per_dimension_cot=_make_dimension_cot({
+                "Masse": (0.98, "Breite und Hoehe stimmen exakt ueberein"),
+                "Brandschutz": (0.96, "EI30 Anforderung vollstaendig erfuellt"),
+                "Schallschutz": (0.92, "32 dB Anforderung erfuellt"),
+                "Material": (0.97, "Holz wie gefordert"),
+                "Zertifizierung": (0.95, "CE Kennzeichnung vorhanden"),
+                "Leistung": (0.90, "Alle Leistungsmerkmale erfuellt"),
+            }),
+        ),
+        AdversarialResult(
+            positions_nr="1.02",
+            validation_status=ValidationStatus.UNSICHER,
+            adjusted_confidence=0.75,
+            bester_match=AdversarialCandidate(
+                produkt_id="P-200",
+                produkt_name="Flurtuere Brandschutz EI60",
+                adjusted_confidence=0.75,
+                dimension_scores=_make_dimension_cot({
+                    "Masse": (0.85, "Abmessungen leicht abweichend"),
+                    "Brandschutz": (0.62, "EI60 gefordert, nur EI30 verfuegbar im naechsten Modell"),
+                    "Schallschutz": (0.70, "Schallschutz knapp unter Anforderung"),
+                    "Material": (0.80, "Material grundsaetzlich passend"),
+                    "Zertifizierung": (0.68, "Zertifizierung nur teilweise vorhanden"),
+                    "Leistung": (0.72, "Leistung teilweise erfuellt"),
+                }),
+                reasoning_summary="Teilweise Uebereinstimmung mit Abweichungen bei Brandschutz",
+            ),
+            debate=[],
+            resolution_reasoning="Brandschutz-Abweichung fuehrt zu Unsicherheit",
+            per_dimension_cot=_make_dimension_cot({
+                "Masse": (0.85, "Abmessungen leicht abweichend"),
+                "Brandschutz": (0.62, "EI60 gefordert, nur EI30 verfuegbar im naechsten Modell"),
+                "Schallschutz": (0.70, "Schallschutz knapp unter Anforderung"),
+                "Material": (0.80, "Material grundsaetzlich passend"),
+                "Zertifizierung": (0.68, "Zertifizierung nur teilweise vorhanden"),
+                "Leistung": (0.72, "Leistung teilweise erfuellt"),
+            }),
+        ),
+        AdversarialResult(
+            positions_nr="1.03",
+            validation_status=ValidationStatus.ABGELEHNT,
+            adjusted_confidence=0.40,
+            bester_match=AdversarialCandidate(
+                produkt_id="P-300",
+                produkt_name="Kellertuere Basis",
+                adjusted_confidence=0.40,
+                dimension_scores=_make_dimension_cot({
+                    "Masse": (0.40, "Abmessungen passen nicht"),
+                    "Brandschutz": (0.20, "Kein Brandschutz vorhanden"),
+                    "Schallschutz": (0.30, "Schallschutz nicht ausreichend"),
+                    "Material": (0.50, "Material nur teilweise passend"),
+                    "Zertifizierung": (0.25, "Fehlende Zertifizierungen"),
+                    "Leistung": (0.45, "Leistung unzureichend"),
+                }),
+                reasoning_summary="Keine passende Zuordnung moeglich",
+            ),
+            debate=[],
+            resolution_reasoning="Zu viele Abweichungen, kein brauchbarer Match",
+            per_dimension_cot=_make_dimension_cot({
+                "Masse": (0.40, "Abmessungen passen nicht"),
+                "Brandschutz": (0.20, "Kein Brandschutz vorhanden"),
+                "Schallschutz": (0.30, "Schallschutz nicht ausreichend"),
+                "Material": (0.50, "Material nur teilweise passend"),
+                "Zertifizierung": (0.25, "Fehlende Zertifizierungen"),
+                "Leistung": (0.45, "Leistung unzureichend"),
+            }),
+        ),
+    ]
+
+
+@pytest.fixture
+def sample_gap_reports() -> list[GapReport]:
+    """GapReport for unsicher (1.02) and abgelehnt (1.03) positions only."""
+    return [
+        GapReport(
+            positions_nr="1.02",
+            gaps=[
+                GapItem(
+                    dimension=GapDimension.BRANDSCHUTZ,
+                    schweregrad=GapSeverity.KRITISCH,
+                    anforderung_wert="EI60",
+                    katalog_wert="EI30",
+                    abweichung_beschreibung="Brandschutzklasse nicht ausreichend",
+                    kundenvorschlag="Upgrade auf EI60-Modell moeglich",
+                    technischer_hinweis="Tuerblattwechsel erforderlich",
+                    gap_geschlossen_durch=["P-201"],
+                ),
+                GapItem(
+                    dimension=GapDimension.SCHALLSCHUTZ,
+                    schweregrad=GapSeverity.MAJOR,
+                    anforderung_wert="37 dB",
+                    katalog_wert="32 dB",
+                    abweichung_beschreibung="5 dB unter Anforderung",
+                    kundenvorschlag="Schallschutz-Upgrade erhaeltlich",
+                    technischer_hinweis=None,
+                    gap_geschlossen_durch=[],
+                ),
+            ],
+            alternativen=[
+                AlternativeProduct(
+                    produkt_id="P-201",
+                    produkt_name="Flurtuere Premium EI60",
+                    teilweise_deckung=0.85,
+                    verbleibende_gaps=["Schallschutz"],
+                    geschlossene_gaps=["Brandschutz"],
+                ),
+            ],
+            zusammenfassung="Brandschutz und Schallschutz nicht vollstaendig erfuellt",
+            validation_status="unsicher",
+        ),
+        GapReport(
+            positions_nr="1.03",
+            gaps=[
+                GapItem(
+                    dimension=GapDimension.BRANDSCHUTZ,
+                    schweregrad=GapSeverity.KRITISCH,
+                    anforderung_wert="EI90",
+                    katalog_wert=None,
+                    abweichung_beschreibung="Kein Brandschutz im Basismodell",
+                    kundenvorschlag="Sonderanfertigung erforderlich",
+                    technischer_hinweis="Komplett anderes Tuersystem noetig",
+                    gap_geschlossen_durch=[],
+                ),
+                GapItem(
+                    dimension=GapDimension.MASSE,
+                    schweregrad=GapSeverity.MAJOR,
+                    anforderung_wert="1200x2400mm",
+                    katalog_wert="1000x2100mm",
+                    abweichung_beschreibung="Uebergroesse nicht im Standardsortiment",
+                    kundenvorschlag=None,
+                    technischer_hinweis="Sondermass moeglich gegen Aufpreis",
+                    gap_geschlossen_durch=["P-301"],
+                ),
+                GapItem(
+                    dimension=GapDimension.MATERIAL,
+                    schweregrad=GapSeverity.MINOR,
+                    anforderung_wert="Edelstahl V2A",
+                    katalog_wert="Stahl verzinkt",
+                    abweichung_beschreibung="Material weicht ab",
+                    kundenvorschlag=None,
+                    technischer_hinweis=None,
+                    gap_geschlossen_durch=[],
+                ),
+            ],
+            alternativen=[
+                AlternativeProduct(
+                    produkt_id="P-301",
+                    produkt_name="Kellertuere Sonder",
+                    teilweise_deckung=0.55,
+                    verbleibende_gaps=["Brandschutz", "Material"],
+                    geschlossene_gaps=["Masse"],
+                ),
+            ],
+            zusammenfassung="Mehrere kritische Abweichungen, Sonderanfertigung empfohlen",
+            validation_status="abgelehnt",
+        ),
+    ]
