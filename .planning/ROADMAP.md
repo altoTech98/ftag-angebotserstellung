@@ -47,12 +47,13 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   3. Session expires after configurable inactivity with a visible warning before timeout
   4. Routes and API endpoints enforce role-based access (Admin/Manager/Analyst/Viewer) -- unauthorized users see an error or redirect, not protected content
   5. App displays the FTAG Rot/Weiss design system with sidebar navigation, breadcrumbs, and responsive layout across desktop, tablet, and mobile
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 10-01: TBD
-- [ ] 10-02: TBD
-- [ ] 10-03: TBD
+- [ ] 10-01-PLAN.md -- Scaffold Next.js 16 with Prisma 7, Better Auth RBAC, and FTAG Tailwind theme
+- [ ] 10-02-PLAN.md -- Auth pages (login, password reset) with route protection and session timeout
+- [ ] 10-03-PLAN.md -- Layout shell (sidebar, header, breadcrumbs) with responsive behavior and placeholder pages
+- [ ] 10-04-PLAN.md -- Integration wiring (session warning in layout, root redirect) and visual checkpoint
 
 ### Phase 11: Python Backend Integration (BFF + Service Auth)
 **Goal**: Next.js can securely proxy requests to the Python/FastAPI backend, and SSE streaming (or polling fallback) is validated end-to-end
@@ -151,7 +152,7 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14 -> 15
 | 7. Excel Output Generation | v1.0 | 2/2 | Complete | 2026-03-10 |
 | 8. Quality, Observability & End-to-End | v1.0 | 3/3 | Complete | 2026-03-10 |
 | 9. Frontend V2 Offer & Feedback Wiring | v1.0 | 2/2 | Complete | 2026-03-10 |
-| 10. Foundation | v2.0 | 0/? | Not started | - |
+| 10. Foundation | v2.0 | 0/4 | Planning complete | - |
 | 11. Python Integration | v2.0 | 0/? | Not started | - |
 | 12. File Handling + Projects | v2.0 | 0/? | Not started | - |
 | 13. Analysis Wizard + Results | v2.0 | 0/? | Not started | - |
