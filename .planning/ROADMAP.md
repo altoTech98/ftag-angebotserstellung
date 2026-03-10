@@ -63,11 +63,12 @@ Plans:
   1. When a door position appears in both an Excel door list and a PDF specification, the system merges all attributes into one enriched requirement record
   2. When documents contain conflicting specifications (e.g., different fire ratings for the same position), the system flags the conflict with both values and their source documents
   3. Cross-document enrichment results are visible in the final output (user can see which data came from which document)
-**Plans**: 2 plans
+**Plans**: 3 plans
 
 Plans:
 - [ ] 03-01-PLAN.md — Schemas, cross-doc matcher, enrichment engine, conflict detector, and prompt templates
 - [ ] 03-02-PLAN.md — Pipeline integration, API response extension, and end-to-end wiring
+- [ ] 03-03-PLAN.md — Gap closure: wire AI conflict resolution in conflict_detector.py
 
 ### Phase 4: Product Matching Engine
 **Goal**: Every extracted requirement is matched against the FTAG product catalog with multi-dimensional confidence scoring and learning from past corrections
@@ -157,7 +158,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 |-------|----------------|--------|-----------|
 | 1. Document Parsing & Pipeline Schemas | 2/2 | Complete   | 2026-03-10 |
 | 2. Multi-Pass Extraction | 3/3 | Complete   | 2026-03-10 |
-| 3. Cross-Document Intelligence | 1/2 | In Progress|  |
+| 3. Cross-Document Intelligence | 2/3 | In Progress|  |
 | 4. Product Matching Engine | 0/2 | Not started | - |
 | 5. Adversarial Validation | 0/2 | Not started | - |
 | 6. Gap Analysis | 0/2 | Not started | - |
