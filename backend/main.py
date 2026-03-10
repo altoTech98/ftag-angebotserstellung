@@ -269,6 +269,7 @@ AUTH_WHITELIST = {
     "/api/auth/login",
     "/api/auth/logout",
     "/health",
+    "/api/health",
     "/info",
     "/",
     "/docs",
@@ -291,9 +292,15 @@ async def auth_middleware(request: Request, call_next):
     ):
         return await call_next(request)
 
-    # Extract Bearer token
+    # Extract Bearer token (header or query param for SSE)
     auth_header = request.headers.get("authorization", "")
-    if not auth_header.startswith("Bearer "):
+    token = None
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    elif request.query_params.get("token"):
+        token = request.query_params.get("token")
+
+    if not token:
         return JSONResponse(
             status_code=401,
             content={"detail": "Nicht authentifiziert"},
@@ -301,7 +308,6 @@ async def auth_middleware(request: Request, call_next):
 
     try:
         from services.auth_service import verify_token
-        token = auth_header[7:]  # Remove "Bearer " prefix
         user = verify_token(token)
         if not user:
             return JSONResponse(
@@ -409,75 +415,18 @@ if settings.ERP_ENABLED:
     app.include_router(erp.router)
     logger.info("[OK] ERP router registered")
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# STATIC FILES & FRONTEND
-# ─────────────────────────────────────────────────────────────────────────────
-
-# React Frontend (production build)
-react_dist_path = BASE_DIR / "frontend-react-dist"
-if react_dist_path.exists():
-    # Serve static assets (JS, CSS, images)
-    assets_path = react_dist_path / "assets"
-    if assets_path.exists():
-        app.mount("/assets", StaticFiles(directory=str(assets_path)), name="react-assets")
-
-    @app.get("/", name="Frontend")
-    async def serve_react_frontend():
-        """Serve React SPA index.html"""
-        return FileResponse(
-            react_dist_path / "index.html",
-            headers={
-                "Cache-Control": "no-cache, must-revalidate",
-                "Content-Type": "text/html; charset=utf-8",
-            },
-        )
-
-    # Catch-all for client-side routing (React Router)
-    @app.get("/{full_path:path}", name="React SPA Fallback")
-    async def serve_react_spa(full_path: str):
-        """Serve React SPA for all non-API routes (client-side routing)"""
-        # Don't catch API routes, health, or static file routes
-        if full_path.startswith(("api/", "health", "info", "docs", "redoc", "openapi.json", "static/")):
-            return JSONResponse(status_code=404, content={"detail": "Not found"})
-        return FileResponse(
-            react_dist_path / "index.html",
-            headers={
-                "Cache-Control": "no-cache, must-revalidate",
-                "Content-Type": "text/html; charset=utf-8",
-            },
-        )
-
-    logger.info(f"[OK] React frontend serving from: {react_dist_path}")
-
-else:
-    # Fallback: serve old vanilla JS frontend
-    frontend_path = BASE_DIR / "frontend"
-    if frontend_path.exists():
-        app.mount("/static", StaticFiles(directory=frontend_path), name="static")
-
-        @app.get("/", name="Frontend")
-        async def serve_frontend():
-            """Serve index.html with no-cache headers"""
-            index_file = frontend_path / "index.html"
-            if index_file.exists():
-                return FileResponse(
-                    index_file,
-                    headers={
-                        "Cache-Control": "no-cache, must-revalidate",
-                        "Content-Type": "text/html; charset=utf-8",
-                    },
-                )
-            return JSONResponse(
-                status_code=404,
-                content={"error": "Frontend not found"},
-            )
-    else:
-        logger.warning(f"Frontend directory not found: {frontend_path}")
+# V2 Routers (lazy import to avoid breaking v1 if v2 imports fail)
+try:
+    from v2.routers import upload_v2, analyze_v2
+    app.include_router(upload_v2.router)
+    app.include_router(analyze_v2.router)
+    logger.info("[OK] V2 routers registered (upload, analyze)")
+except Exception as e:
+    logger.warning(f"[WARN] V2 routers not loaded: {e}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HEALTH & INFO ENDPOINTS
+# HEALTH & INFO ENDPOINTS (must be registered BEFORE SPA catch-all)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/health", name="Health Check")
@@ -493,18 +442,12 @@ async def health_check() -> dict:
         from services.memory_cache import text_cache, offer_cache, project_cache
         from services.catalog_index import get_catalog_index
 
-        # Get Availability Manager Status
         availability_mgr = get_availability_manager()
         am_status = availability_mgr.get_status()
-
-        # Get AI Service status (unified engine status)
         ai_service = get_ai_service()
         ai_status = ai_service.get_status()
-
-        # Check Ollama (live check without cache, for backward compat)
         ollama_status = check_ollama_status_live()
 
-        # Check Catalog
         try:
             catalog = get_catalog_index()
             catalog_ok = len(catalog.main_products) > 0
@@ -514,10 +457,7 @@ async def health_check() -> dict:
             catalog_ok = False
             catalog_count = 0
 
-        # Add context usage to AI status
         ai_status["context"] = ai_service.get_context_usage()
-
-        # Health info with AI engine status for frontend
         ollama_available = ollama_status.get("available", False)
         health_response = {
             "status": "healthy" if availability_mgr.is_system_available() else "degraded",
@@ -530,7 +470,6 @@ async def health_check() -> dict:
             },
         }
 
-        # Detailed info only in development/debug mode
         if settings.DEBUG:
             health_response["ollama"].update({
                 "status": "ok" if ollama_available else "unavailable",
@@ -566,21 +505,22 @@ async def health_check() -> dict:
         }
 
 
+@app.get("/api/health", name="Health Check (API)", include_in_schema=False)
+async def health_check_api() -> dict:
+    """Alias for /health under /api prefix."""
+    return await health_check()
+
+
 @app.get("/api/availability/status", name="Detailed Availability Status")
 async def get_availability_status() -> dict:
-    """
-    Get detailed availability and uptime status for all services.
-    """
+    """Get detailed availability and uptime status for all services."""
     try:
         from services.availability_manager import get_availability_manager
         from services.ollama_watchdog import get_ollama_watchdog
-        
         availability_mgr = get_availability_manager()
         ollama_watchdog = get_ollama_watchdog()
-        
         status = availability_mgr.get_status()
         uptime = availability_mgr.get_uptime_stats()
-        
         return {
             "timestamp": status["timestamp"],
             "overall_health": status["overall_status"],
@@ -589,70 +529,120 @@ async def get_availability_status() -> dict:
             "uptime_statistics": uptime["services"],
             "ollama_watchdog": ollama_watchdog.get_status(),
             "24_7_monitoring": {
-                "enabled": True,
-                "check_interval_seconds": 30,
-                "auto_recovery": True,
-                "recovery_attempts_max": 5,
-                "ollama_watchdog_enabled": True,
-                "ollama_auto_restart": True,
+                "enabled": True, "check_interval_seconds": 30,
+                "auto_recovery": True, "recovery_attempts_max": 5,
+                "ollama_watchdog_enabled": True, "ollama_auto_restart": True,
                 "windows_task_scheduler_enabled": True,
             },
         }
     except Exception as e:
         logger.exception(f"Availability status error: {e}")
-        return {
-            "error": str(e) if settings.DEBUG else "Failed to get availability status"
-        }
+        return {"error": str(e) if settings.DEBUG else "Failed to get availability status"}
 
 
 @app.get("/api/ollama/status", name="Ollama Watchdog Status")
 async def get_ollama_watchdog_status() -> dict:
-    """
-    Get detailed Ollama Watchdog status - 24/7 Monitoring
-    """
+    """Get detailed Ollama Watchdog status."""
     try:
         from services.ollama_watchdog import get_ollama_watchdog
         from services.local_llm import check_ollama_status
-        
         watchdog = get_ollama_watchdog()
         status = watchdog.get_status()
-        
         return {
             "timestamp": datetime.now().isoformat(),
             "watchdog": status,
             "health_check": check_ollama_status(),
             "24_7_guarantee": {
-                "monitoring": True,
-                "auto_restart": True,
+                "monitoring": True, "auto_restart": True,
                 "health_check_interval_seconds": watchdog.health_check_interval,
                 "max_restart_attempts": watchdog.max_restart_attempts,
-                "exponential_backoff": True,
-                "windows_autostart": True,
+                "exponential_backoff": True, "windows_autostart": True,
             },
         }
     except Exception as e:
         logger.exception(f"Ollama watchdog status error: {e}")
-        return {
-            "error": str(e) if settings.DEBUG else "Failed to get Ollama status",
-            "timestamp": datetime.now().isoformat()
-        }
+        return {"error": str(e) if settings.DEBUG else "Failed to get Ollama status", "timestamp": datetime.now().isoformat()}
 
 
 @app.get("/info", name="Application Info")
 async def app_info() -> dict:
     """Get application information and settings (only in debug mode)"""
     if not settings.DEBUG:
-        return {
-            "name": settings.API_TITLE,
-            "version": settings.API_VERSION,
-        }
+        return {"name": settings.API_TITLE, "version": settings.API_VERSION}
     return {
-        "name": settings.API_TITLE,
-        "version": settings.API_VERSION,
-        "environment": settings.ENVIRONMENT.value,
-        "debug": settings.DEBUG,
+        "name": settings.API_TITLE, "version": settings.API_VERSION,
+        "environment": settings.ENVIRONMENT.value, "debug": settings.DEBUG,
         "settings": settings.to_dict(),
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STATIC FILES & FRONTEND
+# ─────────────────────────────────────────────────────────────────────────────
+
+# React Frontend (production build)
+react_dist_path = BASE_DIR / "frontend-react-dist"
+if react_dist_path.exists():
+    # Serve static assets (JS, CSS, images)
+    assets_path = react_dist_path / "assets"
+    if assets_path.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_path)), name="react-assets")
+
+    @app.get("/", name="Frontend")
+    async def serve_react_frontend():
+        """Serve React SPA index.html"""
+        return FileResponse(
+            react_dist_path / "index.html",
+            headers={
+                "Cache-Control": "no-cache, must-revalidate",
+                "Content-Type": "text/html; charset=utf-8",
+            },
+        )
+
+    # Non-API routes handled by React Router (client-side routing)
+    _react_spa_routes = {"analyse", "katalog", "historie", "benutzer", "login", "settings"}
+
+    @app.get("/{full_path:path}", name="React SPA Fallback")
+    async def serve_react_spa(full_path: str):
+        """Serve React SPA for known client-side routes only."""
+        first_segment = full_path.split("/")[0] if full_path else ""
+        if first_segment in _react_spa_routes:
+            return FileResponse(
+                react_dist_path / "index.html",
+                headers={
+                    "Cache-Control": "no-cache, must-revalidate",
+                    "Content-Type": "text/html; charset=utf-8",
+                },
+            )
+        # Let other paths (health, info, etc.) fall through to 404
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
+
+    logger.info(f"[OK] React frontend serving from: {react_dist_path}")
+
+else:
+    # Fallback: serve old vanilla JS frontend
+    frontend_path = BASE_DIR / "frontend"
+    if frontend_path.exists():
+        app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+
+        @app.get("/", name="Frontend")
+        async def serve_frontend():
+            """Serve index.html with no-cache headers"""
+            index_file = frontend_path / "index.html"
+            if index_file.exists():
+                return FileResponse(
+                    index_file,
+                    headers={
+                        "Cache-Control": "no-cache, must-revalidate",
+                        "Content-Type": "text/html; charset=utf-8",
+                    },
+                )
+            return JSONResponse(
+                status_code=404,
+                content={"error": "Frontend not found"},
+            )
+    else:
+        logger.warning(f"Frontend directory not found: {frontend_path}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
