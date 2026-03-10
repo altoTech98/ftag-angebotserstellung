@@ -28,7 +28,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **MATC-06**: System führt Triple-Check durch bei Konfidenz <95% (dritter AI-Durchlauf mit alternativem Prompt)
 - [ ] **MATC-07**: System begründet jeden Match mit Chain-of-Thought (Schritt-für-Schritt-Argumentation)
 - [ ] **MATC-08**: System listet bei mehreren möglichen Produkten alle auf mit Begründung
-- [ ] **MATC-09**: System integriert Feedback/Korrekturen aus früheren Analysen als Few-Shot-Examples
+- [x] **MATC-09**: System integriert Feedback/Korrekturen aus früheren Analysen als Few-Shot-Examples
 
 ### Gap-Analyse
 
@@ -61,7 +61,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **APII-03**: GET /api/analyze/status/{job_id} liefert detaillierten Fortschritt (Position X von Y, aktueller Pass)
 - [ ] **APII-04**: POST /api/offer/generate erstellt 4-Sheet Excel-Output
 - [ ] **APII-05**: GET /api/offer/{id}/download liefert generierte Excel-Datei
-- [ ] **APII-06**: POST /api/feedback speichert Matching-Korrekturen für zukünftige Analysen
+- [x] **APII-06**: POST /api/feedback speichert Matching-Korrekturen für zukünftige Analysen
 
 ## v2 Requirements
 
@@ -115,7 +115,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | MATC-06 | Phase 5 | Pending |
 | MATC-07 | Phase 5 | Pending |
 | MATC-08 | Phase 5 | Pending |
-| MATC-09 | Phase 4 | Pending |
+| MATC-09 | Phase 4 | Complete |
 | GAPA-01 | Phase 6 | Pending |
 | GAPA-02 | Phase 6 | Pending |
 | GAPA-03 | Phase 6 | Pending |
@@ -136,7 +136,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | APII-03 | Phase 8 | Pending |
 | APII-04 | Phase 7 | Pending |
 | APII-05 | Phase 7 | Pending |
-| APII-06 | Phase 4 | Pending |
+| APII-06 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 38 total

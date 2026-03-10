@@ -10,8 +10,8 @@ progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 9
-  completed_plans: 9
-  percent: 47
+  completed_plans: 10
+  percent: 53
 ---
 
 # Project State
@@ -26,18 +26,18 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 4 of 8 (Product Matching Engine) - IN PROGRESS
-Plan: 1 of 3 in current phase
-Status: 04-01 Complete (TF-IDF + AI Matching Engine)
-Last activity: 2026-03-10 — Completed 04-01 (TF-IDF + AI Matching)
+Plan: 2 of 3 in current phase
+Status: 04-02 Complete (Feedback Integration + Pipeline Wiring)
+Last activity: 2026-03-10 — Completed 04-02 (Feedback + Pipeline Wiring)
 
-Progress: [█████░░░░░] 47%
+Progress: [██████░░░░] 53%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 10
 - Average duration: 5.0min
-- Total execution time: 0.7 hours
+- Total execution time: 0.8 hours
 
 **By Phase:**
 
@@ -46,7 +46,7 @@ Progress: [█████░░░░░] 47%
 | 01 | 2/2 | 11min | 5.5min |
 | 02 | 3/3 | 13min | 4.3min |
 | 03 | 3/3 | 16min | 5.3min |
-| 04 | 1/3 | 8min | 8.0min |
+| 04 | 2/3 | 13min | 6.5min |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -92,6 +92,9 @@ Recent decisions affecting current work:
 - 04-01: Broad fallback query for sparse positions (no empty results)
 - 04-01: Category boost via fuzzy substring match on category name (1.3x)
 - 04-01: Safety cap pipeline: apply_safety_caps -> set_hat_match -> limit_alternatives
+- 04-02: FeedbackStoreV2 uses same German token pattern as CatalogTfidfIndex for consistent tokenization
+- 04-02: Lazy TF-IDF rebuild on next find_relevant_feedback call after correction added
+- 04-02: Matching gracefully skipped with matching_skipped flag when modules unavailable
 
 ### Pending Todos
 
@@ -104,6 +107,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T16:48:01Z
-Stopped at: Completed 04-01-PLAN.md
-Resume file: .planning/phases/04-product-matching-engine/04-01-SUMMARY.md
+Last session: 2026-03-10T16:55:34Z
+Stopped at: Completed 04-02-PLAN.md
+Resume file: .planning/phases/04-product-matching-engine/04-02-SUMMARY.md
