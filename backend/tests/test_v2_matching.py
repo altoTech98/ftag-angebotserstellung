@@ -678,3 +678,87 @@ class TestMatchPositionsConcurrent:
         for r in results:
             assert isinstance(r, MatchResult)
             assert r.match_methode == "tfidf_ai"
+
+
+# ---------------------------------------------------------------------------
+# Task 2 (Plan 02): Analyze endpoint with matching pipeline
+# ---------------------------------------------------------------------------
+
+
+class TestAnalyzeWithMatching:
+    @pytest.mark.asyncio
+    async def test_analyze_includes_matching(self):
+        """POST /api/v2/analyze returns extraction results plus match_results."""
+        from unittest.mock import patch, AsyncMock, MagicMock
+
+        mock_match_result = _make_match_result(gesamt_konfidenz=0.88)
+
+        # Mock extraction pipeline result
+        mock_extraction = MagicMock()
+        mock_extraction.positionen = [
+            ExtractedDoorPosition(
+                positions_nr="1.01",
+                positions_bezeichnung="Brandschutztuere EI30",
+                brandschutz_klasse=BrandschutzKlasse.EI30,
+            ),
+        ]
+        mock_extraction.dokument_zusammenfassung = "Test tender"
+        mock_extraction.warnungen = []
+        mock_extraction.enrichment_report = None
+        mock_extraction.conflicts = []
+
+        # Patch extraction pipeline
+        with patch(
+            "v2.routers.analyze_v2.run_extraction_pipeline",
+            new_callable=AsyncMock,
+            return_value=mock_extraction,
+        ):
+            # Patch matching to return our mock result
+            with patch(
+                "v2.routers.analyze_v2.match_positions",
+                new_callable=AsyncMock,
+                return_value=[mock_match_result],
+            ):
+                # Patch _MATCHING_AVAILABLE
+                with patch("v2.routers.analyze_v2._MATCHING_AVAILABLE", True):
+                    # Patch _get_tfidf_index
+                    mock_index = MagicMock()
+                    mock_index._build_query_from_position = MagicMock(
+                        return_value="Brandschutztuere EI30"
+                    )
+                    with patch(
+                        "v2.routers.analyze_v2._get_tfidf_index",
+                        return_value=mock_index,
+                    ):
+                        # Patch anthropic module used inside function body
+                        import anthropic as anthropic_mod
+                        with patch.object(
+                            anthropic_mod, "Anthropic", return_value=MagicMock()
+                        ):
+                            # Setup tender
+                            from v2.routers.upload_v2 import _tenders
+
+                            from v2.parsers.base import ParseResult as PR
+
+                            mock_file = MagicMock(spec=PR)
+                            mock_file.format = "xlsx"
+                            _tenders["test-123"] = {
+                                "id": "test-123",
+                                "files": [mock_file],
+                                "status": "uploaded",
+                            }
+
+                            from v2.routers.analyze_v2 import analyze_tender, AnalyzeRequest
+
+                            response = await analyze_tender(
+                                AnalyzeRequest(tender_id="test-123")
+                            )
+
+                            assert response["status"] == "completed"
+                            assert "match_results" in response
+                            assert len(response["match_results"]) == 1
+                            assert response["total_matches"] == 0  # 0.88 < 0.95
+                            assert response["total_positions_matched"] == 1
+
+                            # Cleanup
+                            del _tenders["test-123"]

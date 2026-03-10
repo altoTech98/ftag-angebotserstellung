@@ -1,12 +1,15 @@
 """
-V2 Analyze Router - Analysis trigger endpoint with full extraction pipeline.
+V2 Analyze Router - Analysis trigger endpoint with full extraction pipeline
+and product matching integration.
 
 Validates tender session, runs the 3-pass extraction pipeline,
-and returns structured ExtractionResult with all door positions.
+then triggers TF-IDF + AI product matching on extracted positions.
+Returns structured ExtractionResult with MatchResults.
 """
 
 import logging
 import traceback
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -17,7 +20,29 @@ from v2.routers.upload_v2 import _tenders
 
 logger = logging.getLogger(__name__)
 
+# Lazy imports for matching modules (may not be available)
+try:
+    from v2.matching import CatalogTfidfIndex, match_positions
+    from v2.matching.feedback_v2 import get_feedback_store
+
+    _MATCHING_AVAILABLE = True
+except ImportError as _import_err:
+    CatalogTfidfIndex = None  # type: ignore
+    _MATCHING_AVAILABLE = False
+    logger.warning(f"[V2 Analyze] Matching modules not available: {_import_err}")
+
 router = APIRouter(prefix="/api/v2", tags=["V2 Analysis"])
+
+# Lazy singleton for TF-IDF index
+_tfidf_index: Optional["CatalogTfidfIndex"] = None  # type: ignore
+
+
+def _get_tfidf_index():
+    """Get or create the TF-IDF index singleton."""
+    global _tfidf_index
+    if _tfidf_index is None and CatalogTfidfIndex is not None:
+        _tfidf_index = CatalogTfidfIndex()
+    return _tfidf_index
 
 
 class AnalyzeRequest(BaseModel):
@@ -27,18 +52,18 @@ class AnalyzeRequest(BaseModel):
 
 @router.post("/analyze")
 async def analyze_tender(request: AnalyzeRequest):
-    """Trigger full 3-pass extraction pipeline on an uploaded tender.
+    """Trigger full 3-pass extraction pipeline and product matching.
 
     Validates tender exists and has files. Runs Pass 1 (structural),
     Pass 2 (semantic AI), and Pass 3 (validation) via the pipeline
-    orchestrator. Returns structured extraction results.
+    orchestrator. Then runs TF-IDF + AI matching on extracted positions.
 
     Args:
         request: JSON body with tender_id.
 
     Returns:
         JSON with tender_id, status, positionen, zusammenfassung,
-        warnungen, and total_positionen.
+        warnungen, total_positionen, and match_results.
     """
     tender_id = request.tender_id
 
@@ -89,6 +114,51 @@ async def analyze_tender(request: AnalyzeRequest):
             "conflicts": [c.model_dump() for c in result.conflicts],
             "total_conflicts": len(result.conflicts),
         }
+
+        # --- Product Matching Phase ---
+        if _MATCHING_AVAILABLE and result.positionen:
+            try:
+                import anthropic
+
+                client = anthropic.Anthropic()
+                tfidf_idx = _get_tfidf_index()
+
+                if tfidf_idx is not None:
+                    # Build feedback function for few-shot learning
+                    def _feedback_fn(pos):
+                        """Get relevant feedback for a position."""
+                        store = get_feedback_store()
+                        query = tfidf_idx._build_query_from_position(pos)
+                        return store.find_relevant_feedback(query)
+
+                    match_results = await match_positions(
+                        client=client,
+                        positions=result.positionen,
+                        tfidf_index=tfidf_idx,
+                        feedback_examples_fn=_feedback_fn,
+                    )
+
+                    response["match_results"] = [
+                        mr.model_dump() for mr in match_results
+                    ]
+                    response["total_matches"] = sum(
+                        1 for mr in match_results if mr.hat_match
+                    )
+                    response["total_positions_matched"] = len(match_results)
+                else:
+                    response["matching_skipped"] = True
+                    response["matching_warning"] = "TF-IDF index not available"
+
+            except Exception as e:
+                logger.error(
+                    f"[V2 Analyze] Matching failed for tender {tender_id}: {e}\n"
+                    f"{traceback.format_exc()}"
+                )
+                response["matching_skipped"] = True
+                response["matching_warning"] = f"Matching failed: {str(e)}"
+        elif not _MATCHING_AVAILABLE:
+            response["matching_skipped"] = True
+            response["matching_warning"] = "Matching modules not installed"
 
         return response
 
