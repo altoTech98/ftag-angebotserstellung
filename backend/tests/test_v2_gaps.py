@@ -6,11 +6,16 @@ Covers:
 - Safety auto-escalation (MINOR -> MAJOR for Brandschutz/Schallschutz)
 - GapItem, AlternativeProduct, GapReport expanded fields
 - GapAnalysisResponse structured output model
+- Gap analyzer engine with mocked Opus calls
+- Alternative search with mocked TF-IDF index
 """
+
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from v2.schemas.matching import MatchDimension
+from v2.schemas.matching import MatchDimension, MatchResult, MatchCandidate
 
 
 class TestGapDimensions:
@@ -230,3 +235,459 @@ class TestGapAnalysisResponse:
                 ],
                 zusammenfassung="Test",
             )
+
+
+# ---------------------------------------------------------------------------
+# Integration-style tests for gap analyzer
+# ---------------------------------------------------------------------------
+
+from v2.schemas.adversarial import (
+    AdversarialResult,
+    AdversarialCandidate,
+    DimensionCoT,
+    ValidationStatus,
+)
+from v2.schemas.gaps import (
+    AlternativeProduct,
+    GapAnalysisResponse,
+    GapAnalysisResponseItem,
+    GapDimension,
+    GapItem,
+    GapReport,
+    GapSeverity,
+)
+from v2.gaps.gap_analyzer import (
+    analyze_single_position_gaps,
+    search_alternatives_for_gaps,
+    _cross_reference_gaps_and_alternatives,
+)
+
+
+def _make_match_result(pos_nr="1.01", has_match=True):
+    """Create a minimal MatchResult for testing."""
+    if has_match:
+        candidate = MatchCandidate(
+            produkt_id="PROD-100",
+            produkt_name="Rahmentuere Standard",
+            gesamt_konfidenz=0.85,
+            begruendung="Guter Match",
+        )
+        return MatchResult(
+            positions_nr=pos_nr,
+            bester_match=candidate,
+            hat_match=True,
+            match_methode="tfidf_ai",
+        )
+    return MatchResult(
+        positions_nr=pos_nr,
+        bester_match=None,
+        hat_match=False,
+        match_methode="tfidf_ai",
+    )
+
+
+def _make_adversarial_result(
+    pos_nr="1.01",
+    status=ValidationStatus.BESTAETIGT,
+    cot_scores=None,
+):
+    """Create a minimal AdversarialResult for testing."""
+    if cot_scores is None:
+        cot_scores = {
+            "Masse": 1.0,
+            "Brandschutz": 0.8,
+            "Schallschutz": 1.0,
+            "Material": 1.0,
+            "Zertifizierung": 1.0,
+            "Leistung": 1.0,
+        }
+    cot_list = [
+        DimensionCoT(
+            dimension=dim,
+            score=score,
+            reasoning=f"{dim} Bewertung",
+            confidence_level="hoch" if score > 0.9 else "niedrig",
+        )
+        for dim, score in cot_scores.items()
+    ]
+    return AdversarialResult(
+        positions_nr=pos_nr,
+        validation_status=status,
+        adjusted_confidence=0.90,
+        per_dimension_cot=cot_list,
+        debate=[],
+        resolution_reasoning="Test resolution",
+    )
+
+
+def _make_mock_opus_response(gaps_data, zusammenfassung="Test Zusammenfassung"):
+    """Create a mock Opus parse response."""
+    parsed = GapAnalysisResponse(
+        gaps=[
+            GapAnalysisResponseItem(**g) for g in gaps_data
+        ],
+        zusammenfassung=zusammenfassung,
+    )
+    mock_response = MagicMock()
+    mock_response.parsed = parsed
+    return mock_response
+
+
+def _make_mock_tfidf_index(search_results=None, candidate_fields=None):
+    """Create a mock TF-IDF index for testing."""
+    mock = MagicMock()
+    if search_results is None:
+        search_results = [
+            (0, 0.9),
+            (1, 0.8),
+            (2, 0.7),
+            (3, 0.6),
+            (4, 0.5),
+        ]
+    mock.search.return_value = search_results
+
+    if candidate_fields is None:
+        candidate_fields = {
+            0: {"Kostentraeger": "PROD-100", "Produktegruppen": "Rahmentuere", "Brandschutzklasse": "EI30", "row_index": 0},
+            1: {"Kostentraeger": "PROD-201", "Produktegruppen": "Rahmentuere EI60", "Brandschutzklasse": "EI60", "row_index": 1},
+            2: {"Kostentraeger": "PROD-202", "Produktegruppen": "Brandschutztuere", "Brandschutzklasse": "EI60", "Widerstandsklasse": "RC2", "row_index": 2},
+            3: {"Kostentraeger": "PROD-203", "Produktegruppen": "Schallschutztuere", "Tuerrohling (dB)": "42", "row_index": 3},
+            4: {"Kostentraeger": "PROD-204", "Produktegruppen": "Standardtuere", "row_index": 4},
+        }
+
+    def extract_fields(row_idx):
+        return candidate_fields.get(row_idx, {"row_index": row_idx})
+
+    mock.extract_candidate_fields.side_effect = extract_fields
+    return mock
+
+
+class TestGapAnalyzer:
+    """Test analyze_single_position_gaps with mocked Anthropic client."""
+
+    def test_bestaetigt_one_non_perfect_dimension(self):
+        """Bestaetigt with one non-perfect dimension produces 1 gap item."""
+        mock_client = MagicMock()
+        mock_client.messages.parse.return_value = _make_mock_opus_response(
+            gaps_data=[
+                {
+                    "dimension": "Brandschutz",
+                    "schweregrad": "major",
+                    "anforderung_wert": "EI60",
+                    "katalog_wert": "EI30",
+                    "abweichung_beschreibung": "Brandschutzklasse zu niedrig",
+                    "kundenvorschlag": "Upgrade auf EI60",
+                    "technischer_hinweis": "Tuerblatt tauschen",
+                }
+            ],
+            zusammenfassung="Brandschutz-Luecke identifiziert",
+        )
+
+        mr = _make_match_result()
+        ar = _make_adversarial_result(
+            status=ValidationStatus.BESTAETIGT,
+            cot_scores={
+                "Masse": 1.0, "Brandschutz": 0.7, "Schallschutz": 1.0,
+                "Material": 1.0, "Zertifizierung": 1.0, "Leistung": 1.0,
+            },
+        )
+
+        semaphore = asyncio.Semaphore(3)
+        result = asyncio.get_event_loop().run_until_complete(
+            analyze_single_position_gaps(
+                client=mock_client,
+                match_result=mr,
+                adversarial_result=ar,
+                tfidf_index=None,
+                semaphore=semaphore,
+            )
+        )
+
+        assert isinstance(result, GapReport)
+        assert len(result.gaps) == 1
+        assert result.gaps[0].dimension == GapDimension.BRANDSCHUTZ
+        assert result.validation_status == "bestaetigt"
+
+    def test_bestaetigt_all_perfect_returns_empty(self):
+        """Bestaetigt with all perfect scores returns empty gaps."""
+        mock_client = MagicMock()
+        mr = _make_match_result()
+        ar = _make_adversarial_result(
+            status=ValidationStatus.BESTAETIGT,
+            cot_scores={
+                "Masse": 1.0, "Brandschutz": 1.0, "Schallschutz": 1.0,
+                "Material": 1.0, "Zertifizierung": 1.0, "Leistung": 1.0,
+            },
+        )
+
+        semaphore = asyncio.Semaphore(3)
+        result = asyncio.get_event_loop().run_until_complete(
+            analyze_single_position_gaps(
+                client=mock_client,
+                match_result=mr,
+                adversarial_result=ar,
+                tfidf_index=None,
+                semaphore=semaphore,
+            )
+        )
+
+        assert len(result.gaps) == 0
+        assert "perfekt" in result.zusammenfassung.lower() or "keine" in result.zusammenfassung.lower()
+
+    def test_unsicher_produces_all_dimension_gaps(self):
+        """Unsicher produces gap items for all reported dimensions."""
+        mock_client = MagicMock()
+        mock_client.messages.parse.return_value = _make_mock_opus_response(
+            gaps_data=[
+                {
+                    "dimension": "Brandschutz",
+                    "schweregrad": "major",
+                    "anforderung_wert": "EI60",
+                    "katalog_wert": "EI30",
+                    "abweichung_beschreibung": "Zu niedrig",
+                },
+                {
+                    "dimension": "Schallschutz",
+                    "schweregrad": "minor",
+                    "anforderung_wert": "42dB",
+                    "katalog_wert": "37dB",
+                    "abweichung_beschreibung": "Schallschutz unzureichend",
+                },
+                {
+                    "dimension": "Masse",
+                    "schweregrad": "minor",
+                    "anforderung_wert": "900x2100",
+                    "katalog_wert": "900x2000",
+                    "abweichung_beschreibung": "Hoehe weicht ab",
+                },
+            ],
+            zusammenfassung="Mehrere Luecken",
+        )
+
+        mr = _make_match_result()
+        ar = _make_adversarial_result(
+            status=ValidationStatus.UNSICHER,
+            cot_scores={
+                "Masse": 0.8, "Brandschutz": 0.5, "Schallschutz": 0.6,
+                "Material": 0.9, "Zertifizierung": 0.9, "Leistung": 0.9,
+            },
+        )
+
+        semaphore = asyncio.Semaphore(3)
+        result = asyncio.get_event_loop().run_until_complete(
+            analyze_single_position_gaps(
+                client=mock_client,
+                match_result=mr,
+                adversarial_result=ar,
+                tfidf_index=None,
+                semaphore=semaphore,
+            )
+        )
+
+        assert len(result.gaps) == 3
+        assert result.validation_status == "unsicher"
+
+    def test_abgelehnt_produces_empty_gaps_with_summary(self):
+        """Abgelehnt produces empty gaps with text summary."""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = [MagicMock(text="Kein passendes Produkt gefunden.")]
+        mock_client.messages.create.return_value = mock_response
+
+        mr = _make_match_result(has_match=False)
+        ar = _make_adversarial_result(
+            status=ValidationStatus.ABGELEHNT,
+            cot_scores={},
+        )
+
+        semaphore = asyncio.Semaphore(3)
+        result = asyncio.get_event_loop().run_until_complete(
+            analyze_single_position_gaps(
+                client=mock_client,
+                match_result=mr,
+                adversarial_result=ar,
+                tfidf_index=None,
+                semaphore=semaphore,
+            )
+        )
+
+        assert len(result.gaps) == 0
+        assert result.zusammenfassung
+        assert result.validation_status == "abgelehnt"
+
+    def test_safety_escalation_applied(self):
+        """Mock returns Brandschutz as MINOR -> verify upgraded to MAJOR."""
+        mock_client = MagicMock()
+        mock_client.messages.parse.return_value = _make_mock_opus_response(
+            gaps_data=[
+                {
+                    "dimension": "Brandschutz",
+                    "schweregrad": "minor",  # Should be escalated
+                    "anforderung_wert": "EI60",
+                    "katalog_wert": "EI30",
+                    "abweichung_beschreibung": "Brandschutz zu niedrig",
+                },
+            ],
+        )
+
+        mr = _make_match_result()
+        ar = _make_adversarial_result(
+            status=ValidationStatus.UNSICHER,
+            cot_scores={
+                "Masse": 1.0, "Brandschutz": 0.5, "Schallschutz": 1.0,
+                "Material": 1.0, "Zertifizierung": 1.0, "Leistung": 1.0,
+            },
+        )
+
+        semaphore = asyncio.Semaphore(3)
+        result = asyncio.get_event_loop().run_until_complete(
+            analyze_single_position_gaps(
+                client=mock_client,
+                match_result=mr,
+                adversarial_result=ar,
+                tfidf_index=None,
+                semaphore=semaphore,
+            )
+        )
+
+        assert result.gaps[0].schweregrad == GapSeverity.MAJOR
+
+
+class TestAlternativeSearch:
+    """Test search_alternatives_for_gaps with mocked tfidf_index."""
+
+    def test_matched_product_filtered_out(self):
+        """The matched product should not appear in alternatives."""
+        from v2.schemas.extraction import ExtractedDoorPosition
+        mock_index = _make_mock_tfidf_index()
+        position = ExtractedDoorPosition(
+            positions_nr="1.01",
+            breite_mm=900,
+            hoehe_mm=2100,
+        )
+        gaps = [
+            GapItem(
+                dimension=GapDimension.BRANDSCHUTZ,
+                schweregrad=GapSeverity.MAJOR,
+                anforderung_wert="EI60",
+                abweichung_beschreibung="Zu niedrig",
+            ),
+        ]
+
+        results = search_alternatives_for_gaps(
+            position, gaps, mock_index,
+            matched_product_id="PROD-100",
+        )
+
+        alt_ids = [a.produkt_id for a in results]
+        assert "PROD-100" not in alt_ids
+
+    def test_max_three_alternatives(self):
+        """At most 3 alternatives should be returned."""
+        from v2.schemas.extraction import ExtractedDoorPosition
+        mock_index = _make_mock_tfidf_index()
+        position = ExtractedDoorPosition(
+            positions_nr="1.01",
+            breite_mm=900,
+            hoehe_mm=2100,
+        )
+        gaps = [
+            GapItem(
+                dimension=GapDimension.BRANDSCHUTZ,
+                schweregrad=GapSeverity.MAJOR,
+                anforderung_wert="EI60",
+                abweichung_beschreibung="Zu niedrig",
+            ),
+        ]
+
+        results = search_alternatives_for_gaps(
+            position, gaps, mock_index,
+            matched_product_id="PROD-100",
+        )
+
+        assert len(results) <= 3
+
+    def test_abgelehnt_filter_coverage(self):
+        """Abgelehnt alternatives must have >30% coverage."""
+        from v2.schemas.extraction import ExtractedDoorPosition
+        # Build index where most candidates won't have matching fields
+        mock_index = _make_mock_tfidf_index(
+            candidate_fields={
+                0: {"Kostentraeger": "PROD-300", "Produktegruppen": "Leer", "row_index": 0},
+                1: {"Kostentraeger": "PROD-301", "Produktegruppen": "Leer", "row_index": 1},
+                2: {"Kostentraeger": "PROD-302", "Produktegruppen": "Brandschutztuere", "Brandschutzklasse": "EI60", "row_index": 2},
+            },
+            search_results=[(0, 0.9), (1, 0.8), (2, 0.7)],
+        )
+        position = ExtractedDoorPosition(
+            positions_nr="1.01",
+            breite_mm=900,
+            hoehe_mm=2100,
+        )
+        gaps = [
+            GapItem(
+                dimension=GapDimension.BRANDSCHUTZ,
+                schweregrad=GapSeverity.MAJOR,
+                anforderung_wert="EI60",
+                abweichung_beschreibung="Kein Brandschutz",
+            ),
+            GapItem(
+                dimension=GapDimension.SCHALLSCHUTZ,
+                schweregrad=GapSeverity.MAJOR,
+                anforderung_wert="42dB",
+                abweichung_beschreibung="Kein Schallschutz",
+            ),
+        ]
+
+        results = search_alternatives_for_gaps(
+            position, gaps, mock_index,
+            matched_product_id=None,
+            is_abgelehnt=True,
+        )
+
+        # Only candidates with >30% coverage should be returned
+        for alt in results:
+            assert alt.teilweise_deckung >= 0.3
+
+    def test_cross_references_set_correctly(self):
+        """gap_geschlossen_durch should contain valid product IDs."""
+        gaps = [
+            GapItem(
+                dimension=GapDimension.BRANDSCHUTZ,
+                schweregrad=GapSeverity.MAJOR,
+                anforderung_wert="EI60",
+                abweichung_beschreibung="Zu niedrig",
+            ),
+            GapItem(
+                dimension=GapDimension.SCHALLSCHUTZ,
+                schweregrad=GapSeverity.MAJOR,
+                anforderung_wert="42dB",
+                abweichung_beschreibung="Unzureichend",
+            ),
+        ]
+        alternatives = [
+            AlternativeProduct(
+                produkt_id="PROD-201",
+                produkt_name="EI60 Tuere",
+                teilweise_deckung=0.5,
+                verbleibende_gaps=["Schallschutz"],
+                geschlossene_gaps=["Brandschutz"],
+            ),
+            AlternativeProduct(
+                produkt_id="PROD-202",
+                produkt_name="Schallschutztuere",
+                teilweise_deckung=0.5,
+                verbleibende_gaps=["Brandschutz"],
+                geschlossene_gaps=["Schallschutz"],
+            ),
+        ]
+
+        _cross_reference_gaps_and_alternatives(gaps, alternatives)
+
+        # Brandschutz gap should reference PROD-201
+        assert "PROD-201" in gaps[0].gap_geschlossen_durch
+        assert "PROD-202" not in gaps[0].gap_geschlossen_durch
+
+        # Schallschutz gap should reference PROD-202
+        assert "PROD-202" in gaps[1].gap_geschlossen_durch
+        assert "PROD-201" not in gaps[1].gap_geschlossen_durch
