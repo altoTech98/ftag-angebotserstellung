@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-03-10T20:24:54.869Z"
+stopped_at: Completed 08-03-PLAN.md
+last_updated: "2026-03-10T20:49:25.526Z"
 last_activity: 2026-03-10 — Completed 08-02 (Pipeline Wiring with SSE Progress)
 progress:
   total_phases: 8
-  completed_phases: 7
-  total_plans: 18
-  completed_plans: 18
+  completed_phases: 8
+  total_plans: 19
+  completed_plans: 19
   percent: 100
 ---
 
@@ -58,6 +58,7 @@ Progress: [██████████] 100%
 *Updated after each plan completion*
 | Phase 08 P01 | 5min | 2 tasks | 6 files |
 | Phase 08 P02 | 6min | 2 tasks | 6 files |
+| Phase 08 P03 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -129,6 +130,8 @@ Recent decisions affecting current work:
 - [Phase 08]: Progress throttle at 500ms to prevent SSE flooding
 - [Phase 08]: Fail-fast via raise_ai_error: no partial results on AI failure
 - [Phase 08]: Extraction progress scaled to 0-30% of total pipeline percent
+- [Phase 08]: V2 path detection via statusPath.startsWith('/v2/') for SSE routing
+- [Phase 08]: Removed tuerliste_count guard since v2 handles classification internally
 
 ### Pending Todos
 
@@ -141,6 +144,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T20:32:16Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-03-10T20:49:25.520Z
+Stopped at: Completed 08-03-PLAN.md
 Resume file: None
