@@ -127,11 +127,11 @@ Plans:
   3. Generated Excel contains Sheet 3 "Gap-Analyse" with all non-matches, gap reasons, deviations, severity, and alternative suggestions
   4. Generated Excel contains Sheet 4 "Executive Summary" with statistics, overall assessment, and recommendations
   5. Cells are color-coded: green (95%+ match), yellow (60-95% partial), red (<60% no match) and every decision cell explains WHY
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
+- [ ] 07-01-PLAN.md — 4-sheet Excel generator with color coding, cell comments, and test suite
+- [ ] 07-02-PLAN.md — API endpoints (offer/generate + offer/download) with Executive Summary AI call
 
 ### Phase 8: Quality, Observability & End-to-End
 **Goal**: The full pipeline runs reliably end-to-end with real-time progress visibility, plausibility validation, and clear error reporting
