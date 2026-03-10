@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { searchProducts, saveFeedback } from '../services/api'
+import { searchProducts, saveV2Feedback } from '../services/api'
 import { useApp } from '../context/AppContext'
 import styles from '../styles/CorrectionModal.module.css'
 
@@ -88,34 +88,21 @@ export default function CorrectionModal({ item, onClose, onSaved }) {
     setSaving(true)
 
     const body = {
-      requirement_text: [
-        pos.beschreibung || item.beschreibung,
+      positions_nr: item.position || pos.positions_nr || pos.position || '?',
+      requirement_summary: [
+        pos.positions_bezeichnung || pos.beschreibung || item.beschreibung,
         pos.tuertyp,
         pos.brandschutz,
-        pos.einbruchschutz || pos.widerstandsklasse,
       ].filter(Boolean).join(' | '),
-      requirement_fields: {
-        tuertyp: pos.tuertyp || null,
-        brandschutz: pos.brandschutz || null,
-        einbruchschutz: pos.einbruchschutz || pos.widerstandsklasse || null,
-        breite: pos.breite ? parseInt(pos.breite, 10) || null : null,
-        hoehe: pos.hoehe ? parseInt(pos.hoehe, 10) || null : null,
-      },
-      wrong_product: {
-        row_index: null,
-        product_summary: currentProductDisplay,
-      },
-      correct_product: {
-        row_index: selectedProduct._row_index,
-        product_summary: selectedProduct._summary,
-      },
-      position_id: item.position || pos.position || '?',
-      match_status_was: item._status || 'unknown',
-      user_note: note,
+      original_produkt_id: item._v2?.match?.bester_match?.produkt_id || '',
+      original_konfidenz: item.confidence || 0,
+      corrected_produkt_id: String(selectedProduct._row_index || ''),
+      corrected_produkt_name: selectedProduct._summary || '',
+      correction_reason: note || 'Manuelle Korrektur',
     }
 
     try {
-      await saveFeedback(body)
+      await saveV2Feedback(body)
       showToast('Korrektur gespeichert')
       onClose()
       if (onSaved) onSaved()

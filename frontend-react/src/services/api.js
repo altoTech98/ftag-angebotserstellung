@@ -73,41 +73,17 @@ export const createUser = (email, password, role) =>
 export const deleteUser = (email) =>
   request(`/auth/users/${encodeURIComponent(email)}`, { method: 'DELETE' })
 
-// Upload
-export const uploadFile = (file) => {
+// V2 Upload
+export const uploadSingleV2 = (file) => {
   const form = new FormData()
   form.append('file', file)
-  return request('/upload', { method: 'POST', body: form })
+  return request('/v2/upload/single', { method: 'POST', body: form })
 }
 
-export const uploadFolder = (files) => {
+export const uploadFolderV2 = (files) => {
   const form = new FormData()
   for (const f of files) form.append('files', f)
-  return request('/upload/folder', { method: 'POST', body: form })
-}
-
-// Analysis
-export const startAnalysis = (fileId) =>
-  request('/analyze', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ file_id: fileId }),
-  })
-
-export const startProjectAnalysis = (projectId) =>
-  request('/analyze/project', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ project_id: projectId, file_overrides: {} }),
-  })
-
-export const getJobStatus = (jobId, statusPath = '/analyze/status/') =>
-  request(`${statusPath}${jobId}`)
-
-export function createSSE(jobId) {
-  const token = getToken()
-  const url = `${API_BASE}/analyze/stream/${jobId}${token ? `?token=${encodeURIComponent(token)}` : ''}`
-  return new EventSource(url)
+  return request('/v2/upload', { method: 'POST', body: form })
 }
 
 // V2 Analysis
@@ -127,29 +103,20 @@ export function createV2SSE(jobId) {
 export const getV2JobStatus = (jobId) =>
   request(`/v2/analyze/status/${jobId}`)
 
-export const uploadFolderV2 = (files) => {
-  const form = new FormData()
-  for (const f of files) form.append('files', f)
-  return request('/v2/upload', { method: 'POST', body: form })
-}
-
-// Result generation
-export const generateResult = (requirements, matching) =>
-  request('/result/generate', {
+// V2 Offer Generation
+export const generateV2Offer = (analysisId) =>
+  request('/offer/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ requirements, matching }),
+    body: JSON.stringify({ analysis_id: analysisId }),
   })
 
-export const getResultStatus = (jobId) =>
-  request(`/result/status/${jobId}`)
+export const getV2OfferStatus = (jobId) =>
+  request(`/offer/status/${jobId}`)
 
-export const getResultDownloadUrl = (resultId) =>
-  `${API_BASE}/result/${resultId}/download`
-
-export const downloadResult = async (resultId, filename) => {
+export const downloadV2Result = async (resultId, filename) => {
   const token = getToken()
-  const res = await fetch(`${API_BASE}/result/${resultId}/download`, {
+  const res = await fetch(`${API_BASE}/offer/${resultId}/download`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
   if (!res.ok) {
@@ -164,12 +131,24 @@ export const downloadResult = async (resultId, filename) => {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = filename || `FTAG_Machbarkeit_${resultId}.xlsx`
+  a.download = filename || `Machbarkeitsanalyse_${resultId}.xlsx`
   document.body.appendChild(a)
   a.click()
   a.remove()
   URL.revokeObjectURL(url)
 }
+
+// V2 Feedback
+export const saveV2Feedback = (body) =>
+  request('/v2/feedback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+// Job status (used by useSSE pollFallback)
+export const getJobStatus = (jobId, statusPath = '/analyze/status/') =>
+  request(`${statusPath}${jobId}`)
 
 // Catalog
 export const getCatalogInfo = () => request('/catalog/info')
@@ -186,14 +165,7 @@ export const getHistoryDetail = (id) => request(`/history/${id}`)
 export const rematchHistory = (id) => request(`/history/${id}/rematch`, { method: 'POST' })
 export const deleteHistory = (id) => request(`/history/${id}`, { method: 'DELETE' })
 
-// Feedback
-export const saveFeedback = (body) =>
-  request('/feedback', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-
+// Product search (used by CorrectionModal)
 export const searchProducts = (query, limit = 15) =>
   request(`/products/search?q=${encodeURIComponent(query)}&limit=${limit}`)
 

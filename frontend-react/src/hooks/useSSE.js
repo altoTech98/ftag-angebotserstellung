@@ -4,29 +4,6 @@ import * as api from '../services/api'
 export function useSSE() {
   const esRef = useRef(null)
 
-  const pollSSE = useCallback((jobId, onProgress) => {
-    return new Promise((resolve, reject) => {
-      const es = api.createSSE(jobId)
-      esRef.current = es
-      let settled = false
-      const settle = (fn, val) => {
-        if (!settled) { settled = true; es.close(); fn(val) }
-      }
-      es.onmessage = (e) => {
-        try {
-          const data = JSON.parse(e.data)
-          if (data.type === 'keepalive') return
-          if (data.progress && onProgress) onProgress(data.progress)
-          if (data.status === 'completed') settle(resolve, data.result)
-          if (data.status === 'failed') settle(reject, new Error(data.error || 'Analyse fehlgeschlagen'))
-        } catch (err) {
-          console.warn('SSE parse error:', err)
-        }
-      }
-      es.onerror = () => settle(reject, new Error('SSE connection error'))
-    })
-  }, [])
-
   const pollV2SSE = useCallback((jobId, onProgress) => {
     return new Promise((resolve, reject) => {
       const es = api.createV2SSE(jobId)
@@ -71,15 +48,9 @@ export function useSSE() {
       } catch (e) {
         console.warn('V2 SSE fallback to polling:', e.message)
       }
-    } else if (statusPath === '/analyze/status/') {
-      try {
-        return await pollSSE(jobId, onProgress)
-      } catch (e) {
-        console.warn('SSE fallback to polling:', e.message)
-      }
     }
     return await pollFallback(jobId, onProgress, statusPath)
-  }, [pollSSE, pollV2SSE, pollFallback])
+  }, [pollV2SSE, pollFallback])
 
   const cleanup = useCallback(() => {
     if (esRef.current) { esRef.current.close(); esRef.current = null }

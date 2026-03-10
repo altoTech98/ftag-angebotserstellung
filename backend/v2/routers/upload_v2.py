@@ -83,6 +83,39 @@ async def upload_files(
     }
 
 
+@router.post("/upload/single")
+async def upload_single_file(file: UploadFile = File(...)):
+    """Upload a single file as a new tender session.
+
+    Args:
+        file: The file to upload.
+
+    Returns:
+        JSON with tender_id, filename, format, and total_files=1.
+    """
+    tender_id = str(uuid.uuid4())
+    _tenders[tender_id] = {
+        "files": [],
+        "status": "uploading",
+        "created_at": datetime.now(timezone.utc),
+    }
+
+    content = await file.read()
+    filename = file.filename or "unknown"
+
+    logger.info(f"[V2 Upload] Parsing single file {filename} ({len(content)} bytes) for tender {tender_id}")
+    result: ParseResult = parse_document(content, filename)
+
+    _tenders[tender_id]["files"].append(result)
+
+    return {
+        "tender_id": tender_id,
+        "filename": filename,
+        "format": result.format,
+        "total_files": 1,
+    }
+
+
 @router.get("/tender/{tender_id}")
 async def get_tender_status(tender_id: str):
     """Get tender session status and file list.
