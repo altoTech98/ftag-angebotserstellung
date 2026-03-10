@@ -12,7 +12,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **DOKA-01**: System parst PDF-Dateien und extrahiert vollständigen Text mit Tabellenstruktur
 - [x] **DOKA-02**: System parst DOCX-Dateien und extrahiert Text mit Formatierung
 - [x] **DOKA-03**: System parst XLSX-Dateien und erkennt Türlisten-Spaltenstruktur automatisch
-- [ ] **DOKA-04**: System akzeptiert mehrere Dateien pro Ausschreibung (PDF + Excel + DOCX gemischt)
+- [x] **DOKA-04**: System akzeptiert mehrere Dateien pro Ausschreibung (PDF + Excel + DOCX gemischt)
 - [x] **DOKA-05**: System führt Multi-Pass-Analyse durch (Pass 1: strukturell, Pass 2: AI-semantisch, Pass 3: Cross-Reference-Validierung)
 - [x] **DOKA-06**: System extrahiert ALLE technischen Anforderungen als einzelne Datenpunkte (Maße, Material, Normen, Zertifizierungen, Leistungsdaten)
 - [ ] **DOKA-07**: System reichert Positionen mit Daten aus verschiedenen Dokumenten an (Cross-Document Enrichment: Excel-Türliste + PDF-Spezifikation + DOCX-Anforderungen)
@@ -56,7 +56,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### API & Integration
 
-- [ ] **APII-01**: POST /api/upload akzeptiert mehrere Dateien pro Ausschreibung
+- [x] **APII-01**: POST /api/upload akzeptiert mehrere Dateien pro Ausschreibung
 - [ ] **APII-02**: POST /api/analyze startet Multi-Pass-Analyse mit SSE-Streaming für Fortschritt
 - [ ] **APII-03**: GET /api/analyze/status/{job_id} liefert detaillierten Fortschritt (Position X von Y, aktueller Pass)
 - [ ] **APII-04**: POST /api/offer/generate erstellt 4-Sheet Excel-Output
@@ -102,7 +102,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | DOKA-01 | Phase 1 | Complete |
 | DOKA-02 | Phase 1 | Complete |
 | DOKA-03 | Phase 1 | Complete |
-| DOKA-04 | Phase 2 | Pending |
+| DOKA-04 | Phase 2 | Complete |
 | DOKA-05 | Phase 2 | Complete |
 | DOKA-06 | Phase 2 | Complete |
 | DOKA-07 | Phase 3 | Pending |
@@ -131,7 +131,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | QUAL-02 | Phase 8 | Pending |
 | QUAL-03 | Phase 8 | Pending |
 | QUAL-04 | Phase 8 | Pending |
-| APII-01 | Phase 2 | Pending |
+| APII-01 | Phase 2 | Complete |
 | APII-02 | Phase 8 | Pending |
 | APII-03 | Phase 8 | Pending |
 | APII-04 | Phase 7 | Pending |

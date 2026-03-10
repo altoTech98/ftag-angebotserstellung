@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 02-01 (Extraction Foundations)
-last_updated: "2026-03-10T13:28:24Z"
-last_activity: 2026-03-10 — Completed 02-01 (Extraction Foundations)
+stopped_at: Completed 02-02 (V2 API Endpoints)
+last_updated: "2026-03-10T13:34:29Z"
+last_activity: 2026-03-10 — Completed 02-02 (V2 API Endpoints)
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 3
-  completed_plans: 3
-  percent: 15
+  completed_plans: 4
+  percent: 19
 ---
 
 # Project State
@@ -26,25 +26,25 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 2 of 8 (Multi-Pass Extraction)
-Plan: 1 of 3 in current phase
-Status: Plan 02-01 Complete
-Last activity: 2026-03-10 — Completed 02-01 (Extraction Foundations)
+Plan: 2 of 3 in current phase
+Status: Plan 02-02 Complete
+Last activity: 2026-03-10 — Completed 02-02 (V2 API Endpoints)
 
-Progress: [██░░░░░░░░] 15%
+Progress: [██░░░░░░░░] 19%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 5.7min
-- Total execution time: 0.28 hours
+- Total plans completed: 4
+- Average duration: 5min
+- Total execution time: 0.33 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 2/2 | 11min | 5.5min |
-| 02 | 1/3 | 6min | 6min |
+| 02 | 2/3 | 9min | 4.5min |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -71,6 +71,10 @@ Recent decisions affecting current work:
 - 02-01: Pass 1 uses pipe-delimited text from XLSX parser (canonical field names)
 - 02-01: Dedup pre-filter uses exact positions_nr match; AI clustering separate
 - 02-01: All prompts in German matching domain language
+- 02-02: tender_id as query param (not Form) to avoid multipart complexity
+- 02-02: In-memory dict for tender storage (single-process dev)
+- 02-02: Format priority sorting: xlsx=0, pdf=1, docx=2
+- 02-02: Lazy try/except import for v2 routers in main.py
 
 ### Pending Todos
 
@@ -83,6 +87,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T13:28:24Z
-Stopped at: Completed 02-01 (Extraction Foundations)
-Resume file: .planning/phases/02-multi-pass-extraction/02-01-SUMMARY.md
+Last session: 2026-03-10T13:34:29Z
+Stopped at: Completed 02-02 (V2 API Endpoints)
+Resume file: .planning/phases/02-multi-pass-extraction/02-02-SUMMARY.md

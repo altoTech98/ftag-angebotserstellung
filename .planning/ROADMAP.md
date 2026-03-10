@@ -155,7 +155,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Document Parsing & Pipeline Schemas | 2/2 | Complete   | 2026-03-10 |
-| 2. Multi-Pass Extraction | 1/3 | In Progress|  |
+| 2. Multi-Pass Extraction | 2/3 | In Progress|  |
 | 3. Cross-Document Intelligence | 0/1 | Not started | - |
 | 4. Product Matching Engine | 0/2 | Not started | - |
 | 5. Adversarial Validation | 0/2 | Not started | - |
