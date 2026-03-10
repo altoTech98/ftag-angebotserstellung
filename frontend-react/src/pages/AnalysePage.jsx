@@ -188,10 +188,90 @@ function PositionDetailModal({ item, onClose }) {
             <>
               <h4 className={styles.subHeading} style={{ marginTop: '1rem', color: 'var(--warning)' }}>Abweichungen</h4>
               <div className={styles.criteriaList}>
-                {gapItems.map((gi, i) => (
-                  <div key={i} className={`${styles.criteriaItem} ${styles.criteriaTeilweise}`}>
-                    <span><strong>{gi.field || gi.feld || ''}</strong></span>
-                    <span style={{ fontSize: '.8rem' }}>{gi.description || gi.detail || ''}</span>
+                {gapItems.map((gi, i) => {
+                  const severityColor = gi.severity === 'kritisch' ? '#ef4444' : gi.severity === 'major' ? '#f59e0b' : '#eab308'
+                  const v2Gap = (item._v2?.gaps?.gaps || []).find(g => (g.dimension || '').toLowerCase() === (gi.field || gi.feld || '').toLowerCase())
+                  return (
+                    <div key={i} className={`${styles.criteriaItem} ${styles.criteriaTeilweise}`}>
+                      <span>
+                        {gi.severity && (
+                          <span style={{ display: 'inline-block', padding: '1px 6px', borderRadius: '4px', fontSize: '.7rem', fontWeight: 600, color: '#fff', background: severityColor, marginRight: '.4rem', verticalAlign: 'middle' }}>
+                            {gi.severity}
+                          </span>
+                        )}
+                        <strong>{gi.field || gi.feld || ''}</strong>
+                      </span>
+                      <span style={{ fontSize: '.8rem' }}>{gi.description || gi.detail || ''}</span>
+                      {v2Gap?.kundenvorschlag && (
+                        <span style={{ fontSize: '.75rem', color: 'var(--text-muted)', marginTop: '.25rem', display: 'block' }}>Vorschlag: {v2Gap.kundenvorschlag}</span>
+                      )}
+                      {v2Gap?.technischer_hinweis && (
+                        <span style={{ fontSize: '.75rem', color: 'var(--text-faint)', display: 'block' }}>Technisch: {v2Gap.technischer_hinweis}</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Adversarial Validation section */}
+          {item._v2?.adversarial && (() => {
+            const adv = item._v2.adversarial
+            const statusBadge = {
+              bestaetigt: { label: 'Bestaetigt', cls: styles.tagGreen },
+              unsicher: { label: 'Unsicher', cls: styles.tagOrange },
+              abgelehnt: { label: 'Abgelehnt', cls: styles.tagRed },
+            }
+            const badge = statusBadge[adv.validation_status] || { label: adv.validation_status, cls: '' }
+            return (
+              <>
+                <h4 className={styles.subHeading} style={{ marginTop: '1rem' }}>Adversarial Validierung</h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.5rem' }}>
+                  <span className={`${styles.tag} ${badge.cls}`}>{badge.label}</span>
+                  <span style={{ fontSize: '.8125rem', color: 'var(--text-muted)' }}>
+                    Angepasste Konfidenz: {(adv.adjusted_confidence * 100).toFixed(0)}%
+                  </span>
+                </div>
+                {adv.resolution_reasoning && (
+                  <div style={{ padding: '.5rem .75rem', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: '.8125rem', color: 'var(--text-muted)', marginBottom: '.5rem' }}>
+                    {adv.resolution_reasoning}
+                  </div>
+                )}
+                {adv.per_dimension_cot && adv.per_dimension_cot.length > 0 && (
+                  <div className={styles.detailFields}>
+                    {adv.per_dimension_cot.map((dim, i) => {
+                      const color = dim.score >= 0.95 ? '#22c55e' : dim.score >= 0.60 ? '#f59e0b' : '#ef4444'
+                      return (
+                        <div key={i} className={styles.detailField}>
+                          <span className={styles.detailFieldLabel} style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+                            {dim.dimension}
+                          </span>
+                          <span className={styles.detailFieldValue}>
+                            <span style={{ fontWeight: 600, color }}>{(dim.score * 100).toFixed(0)}%</span>
+                            {dim.reasoning && <span style={{ marginLeft: '.5rem', fontSize: '.75rem', color: 'var(--text-muted)' }}>{dim.reasoning}</span>}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
+            )
+          })()}
+
+          {/* Gap Alternatives section */}
+          {item._v2?.gaps?.alternativen?.length > 0 && (
+            <>
+              <h4 className={styles.subHeading} style={{ marginTop: '1rem' }}>Alternative Produkte</h4>
+              <div className={styles.detailFields}>
+                {item._v2.gaps.alternativen.map((alt, i) => (
+                  <div key={i} className={styles.detailField}>
+                    <span className={styles.detailFieldLabel}>{alt.produkt_name || alt.produkt_id}</span>
+                    <span className={styles.detailFieldValue}>
+                      {alt.teilweise_deckung != null ? `${(alt.teilweise_deckung * 100).toFixed(0)}% Deckung` : '\u2014'}
+                    </span>
                   </div>
                 ))}
               </div>
