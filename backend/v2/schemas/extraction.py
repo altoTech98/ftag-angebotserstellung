@@ -1,11 +1,15 @@
 """
-Extraction schemas - Phase 2 output.
+Extraction schemas - Phase 2 output + Phase 3 cross-document intelligence.
 
 ExtractedDoorPosition is the central data model: ~50+ German-named fields
 representing every property of a door position extracted from tender documents.
 Uses the enum+freitext pattern for extensible classification.
+
+Phase 3 adds: ConflictSeverity, FieldConflict, CrossDocMatch, GeneralSpec,
+DocumentEnrichmentStats, EnrichmentReport schemas for cross-document intelligence.
 """
 
+from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -205,6 +209,92 @@ class ExtractedDoorPosition(BaseModel):
     )
 
 
+# ---------------------------------------------------------------------------
+# Phase 3: Cross-document intelligence schemas
+# ---------------------------------------------------------------------------
+
+
+class ConflictSeverity(str, Enum):
+    """Severity of a cross-document field conflict."""
+
+    CRITICAL = "critical"  # Safety: fire rating, smoke, burglary
+    MAJOR = "major"        # Spec: dimensions, material, sound
+    MINOR = "minor"        # Cosmetic: color, surface
+
+
+class FieldConflict(BaseModel):
+    """A detected conflict between two document sources for the same field."""
+
+    positions_nr: str = Field(description="Position number")
+    field_name: str = Field(description="Name of the conflicting field")
+    wert_a: str = Field(description="Value from document A")
+    quelle_a: FieldSource = Field(description="Source of value A")
+    wert_b: str = Field(description="Value from document B")
+    quelle_b: FieldSource = Field(description="Source of value B")
+    severity: ConflictSeverity = Field(description="Conflict severity")
+    resolution: str = Field(description="Chosen/resolved value")
+    resolution_reason: str = Field(description="Reasoning for resolution")
+    resolved_by: str = Field(description="'ai' or 'rule'")
+
+
+class CrossDocMatch(BaseModel):
+    """A match between positions from different documents."""
+
+    position_a_index: int = Field(description="Index of position A in flat list")
+    position_b_index: int = Field(description="Index of position B in flat list")
+    confidence: float = Field(description="Match confidence 0.0-1.0")
+    match_method: str = Field(
+        description="Match method: 'exact_id', 'normalized_id', 'room_floor_type', 'ai_semantic'"
+    )
+    auto_merge: bool = Field(description="True if confidence >= 0.9")
+
+
+class GeneralSpec(BaseModel):
+    """A general specification that applies to multiple positions."""
+
+    beschreibung: str = Field(description="The spec text")
+    scope: str = Field(description="Scope filter e.g. 'geschoss==OG', 'all'")
+    affected_fields: dict[str, str] = Field(
+        description="Mapping field_name -> value to apply"
+    )
+    source: FieldSource = Field(description="Source provenance")
+    konfidenz: float = Field(
+        0.7, description="Confidence for applied values (lower for implicit specs)"
+    )
+
+
+class DocumentEnrichmentStats(BaseModel):
+    """Enrichment statistics for a single source document."""
+
+    dokument: str = Field(description="Document filename")
+    positionen_matched: int = Field(description="Positions matched cross-doc")
+    felder_enriched: int = Field(description="Fields enriched from this doc")
+    konflikte_gefunden: int = Field(description="Conflicts found for this doc")
+
+
+class EnrichmentReport(BaseModel):
+    """Overall cross-document enrichment report."""
+
+    total_positionen: int = Field(description="Total positions across all docs")
+    positionen_matched_cross_doc: int = Field(
+        description="Positions matched across documents"
+    )
+    felder_enriched: int = Field(description="Total fields enriched")
+    konflikte_total: int = Field(description="Total conflicts detected")
+    konflikte_critical: int = Field(description="Critical conflicts count")
+    konflikte_major: int = Field(description="Major conflicts count")
+    konflikte_minor: int = Field(description="Minor conflicts count")
+    general_specs_applied: int = Field(
+        description="Number of general specs applied to positions"
+    )
+    dokument_stats: list[DocumentEnrichmentStats] = Field(
+        description="Per-document enrichment statistics"
+    )
+    zusammenfassung: str = Field(
+        description="Human-readable summary for sales team"
+    )
+
+
 class ExtractionResult(BaseModel):
     """Complete extraction result from a document analysis."""
 
@@ -220,4 +310,11 @@ class ExtractionResult(BaseModel):
     )
     dokument_typ: DokumentTyp = Field(
         description="Type of the source document"
+    )
+    # Phase 3: Cross-document intelligence (Optional for backward compat)
+    enrichment_report: Optional[EnrichmentReport] = Field(
+        None, description="Cross-document enrichment statistics"
+    )
+    conflicts: list[FieldConflict] = Field(
+        default_factory=list, description="Detected cross-document conflicts"
     )

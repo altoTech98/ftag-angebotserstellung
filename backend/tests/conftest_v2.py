@@ -21,6 +21,132 @@ from v2.schemas.common import (
 from v2.schemas.extraction import ExtractedDoorPosition
 
 
+# ---------------------------------------------------------------------------
+# Phase 3: Cross-document intelligence fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def xlsx_positions() -> list[ExtractedDoorPosition]:
+    """3 door positions from an XLSX door list.
+
+    Positions 1.01, 1.02, 1.03 with basic dims/material but no fire rating.
+    """
+    return [
+        ExtractedDoorPosition(
+            positions_nr="1.01",
+            positions_bezeichnung="Buerotuere",
+            raum_nr="B101",
+            geschoss="EG",
+            breite_mm=1000,
+            hoehe_mm=2100,
+            material_blatt=MaterialTyp.HOLZ,
+            quellen={
+                "breite_mm": FieldSource(dokument="tuerliste.xlsx", zeile=2, zelle="D2", sheet="Tuerliste", konfidenz=0.95),
+                "hoehe_mm": FieldSource(dokument="tuerliste.xlsx", zeile=2, zelle="E2", sheet="Tuerliste", konfidenz=0.95),
+                "material_blatt": FieldSource(dokument="tuerliste.xlsx", zeile=2, zelle="H2", sheet="Tuerliste", konfidenz=0.9),
+            },
+        ),
+        ExtractedDoorPosition(
+            positions_nr="1.02",
+            positions_bezeichnung="Flurtuere",
+            raum_nr="F201",
+            geschoss="OG",
+            breite_mm=900,
+            hoehe_mm=2050,
+            material_blatt=MaterialTyp.STAHL,
+            quellen={
+                "breite_mm": FieldSource(dokument="tuerliste.xlsx", zeile=3, zelle="D3", sheet="Tuerliste", konfidenz=0.95),
+                "hoehe_mm": FieldSource(dokument="tuerliste.xlsx", zeile=3, zelle="E3", sheet="Tuerliste", konfidenz=0.95),
+            },
+        ),
+        ExtractedDoorPosition(
+            positions_nr="1.03",
+            positions_bezeichnung="WC-Tuere",
+            raum_nr="WC01",
+            geschoss="EG",
+            breite_mm=800,
+            hoehe_mm=2000,
+            material_blatt=MaterialTyp.HOLZ,
+            quellen={
+                "breite_mm": FieldSource(dokument="tuerliste.xlsx", zeile=4, zelle="D4", sheet="Tuerliste", konfidenz=0.95),
+            },
+        ),
+    ]
+
+
+@pytest.fixture
+def pdf_positions() -> list[ExtractedDoorPosition]:
+    """2 door positions from a PDF spec document.
+
+    Position 'Pos. 1.01' with fire rating (overlaps xlsx 1.01).
+    Position 'Tuer 1.02' with detailed specs (overlaps xlsx 1.02).
+    Different naming convention to test normalization.
+    """
+    return [
+        ExtractedDoorPosition(
+            positions_nr="Pos. 1.01",
+            brandschutz_klasse=BrandschutzKlasse.EI30,
+            rauchschutz=True,
+            schallschutz_klasse=SchallschutzKlasse.RW_32,
+            schallschutz_db=32,
+            quellen={
+                "brandschutz_klasse": FieldSource(dokument="spec.pdf", seite=3, konfidenz=0.95),
+                "rauchschutz": FieldSource(dokument="spec.pdf", seite=3, konfidenz=0.9),
+                "schallschutz_klasse": FieldSource(dokument="spec.pdf", seite=4, konfidenz=0.85),
+            },
+        ),
+        ExtractedDoorPosition(
+            positions_nr="Tuer 1.02",
+            brandschutz_klasse=BrandschutzKlasse.EI60,
+            wandstaerke_mm=180,
+            drueckergarnitur="Edelstahl gebuerstet",
+            quellen={
+                "brandschutz_klasse": FieldSource(dokument="spec.pdf", seite=5, konfidenz=0.95),
+                "wandstaerke_mm": FieldSource(dokument="spec.pdf", seite=5, konfidenz=0.9),
+            },
+        ),
+    ]
+
+
+@pytest.fixture
+def conflicting_positions() -> list[ExtractedDoorPosition]:
+    """2 positions with conflicting brandschutz_klasse (T30 vs T90)."""
+    return [
+        ExtractedDoorPosition(
+            positions_nr="1.01",
+            brandschutz_klasse=BrandschutzKlasse.T30,
+            breite_mm=1000,
+            hoehe_mm=2100,
+            quellen={
+                "brandschutz_klasse": FieldSource(dokument="a.xlsx", konfidenz=0.9),
+                "breite_mm": FieldSource(dokument="a.xlsx", konfidenz=0.95),
+            },
+        ),
+        ExtractedDoorPosition(
+            positions_nr="1.01",
+            brandschutz_klasse=BrandschutzKlasse.T90,
+            breite_mm=1000,
+            hoehe_mm=2100,
+            quellen={
+                "brandschutz_klasse": FieldSource(dokument="b.pdf", konfidenz=0.95),
+                "breite_mm": FieldSource(dokument="b.pdf", konfidenz=0.9),
+            },
+        ),
+    ]
+
+
+@pytest.fixture
+def general_spec_text() -> str:
+    """Sample general specification text from a DOCX Pflichtenheft."""
+    return "Alle Innentüren im OG müssen mindestens T30 Brandschutz aufweisen"
+
+
+# ---------------------------------------------------------------------------
+# Phase 1-2 fixtures
+# ---------------------------------------------------------------------------
+
+
 @pytest.fixture
 def sample_pdf_bytes() -> bytes:
     """Minimal valid PDF bytes for testing.

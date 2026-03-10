@@ -34,6 +34,17 @@ class FieldSource(BaseModel):
     konfidenz: float = Field(
         1.0, description="Extraction confidence between 0.0 and 1.0"
     )
+    # Phase 3: Cross-document enrichment provenance
+    enrichment_source: Optional[str] = Field(
+        None, description="Document that provided this value via cross-doc enrichment"
+    )
+    enrichment_type: Optional[str] = Field(
+        None,
+        description=(
+            "Type of enrichment: 'gap_fill', 'confidence_upgrade', "
+            "'general_spec', 'conflict_resolution'"
+        ),
+    )
 
 
 class TrackedField(BaseModel):

@@ -156,6 +156,132 @@ Antworte im JSON-Format mit der vollstaendigen, korrigierten Positionsliste.
 # Dedup: AI-based position clustering
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Phase 3: Cross-document intelligence prompts
+# ---------------------------------------------------------------------------
+
+CROSSDOC_MATCHING_SYSTEM_PROMPT = """\
+Du bist ein Experte fuer die Zuordnung von Tuerpositionen aus verschiedenen \
+Ausschreibungsdokumenten. Deine Aufgabe: Finde Positionen die dieselbe physische \
+Tuer beschreiben, auch wenn sie unterschiedliche Bezeichnungen haben.
+
+## Matching-Regeln
+
+1. **Exakte Positionsnummer**: "1.01" = "1.01" -> Sicherer Match (Konfidenz 1.0)
+2. **Normalisierte ID**: "Tuer 1.01" = "Pos. 1.01" = "Element E1.01" = "T-1.01" = "Nr. 1.01" -> Hohe Konfidenz (0.9+)
+3. **Raum+Geschoss+Typ**: Gleicher Raum, gleiches Geschoss, aehnlicher Tuertyp -> Mittlere Konfidenz (0.6-0.9)
+4. **Keine Uebereinstimmung**: Verschiedene Tueren -> Konfidenz < 0.6, kein Match
+
+## Kontext: Schweizer Ausschreibungen
+
+- XLSX Tuerliste: Positionen + Basisdaten (Masse, Anzahl, Material)
+- PDF Bauphysik/Brandschutz: Detailspezifikationen pro Bereich oder Position
+- DOCX Pflichtenheft: Allgemeine Anforderungen und Vorgaben
+
+## Wichtig
+
+- Positionsnummern koennen unterschiedliche Praefixe haben (Tuer, Pos., Element, T-, Nr.)
+- Gleiche Raumnummer + gleiches Geschoss bedeutet NICHT automatisch gleiche Tuer (ein Raum kann mehrere Tueren haben)
+- Im Zweifelsfall: Niedrigere Konfidenz vergeben statt falsch matchen
+
+Antworte im JSON-Format.
+"""
+
+CROSSDOC_MATCHING_USER_TEMPLATE = """\
+Hier sind die Positionen aus verschiedenen Dokumenten:
+
+## Dokument A: {doc_a_name}
+{doc_a_positions_json}
+
+## Dokument B: {doc_b_name}
+{doc_b_positions_json}
+
+Finde alle Positionspaare die dieselbe physische Tuer beschreiben. \
+Gib fuer jedes Paar die Indizes, Konfidenz, Matching-Methode und ob auto_merge erlaubt ist an.
+
+Antworte als JSON-Liste von Matches.
+"""
+
+CROSSDOC_CONFLICT_SYSTEM_PROMPT = """\
+Du bist ein Experte fuer Bauphysik und Tuertechnik. Deine Aufgabe: Analysiere \
+Konflikte zwischen verschiedenen Dokumenten fuer dieselbe Tuerposition.
+
+## Konfliktanalyse
+
+Fuer jeden Konflikt:
+1. Bestimme welcher Wert wahrscheinlich korrekt ist basierend auf:
+   - Dokumenttyp (PDF-Spezifikation > XLSX-Tuerliste fuer technische Details)
+   - Kontext (spezifische Angabe > allgemeine Angabe)
+   - Fachlogik (z.B. T90 erfordert Stahlzarge, nicht Holzzarge)
+2. Begruende deine Entscheidung kurz und praezise
+3. Gib den gewahlten Wert als Resolution zurueck
+
+## Wichtig
+
+- Sicherheitsrelevante Konflikte (Brandschutz, Rauchschutz) immer konservativ loesen (hoeherer Schutz gewinnt im Zweifelsfall)
+- PDF-Spezifikationen haben generell hoehere Prioritaet als XLSX-Tuerlisten fuer technische Details
+- Beide Werte und Quellen muessen dokumentiert werden
+
+Antworte im JSON-Format.
+"""
+
+CROSSDOC_CONFLICT_USER_TEMPLATE = """\
+Hier sind die Konflikte die zwischen verschiedenen Dokumenten gefunden wurden:
+
+{conflicts_json}
+
+Fuer jeden Konflikt: Bestimme den korrekten Wert und begruende deine Entscheidung.
+
+Antworte als JSON-Liste mit resolution und resolution_reason pro Konflikt.
+"""
+
+CROSSDOC_ENRICHMENT_SYSTEM_PROMPT = """\
+Du bist ein Experte fuer die Analyse von Ausschreibungsdokumenten fuer Tueren. \
+Deine Aufgabe: Erkenne allgemeine Spezifikationen die fuer mehrere Positionen gelten.
+
+## Allgemeine Spezifikationen erkennen
+
+Suche nach Saetzen wie:
+- "Alle Innentüren im OG müssen mindestens T30 Brandschutz aufweisen"
+- "Sämtliche Fluchtwegtueren: Rauchschutz RS, Panikschloss"
+- "Generell: Schallschutz Rw 32dB für alle Bürotueren"
+
+## Ausgabeformat
+
+Fuer jede erkannte allgemeine Spezifikation:
+- beschreibung: Der Originaltext
+- scope: Betroffener Bereich (z.B. "geschoss==OG", "all", "raum_bezeichnung enthält Büro")
+- affected_fields: Welche Felder mit welchem Wert gesetzt werden sollen
+- konfidenz: Wie sicher ist diese Erkennung (Standard: 0.7)
+
+## Wichtig
+
+- Nur allgemeine Spezifikationen erkennen, KEINE positionsspezifischen Angaben
+- Scope muss praezise sein - "alle" nur wenn wirklich alle Positionen gemeint sind
+- affected_fields muessen valide Feldnamen des ExtractedDoorPosition Schemas verwenden
+
+Antworte im JSON-Format.
+"""
+
+CROSSDOC_ENRICHMENT_USER_TEMPLATE = """\
+Hier ist der Dokumenttext aus dem allgemeine Spezifikationen erkannt werden sollen:
+
+---
+{document_text}
+---
+
+Bereits bekannte Positionen:
+{positions_summary_json}
+
+Erkenne alle allgemeinen Spezifikationen die fuer mehrere Positionen gelten.
+
+Antworte als JSON-Liste von GeneralSpec-Objekten.
+"""
+
+# ---------------------------------------------------------------------------
+# Dedup: AI-based position clustering
+# ---------------------------------------------------------------------------
+
 DEDUP_PROMPT_TEMPLATE = """\
 Du erhaeltst eine Liste von Tuerpositionen aus verschiedenen Extraktionsdurchgaengen. \
 Einige Positionen koennten dieselbe physische Tuer beschreiben, aber unterschiedliche \
