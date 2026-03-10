@@ -59,8 +59,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **APII-01**: POST /api/upload akzeptiert mehrere Dateien pro Ausschreibung
 - [ ] **APII-02**: POST /api/analyze startet Multi-Pass-Analyse mit SSE-Streaming für Fortschritt
 - [ ] **APII-03**: GET /api/analyze/status/{job_id} liefert detaillierten Fortschritt (Position X von Y, aktueller Pass)
-- [ ] **APII-04**: POST /api/offer/generate erstellt 4-Sheet Excel-Output
-- [ ] **APII-05**: GET /api/offer/{id}/download liefert generierte Excel-Datei
+- [x] **APII-04**: POST /api/offer/generate erstellt 4-Sheet Excel-Output
+- [x] **APII-05**: GET /api/offer/{id}/download liefert generierte Excel-Datei
 - [x] **APII-06**: POST /api/feedback speichert Matching-Korrekturen für zukünftige Analysen
 
 ## v2 Requirements
@@ -134,8 +134,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | APII-01 | Phase 2 | Complete |
 | APII-02 | Phase 8 | Pending |
 | APII-03 | Phase 8 | Pending |
-| APII-04 | Phase 7 | Pending |
-| APII-05 | Phase 7 | Pending |
+| APII-04 | Phase 7 | Complete |
+| APII-05 | Phase 7 | Complete |
 | APII-06 | Phase 4 | Complete |
 
 **Coverage:**
