@@ -40,12 +40,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Excel-Output
 
-- [ ] **EXEL-01**: System generiert Excel mit Sheet 1 "Übersicht" — alle Anforderungen mit Match-Status (Grün/Gelb/Rot)
-- [ ] **EXEL-02**: System generiert Excel mit Sheet 2 "Details" — Anforderung ↔ Produkt, Konfidenz, dimensionale Aufschlüsselung, Begründung
-- [ ] **EXEL-03**: System generiert Excel mit Sheet 3 "Gap-Analyse" — alle Nicht-Matches mit Gründen, Abweichungen, Schweregrad, Alternativen
-- [ ] **EXEL-04**: System generiert Excel mit Sheet 4 "Executive Summary" — Statistiken, Zusammenfassung, Empfehlungen
-- [ ] **EXEL-05**: System verwendet Farbcodierung: Grün = Match (95%+), Gelb = teilweise (60-95%), Rot = kein Match (<60%)
-- [ ] **EXEL-06**: Jede Entscheidungszelle enthält nachvollziehbare Begründung (WARUM so entschieden)
+- [x] **EXEL-01**: System generiert Excel mit Sheet 1 "Übersicht" — alle Anforderungen mit Match-Status (Grün/Gelb/Rot)
+- [x] **EXEL-02**: System generiert Excel mit Sheet 2 "Details" — Anforderung ↔ Produkt, Konfidenz, dimensionale Aufschlüsselung, Begründung
+- [x] **EXEL-03**: System generiert Excel mit Sheet 3 "Gap-Analyse" — alle Nicht-Matches mit Gründen, Abweichungen, Schweregrad, Alternativen
+- [x] **EXEL-04**: System generiert Excel mit Sheet 4 "Executive Summary" — Statistiken, Zusammenfassung, Empfehlungen
+- [x] **EXEL-05**: System verwendet Farbcodierung: Grün = Match (95%+), Gelb = teilweise (60-95%), Rot = kein Match (<60%)
+- [x] **EXEL-06**: Jede Entscheidungszelle enthält nachvollziehbare Begründung (WARUM so entschieden)
 
 ### Qualitätssicherung
 
@@ -121,12 +121,12 @@ Deferred to future release. Tracked but not in current roadmap.
 | GAPA-03 | Phase 6 | Complete |
 | GAPA-04 | Phase 6 | Complete |
 | GAPA-05 | Phase 6 | Complete |
-| EXEL-01 | Phase 7 | Pending |
-| EXEL-02 | Phase 7 | Pending |
-| EXEL-03 | Phase 7 | Pending |
-| EXEL-04 | Phase 7 | Pending |
-| EXEL-05 | Phase 7 | Pending |
-| EXEL-06 | Phase 7 | Pending |
+| EXEL-01 | Phase 7 | Complete |
+| EXEL-02 | Phase 7 | Complete |
+| EXEL-03 | Phase 7 | Complete |
+| EXEL-04 | Phase 7 | Complete |
+| EXEL-05 | Phase 7 | Complete |
+| EXEL-06 | Phase 7 | Complete |
 | QUAL-01 | Phase 8 | Pending |
 | QUAL-02 | Phase 8 | Pending |
 | QUAL-03 | Phase 8 | Pending |
