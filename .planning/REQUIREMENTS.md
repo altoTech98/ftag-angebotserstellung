@@ -97,17 +97,52 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated during roadmap creation) | | |
+| DOKA-01 | Phase 1 | Pending |
+| DOKA-02 | Phase 1 | Pending |
+| DOKA-03 | Phase 1 | Pending |
+| DOKA-04 | Phase 2 | Pending |
+| DOKA-05 | Phase 2 | Pending |
+| DOKA-06 | Phase 2 | Pending |
+| DOKA-07 | Phase 3 | Pending |
+| DOKA-08 | Phase 3 | Pending |
+| MATC-01 | Phase 4 | Pending |
+| MATC-02 | Phase 4 | Pending |
+| MATC-03 | Phase 4 | Pending |
+| MATC-04 | Phase 4 | Pending |
+| MATC-05 | Phase 5 | Pending |
+| MATC-06 | Phase 5 | Pending |
+| MATC-07 | Phase 5 | Pending |
+| MATC-08 | Phase 5 | Pending |
+| MATC-09 | Phase 4 | Pending |
+| GAPA-01 | Phase 6 | Pending |
+| GAPA-02 | Phase 6 | Pending |
+| GAPA-03 | Phase 6 | Pending |
+| GAPA-04 | Phase 6 | Pending |
+| GAPA-05 | Phase 6 | Pending |
+| EXEL-01 | Phase 7 | Pending |
+| EXEL-02 | Phase 7 | Pending |
+| EXEL-03 | Phase 7 | Pending |
+| EXEL-04 | Phase 7 | Pending |
+| EXEL-05 | Phase 7 | Pending |
+| EXEL-06 | Phase 7 | Pending |
+| QUAL-01 | Phase 8 | Pending |
+| QUAL-02 | Phase 8 | Pending |
+| QUAL-03 | Phase 8 | Pending |
+| QUAL-04 | Phase 8 | Pending |
+| APII-01 | Phase 2 | Pending |
+| APII-02 | Phase 8 | Pending |
+| APII-03 | Phase 8 | Pending |
+| APII-04 | Phase 7 | Pending |
+| APII-05 | Phase 7 | Pending |
+| APII-06 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 28 total
-- Mapped to phases: 0
-- Unmapped: 28 ⚠️
+- v1 requirements: 38 total
+- Mapped to phases: 38
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-10*
-*Last updated: 2026-03-10 after initial definition*
+*Last updated: 2026-03-10 after roadmap creation*
