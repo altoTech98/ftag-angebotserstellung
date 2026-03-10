@@ -40,12 +40,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Excel-Output
 
-- [ ] **EXEL-01**: System generiert Excel mit Sheet 1 "Übersicht" — alle Anforderungen mit Match-Status (Grün/Gelb/Rot)
-- [ ] **EXEL-02**: System generiert Excel mit Sheet 2 "Details" — Anforderung ↔ Produkt, Konfidenz, dimensionale Aufschlüsselung, Begründung
-- [ ] **EXEL-03**: System generiert Excel mit Sheet 3 "Gap-Analyse" — alle Nicht-Matches mit Gründen, Abweichungen, Schweregrad, Alternativen
-- [ ] **EXEL-04**: System generiert Excel mit Sheet 4 "Executive Summary" — Statistiken, Zusammenfassung, Empfehlungen
-- [ ] **EXEL-05**: System verwendet Farbcodierung: Grün = Match (95%+), Gelb = teilweise (60-95%), Rot = kein Match (<60%)
-- [ ] **EXEL-06**: Jede Entscheidungszelle enthält nachvollziehbare Begründung (WARUM so entschieden)
+- [x] **EXEL-01**: System generiert Excel mit Sheet 1 "Übersicht" — alle Anforderungen mit Match-Status (Grün/Gelb/Rot)
+- [x] **EXEL-02**: System generiert Excel mit Sheet 2 "Details" — Anforderung ↔ Produkt, Konfidenz, dimensionale Aufschlüsselung, Begründung
+- [x] **EXEL-03**: System generiert Excel mit Sheet 3 "Gap-Analyse" — alle Nicht-Matches mit Gründen, Abweichungen, Schweregrad, Alternativen
+- [x] **EXEL-04**: System generiert Excel mit Sheet 4 "Executive Summary" — Statistiken, Zusammenfassung, Empfehlungen
+- [x] **EXEL-05**: System verwendet Farbcodierung: Grün = Match (95%+), Gelb = teilweise (60-95%), Rot = kein Match (<60%)
+- [x] **EXEL-06**: Jede Entscheidungszelle enthält nachvollziehbare Begründung (WARUM so entschieden)
 
 ### Qualitätssicherung
 
@@ -59,8 +59,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **APII-01**: POST /api/upload akzeptiert mehrere Dateien pro Ausschreibung
 - [x] **APII-02**: POST /api/analyze startet Multi-Pass-Analyse mit SSE-Streaming für Fortschritt
 - [x] **APII-03**: GET /api/analyze/status/{job_id} liefert detaillierten Fortschritt (Position X von Y, aktueller Pass)
-- [ ] **APII-04**: POST /api/offer/generate erstellt 4-Sheet Excel-Output
-- [ ] **APII-05**: GET /api/offer/{id}/download liefert generierte Excel-Datei
+- [x] **APII-04**: POST /api/offer/generate erstellt 4-Sheet Excel-Output
+- [x] **APII-05**: GET /api/offer/{id}/download liefert generierte Excel-Datei
 - [x] **APII-06**: POST /api/feedback speichert Matching-Korrekturen für zukünftige Analysen
 
 ## v2 Requirements
@@ -121,12 +121,12 @@ Deferred to future release. Tracked but not in current roadmap.
 | GAPA-03 | Phase 6 | Complete |
 | GAPA-04 | Phase 6 | Complete |
 | GAPA-05 | Phase 9 | Pending |
-| EXEL-01 | Phase 9 | Pending |
-| EXEL-02 | Phase 9 | Pending |
-| EXEL-03 | Phase 9 | Pending |
-| EXEL-04 | Phase 9 | Pending |
-| EXEL-05 | Phase 9 | Pending |
-| EXEL-06 | Phase 9 | Pending |
+| EXEL-01 | Phase 9 | Complete |
+| EXEL-02 | Phase 9 | Complete |
+| EXEL-03 | Phase 9 | Complete |
+| EXEL-04 | Phase 9 | Complete |
+| EXEL-05 | Phase 9 | Complete |
+| EXEL-06 | Phase 9 | Complete |
 | QUAL-01 | Phase 8 | Complete |
 | QUAL-02 | Phase 8 | Complete |
 | QUAL-03 | Phase 8 | Complete |
@@ -134,8 +134,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | APII-01 | Phase 2 | Complete |
 | APII-02 | Phase 8 | Complete |
 | APII-03 | Phase 8 | Complete |
-| APII-04 | Phase 9 | Pending |
-| APII-05 | Phase 9 | Pending |
+| APII-04 | Phase 9 | Complete |
+| APII-05 | Phase 9 | Complete |
 | APII-06 | Phase 4 | Complete |
 
 **Coverage:**
