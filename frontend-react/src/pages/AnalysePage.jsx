@@ -458,23 +458,13 @@ export default function AnalysePage() {
     setSubtitle('Dateien werden hochgeladen...')
 
     try {
-      const uploadResult = await api.uploadFolder(files)
-      const summary = uploadResult.summary || {}
-      const classInfo = []
-      if (summary.tuerliste_count) classInfo.push(`${summary.tuerliste_count} Tuerliste(n)`)
-      if (summary.spezifikation_count) classInfo.push(`${summary.spezifikation_count} Spezifikation(en)`)
-      if (summary.plan_count) classInfo.push(`${summary.plan_count} Plaene`)
-      if (summary.foto_count) classInfo.push(`${summary.foto_count} Fotos`)
-      if (summary.sonstig_count) classInfo.push(`${summary.sonstig_count} Sonstige`)
-      updateStep('upload', 'done', `${uploadResult.total_files} Dateien: ${classInfo.join(', ')}`)
-
-      if (!summary.tuerliste_count) {
-        throw new Error('Keine Tuerliste erkannt. Bitte stellen Sie sicher, dass mindestens eine Excel-Datei mit Tuerlisten-Spalten enthalten ist.')
-      }
+      const uploadResult = await api.uploadFolderV2(files)
+      const fileNames = (uploadResult.files || []).map(f => f.filename).join(', ')
+      updateStep('upload', 'done', `${uploadResult.total_files} Dateien hochgeladen: ${fileNames}`)
 
       updateStep('ai', 'running', 'Tuerlisten werden geparst...')
       setSubtitle('Projekt wird analysiert...')
-      const { job_id } = await api.startProjectAnalysis(uploadResult.project_id)
+      const { job_id } = await api.startV2Analysis(uploadResult.tender_id)
       const result = await pollJob(job_id, (progressStr) => {
         // Try parsing as structured JSON progress (v2 pipeline)
         try {
@@ -500,7 +490,7 @@ export default function AnalysePage() {
             updateStep('match', 'running', progressStr)
           }
         }
-      })
+      }, '/v2/analyze/status/')
       setAnalysis(result)
 
       const pos = result.requirements?.positionen?.length || 0
