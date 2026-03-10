@@ -602,6 +602,175 @@ def _normalize_nr(nr: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# AI Conflict Resolution Tests (Plan 03-03)
+# ---------------------------------------------------------------------------
+
+
+class TestAIConflictResolution:
+    """Tests for AI-powered conflict resolution in conflict_detector."""
+
+    @pytest.mark.asyncio
+    async def test_ai_resolution_called_when_client_provided(self):
+        """When client is provided and AI call succeeds, resolved_by is 'ai'."""
+        from unittest.mock import MagicMock, patch
+        from v2.extraction.conflict_detector import (
+            ConflictResolutionItem,
+            ConflictResolutionResult,
+            _resolve_conflicts_with_ai,
+        )
+
+        # Build a mock client whose messages.parse returns structured result
+        mock_client = MagicMock()
+        ai_response = ConflictResolutionResult(
+            resolutions=[
+                ConflictResolutionItem(
+                    field_name="brandschutz_klasse",
+                    resolution="T90",
+                    resolution_reason="PDF-Spezifikation hat hoehere Prioritaet fuer Brandschutz",
+                ),
+            ]
+        )
+        # messages.parse is called via asyncio.to_thread, so it's sync on the mock
+        mock_client.messages.parse.return_value = ai_response
+
+        raw_conflicts = [
+            {
+                "positions_nr": "1.01",
+                "field_name": "brandschutz_klasse",
+                "wert_a": "T30",
+                "quelle_a": FieldSource(dokument="a.xlsx", konfidenz=0.9),
+                "wert_b": "T90",
+                "quelle_b": FieldSource(dokument="b.pdf", konfidenz=0.95),
+                "severity": ConflictSeverity.CRITICAL,
+            },
+        ]
+
+        resolved = await _resolve_conflicts_with_ai(raw_conflicts, mock_client)
+        assert len(resolved) == 1
+        assert resolved[0].resolved_by == "ai"
+        assert resolved[0].resolution == "T90"
+        assert "Prioritaet" in resolved[0].resolution_reason
+        mock_client.messages.parse.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_rule_fallback_when_no_client(self):
+        """When client is None, falls back to rule-based resolution with resolved_by='rule'."""
+        from v2.extraction.conflict_detector import _resolve_conflicts_with_ai
+
+        raw_conflicts = [
+            {
+                "positions_nr": "1.01",
+                "field_name": "brandschutz_klasse",
+                "wert_a": "T30",
+                "quelle_a": FieldSource(dokument="a.xlsx", konfidenz=0.9),
+                "wert_b": "T90",
+                "quelle_b": FieldSource(dokument="b.pdf", konfidenz=0.95),
+                "severity": ConflictSeverity.CRITICAL,
+            },
+        ]
+
+        resolved = await _resolve_conflicts_with_ai(raw_conflicts, None)
+        assert len(resolved) == 1
+        assert resolved[0].resolved_by == "rule"
+
+    @pytest.mark.asyncio
+    async def test_rule_fallback_on_ai_failure(self):
+        """When AI call raises exception 3 times, falls back to rule-based with warning."""
+        import logging
+        from unittest.mock import MagicMock, patch
+        from v2.extraction.conflict_detector import _resolve_conflicts_with_ai
+
+        mock_client = MagicMock()
+        mock_client.messages.parse.side_effect = Exception("API error")
+
+        raw_conflicts = [
+            {
+                "positions_nr": "1.01",
+                "field_name": "brandschutz_klasse",
+                "wert_a": "T30",
+                "quelle_a": FieldSource(dokument="a.xlsx", konfidenz=0.9),
+                "wert_b": "T90",
+                "quelle_b": FieldSource(dokument="b.pdf", konfidenz=0.95),
+                "severity": ConflictSeverity.CRITICAL,
+            },
+        ]
+
+        # Patch asyncio.sleep to avoid actual delays in tests
+        with patch("v2.extraction.conflict_detector.asyncio.sleep"):
+            resolved = await _resolve_conflicts_with_ai(raw_conflicts, mock_client)
+
+        assert len(resolved) == 1
+        assert resolved[0].resolved_by == "rule"
+        assert mock_client.messages.parse.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_ai_receives_formatted_prompt(self):
+        """AI receives conflict data formatted via CROSSDOC_CONFLICT_USER_TEMPLATE."""
+        from unittest.mock import MagicMock, patch, call
+        from v2.extraction.conflict_detector import (
+            ConflictResolutionItem,
+            ConflictResolutionResult,
+            _resolve_conflicts_with_ai,
+        )
+        from v2.extraction.prompts import (
+            CROSSDOC_CONFLICT_SYSTEM_PROMPT,
+        )
+
+        mock_client = MagicMock()
+        ai_response = ConflictResolutionResult(
+            resolutions=[
+                ConflictResolutionItem(
+                    field_name="breite_mm",
+                    resolution="1000",
+                    resolution_reason="XLSX hat praezisere Massdaten",
+                ),
+            ]
+        )
+        mock_client.messages.parse.return_value = ai_response
+
+        raw_conflicts = [
+            {
+                "positions_nr": "1.01",
+                "field_name": "breite_mm",
+                "wert_a": "1000",
+                "quelle_a": FieldSource(dokument="a.xlsx", konfidenz=0.95),
+                "wert_b": "900",
+                "quelle_b": FieldSource(dokument="b.pdf", konfidenz=0.9),
+                "severity": ConflictSeverity.MAJOR,
+            },
+        ]
+
+        resolved = await _resolve_conflicts_with_ai(raw_conflicts, mock_client)
+
+        # Verify the call used proper system prompt and formatted user message
+        call_kwargs = mock_client.messages.parse.call_args
+        assert call_kwargs.kwargs["system"] == CROSSDOC_CONFLICT_SYSTEM_PROMPT
+        # User message should contain conflicts JSON
+        user_msg = call_kwargs.kwargs["messages"][0]["content"]
+        assert "breite_mm" in user_msg
+        assert "1000" in user_msg
+
+    @pytest.mark.asyncio
+    async def test_detect_and_resolve_conflicts_is_async(self, conflicting_positions):
+        """detect_and_resolve_conflicts is async and can be awaited."""
+        from v2.extraction.cross_doc_matcher import match_positions_across_docs
+        from v2.extraction.conflict_detector import detect_and_resolve_conflicts
+
+        matches = match_positions_across_docs({
+            "a.xlsx": [conflicting_positions[0]],
+            "b.pdf": [conflicting_positions[1]],
+        })
+
+        # Should be awaitable (async function)
+        conflicts = await detect_and_resolve_conflicts(
+            matches, conflicting_positions, client=None
+        )
+        assert len(conflicts) >= 1
+        # Without client, should be rule-based
+        assert all(c.resolved_by == "rule" for c in conflicts)
+
+
+# ---------------------------------------------------------------------------
 # Pipeline Integration Tests (Plan 03-02)
 # ---------------------------------------------------------------------------
 
