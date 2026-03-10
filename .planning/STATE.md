@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: Phase 6 context gathered
-last_updated: "2026-03-10T18:38:35.774Z"
-last_activity: 2026-03-10 — Completed 05-02 (Triple-Check Ensemble and Pipeline Wiring)
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-03-10T19:12:22.519Z"
+last_activity: 2026-03-10 — Completed 06-01 (Gap Analysis Engine)
 progress:
   total_phases: 8
-  completed_phases: 5
-  total_plans: 12
-  completed_plans: 13
+  completed_phases: 6
+  total_plans: 14
+  completed_plans: 14
   percent: 70
 ---
 
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** 100% korrekte Zuordnung jeder Anforderung zum richtigen Produkt — oder eine explizite, begründete Gap-Meldung.
-**Current focus:** Phase 6 - Gap Analysis (in progress)
+**Current focus:** Phase 6 - Gap Analysis (complete)
 
 ## Current Position
 
-Phase: 6 of 8 (Gap Analysis)
-Plan: 1 of 2 in current phase
-Status: 06-01 Complete (Gap Analysis Engine)
-Last activity: 2026-03-10 — Completed 06-01 (Gap Analysis Engine)
+Phase: 6 of 8 (Gap Analysis) -- COMPLETE
+Plan: 2 of 2 in current phase (all done)
+Status: 06-02 Complete (Gap Analysis Router Wiring)
+Last activity: 2026-03-10 — Completed 06-02 (Gap Analysis Router Wiring)
 
-Progress: [███████░░░] 70%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
-- Average duration: 5.3min
-- Total execution time: 1.0 hours
+- Total plans completed: 14
+- Average duration: 5.1min
+- Total execution time: 1.2 hours
 
 **By Phase:**
 
@@ -48,7 +48,7 @@ Progress: [███████░░░] 70%
 | 03 | 3/3 | 16min | 5.3min |
 | 04 | 2/3 | 13min | 6.5min |
 | 05 | 2/2 | 14min | 7.0min |
-| 06 | 1/2 | 8min | 8.0min |
+| 06 | 2/2 | 11min | 5.5min |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -110,6 +110,8 @@ Recent decisions affecting current work:
 - 06-01: Safety auto-escalation as deterministic post-processing (MINOR->MAJOR for safety dims)
 - 06-01: Gap-weighted TF-IDF with 2x boost multiplier for gap dimensions
 - 06-01: Abgelehnt alternatives filtered to >30% gap coverage minimum
+- [Phase 06]: Extracted _run_gap_analysis helper for DRY gap invocation across real and synthetic adversarial paths
+- [Phase 06]: Synthetic adversarial results use UNSICHER for hat_match=True and ABGELEHNT for hat_match=False
 
 ### Pending Todos
 
@@ -122,6 +124,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T19:02:05Z
-Stopped at: Completed 06-01-PLAN.md
-Resume file: .planning/phases/06-gap-analysis/06-01-SUMMARY.md
+Last session: 2026-03-10T19:12:22.513Z
+Stopped at: Completed 06-02-PLAN.md
+Resume file: None
