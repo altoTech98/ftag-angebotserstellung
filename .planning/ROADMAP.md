@@ -95,11 +95,11 @@ Plans:
   2. Matches with post-adversarial confidence below 95% trigger a third AI call with an alternative prompt strategy
   3. Every match decision includes step-by-step chain-of-thought reasoning explaining why the product was selected
   4. When multiple products could match a requirement, all candidates are listed with individual confidence scores and reasoning
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
+- [ ] 05-01-PLAN.md — AdversarialResult schemas, German FOR/AGAINST debate prompts, and concurrent adversarial validation engine
+- [ ] 05-02-PLAN.md — Triple-check ensemble (wider pool + inverted prompt) and analyze endpoint integration
 
 ### Phase 6: Gap Analysis
 **Goal**: Every non-match or partial match gets a detailed, categorized gap report with severity and actionable suggestions
