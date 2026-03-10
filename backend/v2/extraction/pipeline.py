@@ -6,7 +6,7 @@ then Pass 3 (validation) across all files. Returns ExtractionResult.
 """
 
 import logging
-from typing import Optional
+from typing import Callable, Optional
 
 import anthropic
 
@@ -19,6 +19,7 @@ from v2.extraction.pass2_semantic import extract_semantic
 from v2.extraction.pass3_validation import validate_and_enrich
 from v2.parsers.base import ParseResult
 from v2.schemas.common import DokumentTyp
+from v2.pipeline_logging import log_step
 from v2.schemas.extraction import (
     EnrichmentReport,
     ExtractionResult,
@@ -156,6 +157,7 @@ async def run_extraction_pipeline(
     parse_results: list[ParseResult],
     tender_id: str,
     client: Optional[anthropic.Anthropic] = None,
+    on_progress: Optional[Callable[[str, str, float], None]] = None,
 ) -> ExtractionResult:
     """Run the full 3-pass extraction pipeline.
 
@@ -187,22 +189,31 @@ async def run_extraction_pipeline(
     )
 
     # Per-file: Pass 1 + Pass 2 with dedup
-    for pr in sorted_results:
+    total_files = len(sorted_results)
+    for file_idx, pr in enumerate(sorted_results):
         original_texts.append(pr.text)
         source_files.append(pr.source_file)
 
         # Pass 1: Structural extraction (regex, no AI)
+        file_pct_base = (file_idx / total_files) * 100
+        file_pct_step = (1 / total_files) * 100
+        if on_progress:
+            on_progress("extraction", f"Pass 1: {pr.source_file}", file_pct_base + file_pct_step * 0.0)
         logger.info(f"Pipeline [{tender_id}]: Pass 1 on {pr.source_file}")
         pass1_results = extract_structural(pr)
         all_positions = merge_positions(
             all_positions, pass1_results, pass_priority=1
         )
+        for pos in pass1_results:
+            log_step(tender_id, "extraction", pos.positions_nr, 1, "structural_extracted")
         logger.info(
             f"Pipeline [{tender_id}]: Pass 1 -> {len(pass1_results)} positions "
             f"(total: {len(all_positions)})"
         )
 
         # Pass 2: Semantic AI extraction
+        if on_progress:
+            on_progress("extraction", f"Pass 2: {pr.source_file}", file_pct_base + file_pct_step * 0.5)
         logger.info(f"Pipeline [{tender_id}]: Pass 2 on {pr.source_file}")
         pass2_results = await extract_semantic(
             pr, existing_positions=all_positions, client=client
@@ -210,6 +221,8 @@ async def run_extraction_pipeline(
         all_positions = merge_positions(
             all_positions, pass2_results, pass_priority=2
         )
+        for pos in pass2_results:
+            log_step(tender_id, "extraction", pos.positions_nr, 2, "semantic_extracted")
         logger.info(
             f"Pipeline [{tender_id}]: Pass 2 -> {len(pass2_results)} positions "
             f"(total: {len(all_positions)})"
@@ -217,12 +230,16 @@ async def run_extraction_pipeline(
 
     # Pass 3: Cross-reference validation across all files
     if all_positions:
+        if on_progress:
+            on_progress("extraction", f"Pass 3: Validierung ({len(all_positions)} Positionen)", 85.0)
         logger.info(
             f"Pipeline [{tender_id}]: Pass 3 validating {len(all_positions)} positions"
         )
         all_positions = await validate_and_enrich(
             all_positions, original_texts, source_files, client=client
         )
+        for pos in all_positions:
+            log_step(tender_id, "extraction", pos.positions_nr, 3, "validated")
         logger.info(
             f"Pipeline [{tender_id}]: Pass 3 -> {len(all_positions)} final positions"
         )
@@ -232,6 +249,8 @@ async def run_extraction_pipeline(
     conflicts: list[FieldConflict] = []
 
     if len(sorted_results) >= 2:
+        if on_progress:
+            on_progress("extraction", "Cross-Document Analyse", 92.0)
         logger.info(
             f"Pipeline [{tender_id}]: Cross-document intelligence on "
             f"{len(all_positions)} positions from {len(sorted_results)} files"
