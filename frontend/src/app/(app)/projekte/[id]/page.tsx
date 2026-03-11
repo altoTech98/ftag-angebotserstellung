@@ -12,7 +12,7 @@ interface PageProps {
 
 export default async function ProjectDetailPage({ params }: PageProps) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect('/auth/login');
+  if (!session) redirect('/login');
 
   const { id } = await params;
   const userId = session.user.id;

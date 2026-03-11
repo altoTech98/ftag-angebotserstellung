@@ -13,7 +13,7 @@ interface PageProps {
 
 export default async function ProjektePage({ searchParams }: PageProps) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect('/auth/login');
+  if (!session) redirect('/login');
 
   const params = await searchParams;
   const showArchived = params.archiv === 'true';

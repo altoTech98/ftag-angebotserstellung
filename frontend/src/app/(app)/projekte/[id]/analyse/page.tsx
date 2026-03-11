@@ -14,7 +14,7 @@ interface PageProps {
 
 export default async function AnalysePage({ params, searchParams }: PageProps) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect('/auth/login');
+  if (!session) redirect('/login');
 
   // Permission check: analysis:create
   const hasPermission = await auth.api.userHasPermission({
