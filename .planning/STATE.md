@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Tender Matcher -- Web-Oberflaeche & Platform
 status: executing
-stopped_at: Completed 15-01-PLAN.md
-last_updated: "2026-03-11T15:32:10.080Z"
-last_activity: 2026-03-11 -- Completed Plan 15-01 (Admin Page)
+stopped_at: Completed 15-02-PLAN.md
+last_updated: "2026-03-11T15:35:52Z"
+last_activity: 2026-03-11 -- Completed Plan 15-02 (Dashboard Page)
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 23
-  completed_plans: 21
-  percent: 91
+  completed_plans: 22
+  percent: 96
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 15 of 15 (Admin, Dashboard & Polish)
-Plan: 2 of 4 (15-01 complete)
+Plan: 3 of 4 (15-02 complete)
 Status: In Progress
-Last activity: 2026-03-11 -- Completed Plan 15-01 (Admin Page)
+Last activity: 2026-03-11 -- Completed Plan 15-02 (Dashboard Page)
 
-Progress: [█████████░] 91%
+Progress: [█████████░] 96%
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Progress: [█████████░] 91%
 | 14-catalog-management | 2/3 | 13min | 4.3min |
 | Phase 15 P00 | 4min | 2 tasks | 27 files |
 | Phase 15 P01 | 4min | 2 tasks | 6 files |
+| Phase 15 P02 | 3min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,8 @@ Progress: [█████████░] 91%
 - [Phase 15]: Used requireAdminPermission helper with specific permission parameter instead of generic requireAdmin
 - [Phase 15]: Invite generates random UUID password; user resets via OTP flow
 - [Phase 15]: System settings uses button-based sub-sections instead of nested tabs
+- [Phase 15-02]: Used buttonVariants with Link (base-ui Button lacks asChild support)
+- [Phase 15-02]: Pending analyses counted as running in dashboard stat cards
 
 ### Pending Todos
 
@@ -122,6 +125,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T15:32:10.075Z
-Stopped at: Completed 15-01-PLAN.md
+Last session: 2026-03-11T15:35:52Z
+Stopped at: Completed 15-02-PLAN.md
 Resume file: None

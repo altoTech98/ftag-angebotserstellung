@@ -27,10 +27,10 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 
 ### Dashboard
 
-- [ ] **DASH-01**: Status-Karten: Laufende / Abgeschlossene / Fehlerhafte Analysen
-- [ ] **DASH-02**: Letzte Aktivitaeten Feed (wer hat was wann gemacht)
-- [ ] **DASH-03**: Statistik-Widget: Gesamtzahl Matches, Gaps, Durchschnitts-Konfidenz
-- [ ] **DASH-04**: Schnellzugriff-Button "Neue Analyse starten"
+- [x] **DASH-01**: Status-Karten: Laufende / Abgeschlossene / Fehlerhafte Analysen
+- [x] **DASH-02**: Letzte Aktivitaeten Feed (wer hat was wann gemacht)
+- [x] **DASH-03**: Statistik-Widget: Gesamtzahl Matches, Gaps, Durchschnitts-Konfidenz
+- [x] **DASH-04**: Schnellzugriff-Button "Neue Analyse starten"
 
 ### Analyse-Wizard
 
@@ -131,10 +131,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | UI-04 | Phase 10 | Complete |
 | UI-05 | Phase 15 | Pending |
 | UI-06 | Phase 15 | Pending |
-| DASH-01 | Phase 15 | Pending |
-| DASH-02 | Phase 15 | Pending |
-| DASH-03 | Phase 15 | Pending |
-| DASH-04 | Phase 15 | Pending |
+| DASH-01 | Phase 15 | Complete |
+| DASH-02 | Phase 15 | Complete |
+| DASH-03 | Phase 15 | Complete |
+| DASH-04 | Phase 15 | Complete |
 | ANLZ-01 | Phase 12 | Complete |
 | ANLZ-02 | Phase 13 | Complete |
 | ANLZ-03 | Phase 13 | Complete |
