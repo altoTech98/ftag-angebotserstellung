@@ -152,6 +152,10 @@ Plans:
   1. `prepareFilesForPython` calls the correct Python endpoint (`/upload/folder`) with the correct auth header (`X-Service-Key`)
   2. Analysis wizard can trigger a full analysis that reaches the Python backend and returns results
   3. Cancel button either calls a working Python endpoint or is gracefully handled when no endpoint exists
+**Plans**: 1 plan
+
+Plans:
+- [ ] 16-01-PLAN.md -- Fix endpoint, auth header, project_id passthrough, cancel handler, and email JSON keys
 
 ### Phase 17: Fix Dashboard & Email Data Access
 **Goal**: Dashboard statistics and email notifications display correct data from analysis results
@@ -185,3 +189,5 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14 -> 15
 | 13. Analysis Wizard + Results | 4/4 | Complete    | 2026-03-11 | - |
 | 14. Catalog Management | 3/3 | Complete    | 2026-03-11 | - |
 | 15. Admin + Dashboard + Polish | 4/4 | Complete    | 2026-03-11 | - |
+| 16. Fix Analysis-Python Bridge | v2.0 | 0/1 | Planned | - |
+| 17. Fix Dashboard & Email Data | v2.0 | 0/1 | Planned | - |
