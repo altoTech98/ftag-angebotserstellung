@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducer, useState, useCallback } from 'react';
+import { useReducer, useState, useCallback, useEffect, useTransition } from 'react';
 import { ArrowLeft, ArrowRight, BarChart3, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { WizardStepper } from '@/components/analysis/wizard-stepper';
 import { StepFiles } from '@/components/analysis/step-files';
 import { StepCatalog } from '@/components/analysis/step-catalog';
+import type { CatalogInfo } from '@/components/analysis/step-catalog';
 import { StepConfig } from '@/components/analysis/step-config';
 import { StepProgress } from '@/components/analysis/step-progress';
 import { StepResults } from '@/components/analysis/step-results';
@@ -16,6 +17,7 @@ import {
   createAnalysis,
   saveAnalysisResult,
 } from '@/lib/actions/analysis-actions';
+import { getCatalogs } from '@/lib/actions/catalog-actions';
 import type {
   WizardState,
   WizardAction,
@@ -153,6 +155,27 @@ export function AnalyseWizardClient({ project, initialResult }: AnalyseWizardCli
   const isViewingPastResult = !!initialResult;
   const [isStarting, setIsStarting] = useState(false);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
+  const [catalogs, setCatalogs] = useState<CatalogInfo[]>([]);
+  const [, startCatalogTransition] = useTransition();
+
+  // Fetch catalogs on mount for step-catalog
+  useEffect(() => {
+    startCatalogTransition(async () => {
+      try {
+        const result = await getCatalogs();
+        const mapped: CatalogInfo[] = result.map((c) => ({
+          id: c.id,
+          name: c.name,
+          productCount: c.versions[0]?.totalProducts ?? 0,
+          updatedAt: c.updatedAt,
+          isActive: !!c.versions[0]?.isActive,
+        }));
+        setCatalogs(mapped);
+      } catch {
+        // Catalogs will remain empty -- step-catalog shows empty state
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canGoBack = state.currentStep > 1 && !state.isAnalyzing && !isViewingPastResult;
   const canGoForward =
@@ -285,6 +308,7 @@ export function AnalyseWizardClient({ project, initialResult }: AnalyseWizardCli
               onCatalogChange={(id) =>
                 dispatch({ type: 'SET_CATALOG', catalogId: id })
               }
+              catalogs={catalogs}
             />
           )}
 
