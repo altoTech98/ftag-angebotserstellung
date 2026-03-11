@@ -4,6 +4,8 @@ import { admin } from "better-auth/plugins";
 import { emailOTP } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 import prisma from "@/lib/prisma";
+import { resend, EMAIL_FROM } from "@/lib/email";
+import { PasswordResetEmail } from "@/emails/password-reset";
 import {
   ac,
   viewerRole,
@@ -41,8 +43,17 @@ export const auth = betterAuth({
       otpLength: 6,
       expiresIn: 600, // 10 minutes
       async sendVerificationOTP({ email, otp, type }) {
-        // Email sending -- placeholder until INFRA-05 (Phase 15)
-        console.log(`[DEV] OTP for ${email}: ${otp} (type: ${type})`);
+        try {
+          const user = await prisma.user.findUnique({ where: { email } });
+          await resend.emails.send({
+            from: EMAIL_FROM,
+            to: [email],
+            subject: 'Ihr Verifizierungscode',
+            react: PasswordResetEmail({ otp, name: user?.name || email }),
+          });
+        } catch (error) {
+          console.error(`Failed to send OTP email to ${email}:`, error);
+        }
       },
     }),
     nextCookies(), // Must be last plugin

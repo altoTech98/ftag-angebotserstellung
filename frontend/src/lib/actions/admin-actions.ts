@@ -6,6 +6,8 @@ import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { logAuditEvent } from '@/lib/actions/audit-actions';
 import { randomUUID } from 'crypto';
+import { resend, EMAIL_FROM } from '@/lib/email';
+import { UserInvitationEmail } from '@/emails/user-invitation';
 
 async function requireAdminPermission(permission: 'manage-users' | 'manage-settings') {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -57,6 +59,22 @@ export async function inviteUser(formData: FormData) {
       role,
     },
   });
+
+  // Send invitation email (fire-and-forget)
+  try {
+    await resend.emails.send({
+      from: EMAIL_FROM,
+      to: [email],
+      subject: 'Einladung zur FTAG Angebotserstellung',
+      react: UserInvitationEmail({
+        name,
+        invitedBy: session.user.name || 'Admin',
+        loginUrl: `${process.env.BETTER_AUTH_URL}/login`,
+      }),
+    });
+  } catch (error) {
+    console.error(`Failed to send invitation email to ${email}:`, error);
+  }
 
   // Fire-and-forget audit log
   logAuditEvent({

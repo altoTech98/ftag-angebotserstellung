@@ -4,6 +4,8 @@ import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { resend, EMAIL_FROM } from '@/lib/email';
+import { AnalysisCompleteEmail } from '@/emails/analysis-complete';
 
 const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
 const PYTHON_SERVICE_KEY = process.env.PYTHON_SERVICE_KEY || '';
@@ -127,9 +129,68 @@ export async function saveAnalysisResult(
       },
     });
 
+    // Send completion email (fire-and-forget, do not await to avoid blocking the response)
+    sendAnalysisCompleteEmail(analysisId).catch((err) =>
+      console.error('Failed to send analysis completion email:', err)
+    );
+
     revalidatePath(`/projekte/${analysis.projectId}`);
     return { success: true };
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
+  }
+}
+
+/**
+ * Sends an email notification when an analysis completes.
+ */
+export async function sendAnalysisCompleteEmail(analysisId: string) {
+  try {
+    const analysis = await prisma.analysis.findUnique({
+      where: { id: analysisId },
+      include: { project: true },
+    });
+    if (!analysis || !analysis.startedBy) return;
+
+    const user = await prisma.user.findUnique({
+      where: { id: analysis.startedBy },
+    });
+    if (!user) return;
+
+    // Parse result for stats
+    const result = analysis.result as Record<string, unknown> | null;
+    const matchItems = Array.isArray(result?.match_items) ? result.match_items : [];
+    const gapItems = Array.isArray(result?.gap_items) ? result.gap_items : [];
+    const matchCount = matchItems.length;
+    const gapCount = gapItems.length;
+
+    // Calculate average confidence from match items
+    let avgConfidence = 0;
+    if (matchCount > 0) {
+      const totalConfidence = matchItems.reduce(
+        (sum: number, item: Record<string, unknown>) =>
+          sum + (typeof item.confidence === 'number' ? item.confidence : 0),
+        0
+      );
+      avgConfidence = Math.round((totalConfidence / matchCount) * 100);
+    }
+
+    const resultUrl = `${process.env.BETTER_AUTH_URL}/projekte/${analysis.projectId}`;
+
+    await resend.emails.send({
+      from: EMAIL_FROM,
+      to: [user.email],
+      subject: `Analyse abgeschlossen: ${analysis.project?.name || 'Projekt'}`,
+      react: AnalysisCompleteEmail({
+        userName: user.name || user.email,
+        projectName: analysis.project?.name || 'Unbenanntes Projekt',
+        matchCount,
+        gapCount,
+        avgConfidence,
+        resultUrl,
+      }),
+    });
+  } catch (error) {
+    console.error('Failed to send analysis completion email:', error);
   }
 }
