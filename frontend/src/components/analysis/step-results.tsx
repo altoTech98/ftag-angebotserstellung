@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { ArrowUpDown, Download, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { ConfidenceBadge } from '@/components/analysis/confidence-badge';
+import { ResultDetail } from '@/components/analysis/result-detail';
 import { getConfidenceLevel } from '@/components/analysis/types';
 import type { AnalysisResult, MatchEntry, WizardState } from '@/components/analysis/types';
 
@@ -338,33 +339,41 @@ export function StepResults({ result, config, onExpandRow, expandedRow }: StepRe
               </TableRow>
             ) : (
               sortedEntries.map((entry) => (
-                <TableRow
-                  key={entry.nr}
-                  className={`cursor-pointer hover:bg-muted/50 ${
-                    entry.status === 'unmatched' ? 'bg-red-50 dark:bg-red-950/20' : ''
-                  } ${expandedRow === entry.nr ? 'bg-muted' : ''}`}
-                  onClick={() => onExpandRow(entry.nr)}
-                  data-testid={`result-row-${entry.nr}`}
-                >
-                  <TableCell className="font-medium">{entry.nr}</TableCell>
-                  <TableCell title={entry.beschreibung}>
-                    {truncate(entry.beschreibung, 60)}
-                  </TableCell>
-                  <TableCell>{entry.position}</TableCell>
-                  <TableCell>
-                    {entry.matched_products[0]?.bezeichnung || 'Kein Produkt'}
-                  </TableCell>
-                  <TableCell>
-                    {entry.matched_products[0]?.artikelnr || '-'}
-                  </TableCell>
-                  <TableCell>
-                    <ConfidenceBadge
-                      confidence={entry.confidence}
-                      highThreshold={config.highThreshold}
-                      lowThreshold={config.lowThreshold}
-                    />
-                  </TableCell>
-                </TableRow>
+                <React.Fragment key={entry.nr}>
+                  <TableRow
+                    className={`cursor-pointer hover:bg-muted/50 ${
+                      entry.status === 'unmatched' ? 'bg-red-50 dark:bg-red-950/20' : ''
+                    } ${expandedRow === entry.nr ? 'bg-muted border-l-2 border-l-[hsl(var(--ftag-red,0_84%_44%))]' : ''}`}
+                    onClick={() => onExpandRow(entry.nr)}
+                    data-testid={`result-row-${entry.nr}`}
+                  >
+                    <TableCell className="font-medium">{entry.nr}</TableCell>
+                    <TableCell title={entry.beschreibung}>
+                      {truncate(entry.beschreibung, 60)}
+                    </TableCell>
+                    <TableCell>{entry.position}</TableCell>
+                    <TableCell>
+                      {entry.matched_products[0]?.bezeichnung || 'Kein Produkt'}
+                    </TableCell>
+                    <TableCell>
+                      {entry.matched_products[0]?.artikelnr || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <ConfidenceBadge
+                        confidence={entry.confidence}
+                        highThreshold={config.highThreshold}
+                        lowThreshold={config.lowThreshold}
+                      />
+                    </TableCell>
+                  </TableRow>
+                  {expandedRow === entry.nr && (
+                    <TableRow data-testid={`result-detail-row-${entry.nr}`}>
+                      <TableCell colSpan={6} className="p-0">
+                        <ResultDetail entry={entry} config={config} />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
               ))
             )}
           </TableBody>
