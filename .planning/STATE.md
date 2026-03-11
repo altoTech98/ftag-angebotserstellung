@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Tender Matcher -- Web-Oberflaeche & Platform
 status: in-progress
-stopped_at: Completed 12-02 (Project Management UI)
-last_updated: "2026-03-11T09:25:00Z"
-last_activity: 2026-03-11 -- Completed Plan 12-02 (Project Management UI)
+stopped_at: Completed 12-03 (Project Sharing)
+last_updated: "2026-03-11T09:38:41Z"
+last_activity: 2026-03-11 -- Completed Plan 12-03 (Project Sharing)
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 10
-  completed_plans: 11
+  completed_plans: 12
   percent: 100
 ---
 
@@ -26,18 +26,18 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 12 of 15 (File Handling & Project Management)
-Plan: 2 of 3 (in progress)
-Status: Executing Phase 12
-Last activity: 2026-03-11 -- Completed Plan 12-02 (Project Management UI)
+Plan: 3 of 3 (complete)
+Status: Phase 12 Complete
+Last activity: 2026-03-11 -- Completed Plan 12-03 (Project Sharing)
 
 Progress: [##########] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11 (v2.0)
-- Average duration: 4.3min
-- Total execution time: 47min
+- Total plans completed: 12 (v2.0)
+- Average duration: 4.2min
+- Total execution time: 50min
 
 **By Phase:**
 
@@ -45,7 +45,7 @@ Progress: [##########] 100%
 |-------|-------|-------|----------|
 | 10-foundation | 6/6 | 27min | 4.5min |
 | 11-python-backend | 3/3 | 11min | 3.7min |
-| 12-file-handling | 2/? | 9min | 4.5min |
+| 12-file-handling | 3/3 | 12min | 4.0min |
 
 ## Accumulated Context
 
@@ -82,6 +82,8 @@ Progress: [##########] 100%
 - [Phase 12-01]: Server Actions pattern: auth.api.getSession -> userHasPermission -> prisma query -> revalidatePath
 - [Phase 12-02]: Split project detail into server (page.tsx) + client (client.tsx) components for optimal hydration
 - [Phase 12-02]: FileDropzone uses native HTML5 drag-and-drop (no library) for minimal bundle size
+- [Phase 12-03]: Share actions return error objects ({error}) instead of throwing for user-facing validation errors (not found, duplicate)
+- [Phase 12-03]: canShare computed server-side (isOwner || isAdmin) passed as prop -- avoids extra client permission API call
 
 ### Pending Todos
 
@@ -95,6 +97,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T09:32:16Z
-Stopped at: Completed 12-02 (Project Management UI)
+Last session: 2026-03-11T09:38:41Z
+Stopped at: Completed 12-03 (Project Sharing)
 Resume file: None

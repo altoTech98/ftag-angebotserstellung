@@ -52,7 +52,7 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 - [x] **PROJ-01**: Projekte anlegen (Name, Kunde, Frist, Beschreibung)
 - [x] **PROJ-02**: Mehrere Analysen pro Projekt mit Historie
 - [x] **PROJ-03**: Projekte archivieren und loeschen
-- [ ] **PROJ-04**: Projekte mit anderen Benutzern teilen
+- [x] **PROJ-04**: Projekte mit anderen Benutzern teilen
 
 ### Katalogverwaltung
 
@@ -147,7 +147,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | PROJ-01 | Phase 12 | Complete |
 | PROJ-02 | Phase 12 | Complete |
 | PROJ-03 | Phase 12 | Complete |
-| PROJ-04 | Phase 12 | Pending |
+| PROJ-04 | Phase 12 | Complete |
 | KAT-01 | Phase 14 | Pending |
 | KAT-02 | Phase 14 | Pending |
 | KAT-03 | Phase 14 | Pending |
