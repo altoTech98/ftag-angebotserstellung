@@ -2,8 +2,8 @@
 phase: 13
 slug: analysis-wizard-results-view
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-11
 ---
 
@@ -38,25 +38,29 @@ created: 2026-03-11
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 13-01-01 | 01 | 0 | ANLZ-02 | unit | `cd frontend && npx vitest run src/components/analysis/step-catalog.test.tsx -x` | ❌ W0 | ⬜ pending |
-| 13-01-02 | 01 | 0 | ANLZ-03 | unit | `cd frontend && npx vitest run src/components/analysis/step-config.test.tsx -x` | ❌ W0 | ⬜ pending |
-| 13-01-03 | 01 | 0 | ANLZ-04 | unit | `cd frontend && npx vitest run src/components/analysis/step-progress.test.tsx -x` | ❌ W0 | ⬜ pending |
-| 13-01-04 | 01 | 0 | ANLZ-05, RSLT-01, RSLT-04 | unit | `cd frontend && npx vitest run src/components/analysis/step-results.test.tsx -x` | ❌ W0 | ⬜ pending |
-| 13-01-05 | 01 | 0 | RSLT-02 | unit | `cd frontend && npx vitest run src/components/analysis/result-detail.test.tsx -x` | ❌ W0 | ⬜ pending |
-| 13-01-06 | 01 | 0 | RSLT-03 | unit | `cd frontend && npx vitest run src/components/analysis/comparison-card.test.tsx -x` | ❌ W0 | ⬜ pending |
+| 13-00-01 | 00 | 0 | all | stub | `cd frontend && npx vitest run src/__tests__/analysis/ --reporter=verbose` | Plan 00 creates | pending |
+| 13-01-02 | 01 | 1 | ANLZ-02, ANLZ-03 | unit | `cd frontend && npx vitest run src/__tests__/analysis/step-catalog.test.tsx src/__tests__/analysis/step-config.test.tsx -x` | Plan 01 updates | pending |
+| 13-02-01 | 02 | 2 | ANLZ-04 | unit | `cd frontend && npx vitest run src/__tests__/analysis/step-progress.test.tsx -x` | Plan 02 updates | pending |
+| 13-02-02 | 02 | 2 | ANLZ-05, RSLT-01, RSLT-04 | unit | `cd frontend && npx vitest run src/__tests__/analysis/step-results.test.tsx -x` | Plan 02 updates | pending |
+| 13-03-01 | 03 | 3 | RSLT-02 | unit | `cd frontend && npx vitest run src/__tests__/analysis/result-detail.test.tsx -x` | Plan 03 updates | pending |
+| 13-03-02 | 03 | 3 | RSLT-03 | unit | `cd frontend && npx vitest run src/__tests__/analysis/comparison-card.test.tsx -x` | Plan 03 updates | pending |
+| 13-03-03 | 03 | 3 | ANLZ-05 | unit | `cd frontend && npx vitest run src/__tests__/analysis/wizard-init.test.tsx -x` | Plan 03 updates | pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: pending / green / red / flaky*
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `frontend/src/components/analysis/step-catalog.test.tsx` — stubs for ANLZ-02
-- [ ] `frontend/src/components/analysis/step-config.test.tsx` — stubs for ANLZ-03
-- [ ] `frontend/src/components/analysis/step-progress.test.tsx` — stubs for ANLZ-04
-- [ ] `frontend/src/components/analysis/step-results.test.tsx` — stubs for ANLZ-05, RSLT-01, RSLT-04
-- [ ] `frontend/src/components/analysis/result-detail.test.tsx` — stubs for RSLT-02
-- [ ] `frontend/src/components/analysis/comparison-card.test.tsx` — stubs for RSLT-03
+- [x] `frontend/src/__tests__/analysis/step-catalog.test.tsx` — stubs for ANLZ-02 (Plan 13-00)
+- [x] `frontend/src/__tests__/analysis/step-config.test.tsx` — stubs for ANLZ-03 (Plan 13-00)
+- [x] `frontend/src/__tests__/analysis/step-progress.test.tsx` — stubs for ANLZ-04 (Plan 13-00)
+- [x] `frontend/src/__tests__/analysis/step-results.test.tsx` — stubs for ANLZ-05, RSLT-01, RSLT-04 (Plan 13-00)
+- [x] `frontend/src/__tests__/analysis/result-detail.test.tsx` — stubs for RSLT-02 (Plan 13-00)
+- [x] `frontend/src/__tests__/analysis/comparison-card.test.tsx` — stubs for RSLT-03 (Plan 13-00)
+- [x] `frontend/src/__tests__/analysis/wizard-init.test.tsx` — stubs for analysisId -> step 5 loading (Plan 13-00)
+
+NOTE: Test stubs live in `src/__tests__/analysis/` (project convention), not alongside components.
 
 ---
 
@@ -71,11 +75,11 @@ created: 2026-03-11
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 15s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify with behavioral test commands
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (Plan 13-00)
+- [x] No watch-mode flags
+- [x] Feedback latency < 15s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** pending execution
