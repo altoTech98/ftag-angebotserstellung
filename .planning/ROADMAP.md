@@ -165,6 +165,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. `getMatchGapStatistics` reads `result.matched` and produces correct match count, gap count, and average confidence
   2. `sendAnalysisCompleteEmail` reads `result.matched` and `result.unmatched` and reports correct stats in the email body
+**Plans**: 1 plan
+
+Plans:
+- [ ] 17-01-PLAN.md -- Fix getMatchGapStatistics wrong keys and sendAnalysisCompleteEmail missing partial entries
 
 ## Progress
 
