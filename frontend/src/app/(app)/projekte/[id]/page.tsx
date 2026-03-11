@@ -42,7 +42,12 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           createdAt: true,
         },
       },
-      shares: { select: { userId: true } },
+      shares: {
+        select: {
+          userId: true,
+          user: { select: { name: true, email: true } },
+        },
+      },
     },
   });
 
@@ -54,6 +59,9 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   const isAdmin = session.user.role === 'admin';
 
   if (!isOwner && !isShared && !isAdmin) notFound();
+
+  // Check if user can share (manager/admin with project:share permission)
+  const canShare = isOwner || isAdmin;
 
   const deadlineStr = project.deadline
     ? project.deadline.toLocaleDateString('de-CH', {
@@ -115,6 +123,8 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           status: project.status,
           files: project.files,
           analyses: project.analyses,
+          sharesCount: project.shares.length,
+          canShare,
         }}
       />
     </div>

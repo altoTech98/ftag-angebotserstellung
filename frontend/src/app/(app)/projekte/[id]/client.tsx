@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Archive, Trash2, BarChart3 } from 'lucide-react';
+import { Archive, Trash2, BarChart3, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FileDropzone } from '@/components/upload/file-dropzone';
 import { FileList, type FileData } from '@/components/upload/file-list';
 import { ArchiveDialog } from '@/components/projects/archive-dialog';
+import { ShareDialog } from '@/components/projects/share-dialog';
 
 interface AnalysisData {
   id: string;
@@ -23,6 +24,8 @@ interface ProjectDetailClientProps {
     status: string;
     files: FileData[];
     analyses: AnalysisData[];
+    sharesCount: number;
+    canShare: boolean;
   };
 }
 
@@ -57,6 +60,7 @@ function analysisStatusBadge(status: string) {
 export function ProjectDetailClient({ project }: ProjectDetailClientProps) {
   const router = useRouter();
   const [archiveAction, setArchiveAction] = useState<'archive' | 'delete' | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   function handleFileChange() {
     router.refresh();
@@ -67,6 +71,21 @@ export function ProjectDetailClient({ project }: ProjectDetailClientProps) {
       {/* Action buttons */}
       {project.status !== 'archived' && (
         <div className="flex items-center gap-2">
+          {project.canShare && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShareOpen(true)}
+            >
+              <Share2 className="size-4" />
+              Teilen
+              {project.sharesCount > 0 && (
+                <span className="ml-1 inline-flex size-5 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                  {project.sharesCount}
+                </span>
+              )}
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -137,6 +156,14 @@ export function ProjectDetailClient({ project }: ProjectDetailClientProps) {
           </ul>
         )}
       </section>
+
+      {/* Share Dialog */}
+      <ShareDialog
+        projectId={project.id}
+        projectName={project.name}
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+      />
 
       {/* Archive/Delete Dialog */}
       {archiveAction && (
