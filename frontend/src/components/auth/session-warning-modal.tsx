@@ -9,7 +9,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useSessionTimeout } from "@/hooks/use-session-timeout";
 
 function formatRemainingTime(ms: number): string {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
@@ -23,16 +22,16 @@ function formatRemainingTime(ms: number): string {
 }
 
 interface SessionWarningModalProps {
-  /** Session timeout in milliseconds (default: 8 hours) */
-  expiresInMs?: number;
+  showWarning: boolean;
+  remainingTime: number;
+  extendSession: () => void;
 }
 
 export function SessionWarningModal({
-  expiresInMs,
+  showWarning,
+  remainingTime,
+  extendSession,
 }: SessionWarningModalProps) {
-  const { showWarning, extendSession, remainingTime } =
-    useSessionTimeout(expiresInMs);
-
   function handleLogout() {
     window.location.href = "/login";
   }

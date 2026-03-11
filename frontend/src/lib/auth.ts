@@ -19,6 +19,7 @@ export const auth = betterAuth({
     minPasswordLength: 8,
     maxPasswordLength: 128,
     requireEmailVerification: false, // invite-only, admin creates users
+    disableSignUp: true,
   },
   session: {
     expiresIn: 60 * 60 * 8, // 8 hours (28800 seconds)

@@ -1,5 +1,6 @@
 "use client";
 
+import { useSessionTimeout } from "@/hooks/use-session-timeout";
 import { SessionWarningModal } from "@/components/auth/session-warning-modal";
 
 interface AppShellClientProps {
@@ -8,13 +9,19 @@ interface AppShellClientProps {
 
 /**
  * Client wrapper for the authenticated app layout.
- * Renders the session warning modal (with idle detection)
- * alongside the main app content.
+ * Calls useSessionTimeout at the shell level and passes state
+ * as props to SessionWarningModal (pure presentational).
  */
 export function AppShellClient({ children }: AppShellClientProps) {
+  const { showWarning, extendSession, remainingTime } = useSessionTimeout();
+
   return (
     <>
-      <SessionWarningModal />
+      <SessionWarningModal
+        showWarning={showWarning}
+        remainingTime={remainingTime}
+        extendSession={extendSession}
+      />
       {children}
     </>
   );
