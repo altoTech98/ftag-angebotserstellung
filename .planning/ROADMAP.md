@@ -32,7 +32,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 11: Python Backend Integration (BFF + Service Auth)** - BFF proxy layer connecting Next.js to Python/FastAPI with service auth and SSE validation (completed 2026-03-11)
 - [x] **Phase 12: File Handling + Project Management** - Vercel Blob file uploads, project CRUD with history, archiving, and sharing (completed 2026-03-11)
 - [x] **Phase 13: Analysis Wizard + Results View** - 5-step analysis wizard with SSE progress and full results view with filtering, detail expansion, and Excel export (completed 2026-03-11)
-- [ ] **Phase 14: Catalog Management** - Product catalog upload, browse, search, versioning, and individual product CRUD
+- [x] **Phase 14: Catalog Management** - Product catalog upload, browse, search, versioning, and individual product CRUD (completed 2026-03-11)
 - [ ] **Phase 15: Admin + Dashboard + Polish** - Admin user/settings management, audit log, dashboard KPIs, keyboard shortcuts, and email notifications
 
 ## Phase Details
@@ -161,5 +161,5 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14 -> 15
 | 11. Python Integration | v2.0 | Complete    | 2026-03-11 | 2026-03-11 |
 | 12. File Handling + Projects | 3/3 | Complete    | 2026-03-11 | - |
 | 13. Analysis Wizard + Results | 4/4 | Complete    | 2026-03-11 | - |
-| 14. Catalog Management | 2/3 | In Progress|  | - |
+| 14. Catalog Management | 3/3 | Complete   | 2026-03-11 | - |
 | 15. Admin + Dashboard + Polish | v2.0 | 0/? | Not started | - |

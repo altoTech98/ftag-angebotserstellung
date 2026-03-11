@@ -26,18 +26,18 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 14 of 15 (Catalog Management)
-Plan: 2 of 3 (14-01 complete)
+Plan: 3 of 3 (14-02 complete)
 Status: In Progress
-Last activity: 2026-03-11 -- Completed Plan 14-01 (Catalog Backend Foundation)
+Last activity: 2026-03-11 -- Completed Plan 14-02 (Catalog UI)
 
 Progress: [===========-] 95%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 18 (v2.0)
-- Average duration: 4.0min
-- Total execution time: 75min
+- Total plans completed: 19 (v2.0)
+- Average duration: 4.2min
+- Total execution time: 82min
 
 **By Phase:**
 
@@ -47,7 +47,7 @@ Progress: [===========-] 95%
 | 11-python-backend | 3/3 | 11min | 3.7min |
 | 12-file-handling | 3/3 | 12min | 4.0min |
 | 13-analysis-wizard | 4/4 | 19min | 4.8min |
-| 14-catalog-management | 2/3 | 6min | 3.0min |
+| 14-catalog-management | 2/3 | 13min | 4.3min |
 
 ## Accumulated Context
 
@@ -99,6 +99,9 @@ Progress: [===========-] 95%
 - [Phase 14-01]: Used Prisma.InputJsonValue cast for Json fields (Prisma 7 stricter nullable JSON typing)
 - [Phase 14-01]: Product overrides stored in Prisma only; Python override endpoint is placeholder
 - [Phase 14-01]: Catalog activation downloads blob to local file and rebuilds index cache
+- [Phase 14-02]: StepCatalog accepts catalogs prop from parent; wizard client.tsx fetches via getCatalogs in useEffect
+- [Phase 14-02]: Removed DEFAULT_CATALOG_ID; auto-select only when single catalog exists
+- [Phase 14-02]: Product edit dialog exposes 11 key fields from 318-column catalog as practical subset
 
 ### Pending Todos
 
@@ -112,6 +115,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T13:58:29Z
-Stopped at: Completed 14-01-PLAN.md
-Resume file: .planning/phases/14-catalog-management/14-02-PLAN.md
+Last session: 2026-03-11T14:08:48Z
+Stopped at: Completed 14-02-PLAN.md
+Resume file: .planning/phases/14-catalog-management/14-03-PLAN.md
