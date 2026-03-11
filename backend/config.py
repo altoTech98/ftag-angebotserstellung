@@ -8,6 +8,18 @@ from pathlib import Path
 from enum import Enum
 from typing import Optional
 
+# Load .env file (backend/.env or project root .env)
+try:
+    from dotenv import load_dotenv
+    _backend_env = Path(__file__).parent / ".env"
+    _root_env = Path(__file__).parent.parent / ".env"
+    if _backend_env.exists():
+        load_dotenv(_backend_env)
+    elif _root_env.exists():
+        load_dotenv(_root_env)
+except ImportError:
+    pass
+
 
 class Environment(str, Enum):
     """Umgebung der Anwendung"""
@@ -142,6 +154,9 @@ class Settings:
     PYTHON_SERVICE_KEY: str = os.environ.get("PYTHON_SERVICE_KEY", "")
     SSE_TOKEN_SECRET: str = os.environ.get("SSE_TOKEN_SECRET", os.environ.get("PYTHON_SERVICE_KEY", ""))
     NEXTJS_ORIGIN: str = os.environ.get("NEXTJS_ORIGIN", "http://localhost:3000")
+
+    # Cloudflare Tunnel (on-premise deployment)
+    CLOUDFLARE_TUNNEL_URL: Optional[str] = os.environ.get("CLOUDFLARE_TUNNEL_URL")
 
     # CORS
     CORS_ORIGINS: list = [

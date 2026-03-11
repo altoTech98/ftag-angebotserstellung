@@ -257,6 +257,10 @@ if settings.ENVIRONMENT == Environment.DEVELOPMENT:
     _cors_origins.extend(["http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:3000"])
 elif settings.ENVIRONMENT == Environment.PRODUCTION:
     _cors_origins.extend(settings.CORS_ORIGINS)
+# Add Cloudflare tunnel URL if configured
+_tunnel_url = _os.environ.get("CLOUDFLARE_TUNNEL_URL", "")
+if _tunnel_url:
+    _cors_origins.append(_tunnel_url)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(set(_cors_origins)),

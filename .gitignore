@@ -43,3 +43,6 @@ frontend-react-dist/
 # IDE
 .vscode/
 .idea/
+
+# Deployment binaries (downloaded at runtime)
+scripts/*.exe
