@@ -34,6 +34,8 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 13: Analysis Wizard + Results View** - 5-step analysis wizard with SSE progress and full results view with filtering, detail expansion, and Excel export (completed 2026-03-11)
 - [x] **Phase 14: Catalog Management** - Product catalog upload, browse, search, versioning, and individual product CRUD (completed 2026-03-11)
 - [x] **Phase 15: Admin + Dashboard + Polish** - Admin user/settings management, audit log, dashboard KPIs, keyboard shortcuts, and email notifications (completed 2026-03-11)
+- [ ] **Phase 16: Fix Analysis-to-Python File Bridge** - Fix broken endpoint, auth header, and cancel route in analysis-to-Python integration (gap closure)
+- [ ] **Phase 17: Fix Dashboard & Email Data Access** - Fix wrong JSON key access in dashboard statistics and email notifications (gap closure)
 
 ## Phase Details
 
@@ -140,6 +142,25 @@ Plans:
 - [ ] 15-01-PLAN.md -- Admin page: user management table with CRUD, audit log with filters, tabbed system settings
 - [ ] 15-02-PLAN.md -- Dashboard: stat cards, activity feed, statistics widget, quick-action button
 - [ ] 15-03-PLAN.md -- Email templates (Resend + React Email), keyboard shortcuts with help dialog, skeleton loaders
+
+### Phase 16: Fix Analysis-to-Python File Bridge
+**Goal**: Analysis flow executes end-to-end from Next.js wizard through Python backend without endpoint or auth failures
+**Depends on**: Phase 13, Phase 11
+**Requirements**: ANLZ-04
+**Gap Closure:** Closes gaps from v2.0 audit
+**Success Criteria** (what must be TRUE):
+  1. `prepareFilesForPython` calls the correct Python endpoint (`/upload/folder`) with the correct auth header (`X-Service-Key`)
+  2. Analysis wizard can trigger a full analysis that reaches the Python backend and returns results
+  3. Cancel button either calls a working Python endpoint or is gracefully handled when no endpoint exists
+
+### Phase 17: Fix Dashboard & Email Data Access
+**Goal**: Dashboard statistics and email notifications display correct data from analysis results
+**Depends on**: Phase 15, Phase 13
+**Requirements**: DASH-03, INFRA-05
+**Gap Closure:** Closes gaps from v2.0 audit
+**Success Criteria** (what must be TRUE):
+  1. `getMatchGapStatistics` reads `result.matched` and produces correct match count, gap count, and average confidence
+  2. `sendAnalysisCompleteEmail` reads `result.matched` and `result.unmatched` and reports correct stats in the email body
 
 ## Progress
 
