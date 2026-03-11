@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Tender Matcher -- Web-Oberflaeche & Platform
 status: completed
-stopped_at: Completed 17-01-PLAN.md
-last_updated: "2026-03-11T16:44:45.924Z"
-last_activity: 2026-03-11 -- Completed Plan 17-01 (Fix Dashboard & Email Data Access)
+stopped_at: Completed 18-01-PLAN.md
+last_updated: "2026-03-11T22:15:05Z"
+last_activity: 2026-03-11 -- Completed Plan 18-01 (Fix Cross-Phase Integration Gaps)
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 25
-  completed_plans: 25
+  total_phases: 9
+  completed_phases: 9
+  total_plans: 26
+  completed_plans: 26
   percent: 100
 ---
 
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** 100% korrekte Zuordnung jeder Anforderung zum richtigen Produkt -- oder eine explizite, begruendete Gap-Meldung.
-**Current focus:** Phase 17 - Fix Dashboard & Email Data Access
+**Current focus:** Phase 18 - Fix Cross-Phase Integration Gaps
 
 ## Current Position
 
-Phase: 17 of 17 (Fix Dashboard & Email Data Access)
-Plan: 1 of 1 (17-01 complete)
+Phase: 18 of 18 (Fix Cross-Phase Integration Gaps)
+Plan: 1 of 1 (18-01 complete)
 Status: Complete
-Last activity: 2026-03-11 -- Completed Plan 17-01 (Fix Dashboard & Email Data Access)
+Last activity: 2026-03-11 -- Completed Plan 18-01 (Fix Cross-Phase Integration Gaps)
 
 Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 20 (v2.0)
-- Average duration: 4.0min
-- Total execution time: 85min
+- Total plans completed: 21 (v2.0)
+- Average duration: 3.9min
+- Total execution time: 88min
 
 **By Phase:**
 
@@ -54,6 +54,7 @@ Progress: [██████████] 100%
 | Phase 15 P03 | 4min | 2 tasks | 14 files |
 | Phase 16 P01 | 2min | 2 tasks | 5 files |
 | Phase 17 P01 | 3min | 2 tasks | 4 files |
+| Phase 18 P01 | 3min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,7 @@ Progress: [██████████] 100%
 - [Phase 15]: Analysis completion email extracts stats from result JSON match_items/gap_items arrays
 - [Phase 16-01]: Fixed email JSON keys (matched/unmatched) inline rather than deferring to Phase 17 -- same file, avoids duplicate plan
 - [Phase 17-01]: Partial entries count as matches (have products assigned); dashboard avgConfidence 0-1 scale, email avgConfidence percentage integer
+- [Phase 18-01]: Refactored get_catalog_index to use shared _build_catalog_index_from_df helper to avoid code duplication with load_catalog_from_bytes
 
 ### Pending Todos
 
@@ -133,6 +135,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T16:41:08Z
-Stopped at: Completed 17-01-PLAN.md
+Last session: 2026-03-11T22:15:05Z
+Stopped at: Completed 18-01-PLAN.md
 Resume file: None

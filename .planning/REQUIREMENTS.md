@@ -13,7 +13,7 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 - [x] **AUTH-02**: User kann Passwort per E-Mail-Link zuruecksetzen
 - [x] **AUTH-03**: Session wird automatisch nach konfigurierbarer Inaktivitaet beendet (mit Warnung)
 - [x] **AUTH-04**: System unterstuetzt 4 Rollen: Admin, Manager, Analyst, Viewer
-- [ ] **AUTH-05**: Routen und API-Endpoints sind rollenbasiert geschuetzt
+- [x] **AUTH-05**: Routen und API-Endpoints sind rollenbasiert geschuetzt
 - [x] **AUTH-06**: JWT-Token-Bridging zwischen Next.js und Python-Backend
 
 ### Design System & Layout
@@ -30,12 +30,12 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 - [x] **DASH-01**: Status-Karten: Laufende / Abgeschlossene / Fehlerhafte Analysen
 - [x] **DASH-02**: Letzte Aktivitaeten Feed (wer hat was wann gemacht)
 - [x] **DASH-03**: Statistik-Widget: Gesamtzahl Matches, Gaps, Durchschnitts-Konfidenz
-- [ ] **DASH-04**: Schnellzugriff-Button "Neue Analyse starten"
+- [x] **DASH-04**: Schnellzugriff-Button "Neue Analyse starten"
 
 ### Analyse-Wizard
 
 - [x] **ANLZ-01**: Schritt 1 -- Drag & Drop Upload (PDF/DOCX/XLSX) via Vercel Blob
-- [ ] **ANLZ-02**: Schritt 2 -- Produktkatalog auswaehlen oder neu hochladen
+- [x] **ANLZ-02**: Schritt 2 -- Produktkatalog auswaehlen oder neu hochladen
 - [x] **ANLZ-03**: Schritt 3 -- Schwellenwerte und Validierungsdurchlaeufe konfigurieren
 - [x] **ANLZ-04**: Schritt 4 -- Analyse starten mit Echtzeit-Fortschrittsbalken (SSE direkt zu Python)
 - [x] **ANLZ-05**: Schritt 5 -- Ergebnis-Ansicht mit Tabs (Matches/Gaps/Zusammenfassung)
@@ -123,7 +123,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | AUTH-02 | Phase 10 | Complete |
 | AUTH-03 | Phase 10 | Complete |
 | AUTH-04 | Phase 10 | Complete |
-| AUTH-05 | Phase 18 | Pending |
+| AUTH-05 | Phase 18 | Complete |
 | AUTH-06 | Phase 11 | Complete |
 | UI-01 | Phase 10 | Complete |
 | UI-02 | Phase 10 | Complete |
@@ -134,9 +134,9 @@ Deferred to future release. Tracked but not in current roadmap.
 | DASH-01 | Phase 15 | Complete |
 | DASH-02 | Phase 15 | Complete |
 | DASH-03 | Phase 17 | Complete |
-| DASH-04 | Phase 18 | Pending |
+| DASH-04 | Phase 18 | Complete |
 | ANLZ-01 | Phase 12 | Complete |
-| ANLZ-02 | Phase 18 | Pending |
+| ANLZ-02 | Phase 18 | Complete |
 | ANLZ-03 | Phase 13 | Complete |
 | ANLZ-04 | Phase 16 | Complete |
 | ANLZ-05 | Phase 13 | Complete |

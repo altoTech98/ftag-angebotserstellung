@@ -36,7 +36,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 15: Admin + Dashboard + Polish** - Admin user/settings management, audit log, dashboard KPIs, keyboard shortcuts, and email notifications (completed 2026-03-11)
 - [x] **Phase 16: Fix Analysis-to-Python File Bridge** - Fix broken endpoint, auth header, and cancel route in analysis-to-Python integration (gap closure) (completed 2026-03-11)
 - [x] **Phase 17: Fix Dashboard & Email Data Access** - Fix wrong JSON key access in dashboard statistics and email notifications (gap closure) (completed 2026-03-11)
-- [ ] **Phase 18: Fix Cross-Phase Integration Gaps** - Fix catalogId passthrough, /neue-analyse stub page, and wrong auth redirect paths (gap closure)
+- [x] **Phase 18: Fix Cross-Phase Integration Gaps** - Fix catalogId passthrough, /neue-analyse stub page, and wrong auth redirect paths (gap closure) (completed 2026-03-11)
 
 ## Phase Details
 
@@ -210,4 +210,4 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14 -> 15
 | 15. Admin + Dashboard + Polish | 4/4 | Complete    | 2026-03-11 | - |
 | 16. Fix Analysis-Python Bridge | 1/1 | Complete    | 2026-03-11 | - |
 | 17. Fix Dashboard & Email Data | 1/1 | Complete    | 2026-03-11 | - |
-| 18. Fix Cross-Phase Integration | 0/1 | Pending     | -          | - |
+| 18. Fix Cross-Phase Integration | 1/1 | Complete   | 2026-03-11 | - |
