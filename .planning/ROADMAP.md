@@ -66,11 +66,11 @@ Plans:
   2. Python backend validates a shared API key on every request and rejects unauthenticated calls with 401
   3. JWT token from Better Auth is forwarded to Python, and Python can extract the user role from it
   4. SSE progress events from the Python backend reach the browser in real-time (either proxied or via direct connection with CORS), with a working polling fallback if SSE is unreliable
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 11-01: TBD
-- [ ] 11-02: TBD
+- [ ] 11-01-PLAN.md -- Python service key auth middleware, SSE token validator, CORS config update
+- [ ] 11-02-PLAN.md -- Next.js BFF catch-all proxy, SSE token issuer, SSE client with polling fallback
 
 ### Phase 12: File Handling + Project Management
 **Goal**: Users can create projects, upload tender documents, and organize their work with sharing and archiving
@@ -155,7 +155,7 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14 -> 15
 | 8. Quality, Observability & End-to-End | v1.0 | 3/3 | Complete | 2026-03-10 |
 | 9. Frontend V2 Offer & Feedback Wiring | v1.0 | 2/2 | Complete | 2026-03-10 |
 | 10. Foundation | 6/6 | Complete   | 2026-03-11 | 2026-03-11 |
-| 11. Python Integration | v2.0 | 0/? | Not started | - |
+| 11. Python Integration | v2.0 | 0/2 | Not started | - |
 | 12. File Handling + Projects | v2.0 | 0/? | Not started | - |
 | 13. Analysis Wizard + Results | v2.0 | 0/? | Not started | - |
 | 14. Catalog Management | v2.0 | 0/? | Not started | - |
