@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Tender Matcher -- Web-Oberflaeche & Platform
 status: completed
-stopped_at: Completed 11-02 (BFF Proxy & SSE Client)
-last_updated: "2026-03-11T02:35:56.157Z"
-last_activity: 2026-03-11 -- Completed Plan 11-02 (BFF Proxy & SSE Client)
+stopped_at: Completed 11-03 (SSE Token Encoding Fix)
+last_updated: "2026-03-11T02:50:47Z"
+last_activity: 2026-03-11 -- Completed Plan 11-03 (SSE Token Encoding Fix)
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 9
+  completed_plans: 9
   percent: 100
 ---
 
@@ -26,25 +26,25 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 11 of 15 (Python Backend Integration)
-Plan: 2 of 2 (complete)
+Plan: 3 of 3 (complete)
 Status: Phase 11 Complete
-Last activity: 2026-03-11 -- Completed Plan 11-02 (BFF Proxy & SSE Client)
+Last activity: 2026-03-11 -- Completed Plan 11-03 (SSE Token Encoding Fix)
 
 Progress: [##########] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8 (v2.0)
-- Average duration: 4.4min
-- Total execution time: 35min
+- Total plans completed: 9 (v2.0)
+- Average duration: 4.2min
+- Total execution time: 38min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 10-foundation | 6/6 | 27min | 4.5min |
-| 11-python-backend | 2/2 | 8min | 4min |
+| 11-python-backend | 3/3 | 11min | 3.7min |
 
 ## Accumulated Context
 
@@ -73,7 +73,8 @@ Progress: [##########] 100%
 - [Phase 11-01]: SSE stream paths skip service key check, use dedicated HMAC token auth via query param
 - [Phase 11-01]: CORS allows explicit headers (X-Service-Key, X-User-*), credentials=False (tokens via query param)
 - [Phase 11-02]: BFF proxy reads PYTHON_SERVICE_KEY from server-side env only (no NEXT_PUBLIC_ prefix)
-- [Phase 11-02]: SSE token format: base64url(payload).base64url(HMAC-SHA256 signature) matching Python validator
+- [Phase 11-02]: SSE token format: base64url(payload).hex(HMAC-SHA256 signature) matching Python validator (corrected in 11-03)
+- [Phase 11-03]: Token format contract: base64url(payload).hex(HMAC-SHA256) -- hex chosen over base64url for signature to match Python hexdigest()
 - [Phase 11-02]: Analysis endpoints get 300s timeout; all others get 30s default
 - [Phase 11-02]: SSE client retries 3x with linear backoff then falls back to polling every 3s
 
@@ -89,6 +90,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T02:35:56.151Z
-Stopped at: Completed 11-02 (BFF Proxy & SSE Client)
+Last session: 2026-03-11T02:50:47Z
+Stopped at: Completed 11-03 (SSE Token Encoding Fix)
 Resume file: None

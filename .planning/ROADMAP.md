@@ -29,7 +29,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 **Milestone Goal:** Professionelle SaaS-Web-Applikation (Next.js) um die bestehende AI-Matching-Engine -- minimalistisch, uebersichtlich, B2B-tauglich.
 
 - [x] **Phase 10: Foundation (Auth + Database + Design System)** - Next.js app with Better Auth login, 4-role RBAC, Prisma/Neon DB, and FTAG Rot/Weiss design system (completed 2026-03-11)
-- [ ] **Phase 11: Python Backend Integration (BFF + Service Auth)** - BFF proxy layer connecting Next.js to Python/FastAPI with service auth and SSE validation (gap closure in progress)
+- [x] **Phase 11: Python Backend Integration (BFF + Service Auth)** - BFF proxy layer connecting Next.js to Python/FastAPI with service auth and SSE validation (completed 2026-03-11)
 - [ ] **Phase 12: File Handling + Project Management** - Vercel Blob file uploads, project CRUD with history, archiving, and sharing
 - [ ] **Phase 13: Analysis Wizard + Results View** - 5-step analysis wizard with SSE progress and full results view with filtering, detail expansion, and Excel export
 - [ ] **Phase 14: Catalog Management** - Product catalog upload, browse, search, versioning, and individual product CRUD
@@ -156,7 +156,7 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14 -> 15
 | 8. Quality, Observability & End-to-End | v1.0 | 3/3 | Complete | 2026-03-10 |
 | 9. Frontend V2 Offer & Feedback Wiring | v1.0 | 2/2 | Complete | 2026-03-10 |
 | 10. Foundation | 6/6 | Complete   | 2026-03-11 | 2026-03-11 |
-| 11. Python Integration | 2/3 | Gap closure | 2026-03-11 | - |
+| 11. Python Integration | v2.0 | 3/3 | Complete | 2026-03-11 |
 | 12. File Handling + Projects | v2.0 | 0/? | Not started | - |
 | 13. Analysis Wizard + Results | v2.0 | 0/? | Not started | - |
 | 14. Catalog Management | v2.0 | 0/? | Not started | - |
