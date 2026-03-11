@@ -21,6 +21,114 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+
+def unmerge_cells(ws) -> None:
+    """
+    Resolve merged cells in an openpyxl worksheet.
+    Copies the merged cell's value into all cells of the merged range.
+    Must be called BEFORE reading with pandas.
+    """
+    for merge_range in list(ws.merged_cells.ranges):
+        min_row, min_col = merge_range.min_row, merge_range.min_col
+        value = ws.cell(row=min_row, column=min_col).value
+        ws.unmerge_cells(str(merge_range))
+        for row in range(merge_range.min_row, merge_range.max_row + 1):
+            for col in range(merge_range.min_col, merge_range.max_col + 1):
+                ws.cell(row=row, column=col).value = value
+
+
+def combine_multi_row_headers(row1: list, row2: list = None) -> list:
+    """
+    Combine two header rows into one.
+    If row1[i] is a group header and row2[i] is a detail header,
+    combines them: "Masse" + "Breite [mm]" -> "Masse Breite [mm]".
+    Skips combining if row1 value is same as row2 or if row2 is None.
+    """
+    if row2 is None:
+        return row1
+
+    combined = []
+    for i in range(max(len(row1), len(row2))):
+        top = str(row1[i]).strip() if i < len(row1) and row1[i] else ""
+        bot = str(row2[i]).strip() if i < len(row2) and row2[i] else ""
+
+        if not top and not bot:
+            combined.append("")
+        elif not top:
+            combined.append(bot)
+        elif not bot:
+            combined.append(top)
+        elif top.lower() == bot.lower():
+            combined.append(bot)
+        else:
+            combined.append(f"{top} {bot}")
+
+    return combined
+
+
+# Column mapping cache (persists during session)
+_column_mapping_cache: dict[str, str] = {}
+
+
+def _call_ai_for_columns(unknown_columns: list[str], known_mapping: dict) -> dict | None:
+    """Ask Claude to identify unknown column headers. Returns {header: field} or None."""
+    from services.local_llm import _call_ai
+
+    known_str = ", ".join(f"{v} → {k}" for k, v in known_mapping.items())
+    unknown_str = ", ".join(f'"{c}"' for c in unknown_columns)
+
+    prompt = f"""Du bist Experte für Schweizer Türlisten (Excel-Tabellen mit Türpositionen).
+
+Bereits erkannte Spalten: {known_str}
+
+Unbekannte Spaltenüberschriften: {unknown_str}
+
+Ordne jede unbekannte Spalte einem dieser Felder zu (oder "unknown" wenn unklar):
+tuer_nr, geschoss, breite, hoehe, brandschutz, schallschutz, einbruchschutz,
+tuertyp, beschlaege, oberflaechenbehandlung, verglasung, menge, besonderheiten,
+raum, wandtyp, schloss_typ, zylinder, glas_typ, schliessblech, tuerschliesser,
+fluegel_anzahl, bandtyp, zargentyp
+
+Antworte NUR als JSON-Objekt: {{"Spaltenname": "feldname", ...}}"""
+
+    response = _call_ai(prompt, timeout=30)
+    if not response:
+        return None
+
+    try:
+        import json
+        text = response.strip()
+        if text.startswith("```"):
+            text = re.sub(r'^```\w*\n?', '', text)
+            text = re.sub(r'\n?```$', '', text)
+        mapping = json.loads(text.strip())
+        # Filter out "unknown" values
+        return {k: v for k, v in mapping.items() if v != "unknown" and isinstance(v, str)}
+    except Exception:
+        return None
+
+
+def ai_map_unknown_columns(unknown_columns: list[str], known_mapping: dict) -> dict:
+    """
+    Use AI to identify unknown column headers. Results are cached.
+    Returns {header_name: field_name} for successfully mapped columns.
+    """
+    if not unknown_columns:
+        return {}
+
+    # Check cache first
+    uncached = [c for c in unknown_columns if c not in _column_mapping_cache]
+
+    if uncached:
+        ai_result = _call_ai_for_columns(uncached, known_mapping)
+        if ai_result:
+            _column_mapping_cache.update(ai_result)
+            logger.info(f"[EXCEL] AI mapped {len(ai_result)} unknown columns: {ai_result}")
+
+    # Return cached results for requested columns
+    return {c: _column_mapping_cache[c] for c in unknown_columns if c in _column_mapping_cache}
+
+
 # ---------------------------------------------------------------------------
 # Known field patterns for fuzzy column header matching
 # ---------------------------------------------------------------------------
@@ -39,12 +147,14 @@ KNOWN_FIELD_PATTERNS = {
         "türbreite", "breite mm", "breite [mm]", "lichte b",
         "rohbaumass breite", "rbm breite", "width",
         "rm-b rohbaumass breite", "dm-b durchgang breite", "durchgang breite",
+        "rbm b", "rohbaumass b", "lw b", "lichtes mass b",
     ],
     "hoehe": [
         "höhe", "hoehe", "h [mm]", "h[mm]", "h (mm)", "lichte höhe", "th",
         "türhöhe", "höhe mm", "höhe [mm]", "lichte h", "lichte höhe",
         "rohbaumass höhe", "rbm höhe", "height",
         "rm-h rohbaumass höhe", "dm-h durchgang höhe", "durchgang höhe",
+        "rbm h", "rohbaumass h", "lw h", "lichtes mass h",
     ],
     "brandschutz": [
         "brandschutz", "feuerschutz", "bs", "feuerwiderstand",
@@ -75,7 +185,7 @@ KNOWN_FIELD_PATTERNS = {
     "oberflaechenbehandlung": [
         "oberfläche", "oberflaeche", "farbe", "ral", "beschichtung",
         "anstrich", "finish", "surface", "oberflächenbehandlung",
-        "farbgebung", "ral-ton",
+        "farbgebung", "ral-ton", "oberfl",
     ],
     "verglasung": [
         "verglasung", "verglast", "lichtausschnitt",
@@ -95,7 +205,7 @@ KNOWN_FIELD_PATTERNS = {
     ],
     "wandtyp": [
         "wandtyp", "wand", "wandkonstruktion", "wandaufbau", "mauerwerk",
-        "wandstärke", "wanddicke", "mauertyp", "mauerart",
+        "wandstärke", "wanddicke", "mauertyp", "mauerart", "wandart",
     ],
     "schloss_typ": [
         "schloss", "schlosstyp", "schlossart", "verriegelung",
@@ -128,6 +238,7 @@ KNOWN_FIELD_PATTERNS = {
     "zargentyp": [
         "zargentyp", "zargenart", "zarge", "umfassungszarge",
         "blockzarge", "eckzarge", "umfassungsart", "umfassung",
+        "zarge typ",
     ],
 }
 
@@ -176,7 +287,7 @@ def _best_field_match(column_name: str) -> tuple[str | None, float]:
                 if len(pattern) < 4:
                     continue
                 ratio = _fuzzy_ratio(col_lower, pattern)
-                score = ratio if ratio >= 0.75 else 0.0
+                score = ratio if ratio >= 0.60 else 0.0
 
             if score > field_best:
                 field_best = score
@@ -267,7 +378,28 @@ def _clean_string_value(value) -> str | None:
 
 def parse_tuerliste_bytes(content: bytes) -> dict:
     """Parse an Excel Türliste from raw bytes. See parse_tuerliste for return format."""
-    return _parse_tuerliste_from_excel(pd.ExcelFile(io.BytesIO(content)))
+    buf = io.BytesIO(content)
+
+    # Pre-process: resolve merged cells with openpyxl
+    import openpyxl as _opx
+    try:
+        wb = _opx.load_workbook(buf, data_only=True)
+        for ws in wb.worksheets:
+            unmerge_cells(ws)
+        # Save back to buffer
+        buf2 = io.BytesIO()
+        wb.save(buf2)
+        buf2.seek(0)
+        buf = buf2
+    except Exception as e:
+        logger.debug(f"[EXCEL] Merged cell pre-processing failed: {e}")
+        buf.seek(0)
+
+    xl = pd.ExcelFile(buf)
+    try:
+        return _parse_tuerliste_from_excel(xl)
+    finally:
+        xl.close()
 
 
 def parse_tuerliste(file_path: str) -> dict:
@@ -320,6 +452,24 @@ def _parse_tuerliste_from_excel(xl: pd.ExcelFile) -> dict:
     # Re-read with correct header
     df = pd.read_excel(xl, sheet_name=sheet_name, header=header_idx, dtype=str)
     df.columns = [str(c).strip() for c in df.columns]
+
+    # Check for multi-row headers: if the row above header_idx looks like group headers
+    if header_idx is not None and header_idx > 0:
+        try:
+            group_row = df_raw.iloc[header_idx - 1].tolist()
+            detail_row = df_raw.iloc[header_idx].tolist()
+            # Check if group row has fewer unique non-empty values (sign of group headers)
+            group_values = [str(v).strip() for v in group_row if str(v).strip()]
+            detail_values = [str(v).strip() for v in detail_row if str(v).strip()]
+            if group_values and len(set(group_values)) < len(set(detail_values)):
+                combined = combine_multi_row_headers(group_row, detail_row)
+                # Apply combined headers to DataFrame
+                if len(combined) >= len(df.columns):
+                    df.columns = [str(c).strip() for c in combined[:len(df.columns)]]
+                    logger.info(f"[EXCEL] Combined multi-row headers from rows {header_idx - 1} and {header_idx}")
+        except Exception as e:
+            logger.debug(f"[EXCEL] Multi-row header detection failed: {e}")
+
     df = df.fillna("")
 
     # Drop completely empty rows
@@ -481,6 +631,18 @@ def _map_columns(df: pd.DataFrame) -> dict[str, str]:
             if field and field not in mapping and score >= threshold:
                 mapping[field] = col
                 used_columns.add(col)
+
+    # AI mapping for remaining unmapped columns
+    unmapped = [col for col in df.columns if col not in used_columns and str(col).strip()]
+    if unmapped and len(unmapped) <= 20 and not os.environ.get("TESTING"):  # Don't AI-map if too many unknowns or testing
+        try:
+            ai_mapped = ai_map_unknown_columns(unmapped, mapping)
+            for header, field in ai_mapped.items():
+                if field not in mapping:
+                    mapping[field] = header
+                    used_columns.add(header)
+        except Exception as e:
+            logger.debug(f"[EXCEL] AI column mapping failed: {e}")
 
     return mapping
 

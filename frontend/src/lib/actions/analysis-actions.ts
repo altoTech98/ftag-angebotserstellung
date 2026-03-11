@@ -1,0 +1,198 @@
+'use server';
+
+import prisma from '@/lib/prisma';
+import { auth } from '@/lib/auth';
+import { headers } from 'next/headers';
+import { revalidatePath } from 'next/cache';
+import { resend, EMAIL_FROM } from '@/lib/email';
+import { AnalysisCompleteEmail } from '@/emails/analysis-complete';
+
+const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
+const PYTHON_SERVICE_KEY = process.env.PYTHON_SERVICE_KEY || '';
+
+/**
+ * Downloads files from Vercel Blob and uploads them to Python's project_cache.
+ * This bridges the gap between Vercel Blob storage and Python's in-memory cache.
+ */
+export async function prepareFilesForPython(
+  projectId: string,
+  fileIds: string[]
+): Promise<{ success: true; pythonProjectId: string } | { error: string }> {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session) return { error: 'Nicht authentifiziert' };
+
+    // Fetch file records from Prisma
+    const files = await prisma.file.findMany({
+      where: { id: { in: fileIds }, projectId },
+    });
+
+    if (files.length === 0) {
+      return { error: 'Keine Dateien gefunden' };
+    }
+
+    // Download each file from Vercel Blob and build FormData
+    const formData = new FormData();
+
+    for (const file of files) {
+      const response = await fetch(file.downloadUrl);
+      if (!response.ok) {
+        return { error: `Datei ${file.name} konnte nicht heruntergeladen werden` };
+      }
+      const buffer = await response.arrayBuffer();
+      const blob = new Blob([buffer], { type: file.contentType });
+      formData.append('files', blob, file.name);
+    }
+
+    // POST to Python upload endpoint to populate project_cache
+    const uploadResponse = await fetch(
+      `${PYTHON_BACKEND_URL}/api/upload/folder`,
+      {
+        method: 'POST',
+        headers: {
+          'X-Service-Key': PYTHON_SERVICE_KEY,
+        },
+        body: formData,
+      }
+    );
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      return { error: `Python-Upload fehlgeschlagen: ${errorText}` };
+    }
+
+    const uploadData = await uploadResponse.json();
+    return { success: true, pythonProjectId: uploadData.project_id };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
+  }
+}
+
+/**
+ * Creates an Analysis record in Prisma with status "running".
+ */
+export async function createAnalysis(
+  projectId: string
+): Promise<{ analysisId: string } | { error: string }> {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session) return { error: 'Nicht authentifiziert' };
+
+    // Permission check
+    const hasPermission = await auth.api.userHasPermission({
+      body: {
+        userId: session.user.id,
+        permissions: { analysis: ['create'] },
+      },
+    });
+    if (!hasPermission?.success) {
+      return { error: 'Keine Berechtigung fuer Analyse' };
+    }
+
+    const analysis = await prisma.analysis.create({
+      data: {
+        projectId,
+        status: 'running',
+        startedAt: new Date(),
+        startedBy: session.user.id,
+      },
+    });
+
+    return { analysisId: analysis.id };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
+  }
+}
+
+/**
+ * Saves the analysis result to Prisma, marking it as completed.
+ */
+export async function saveAnalysisResult(
+  analysisId: string,
+  result: unknown
+): Promise<{ success: true } | { error: string }> {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session) return { error: 'Nicht authentifiziert' };
+
+    const analysis = await prisma.analysis.findUnique({
+      where: { id: analysisId },
+    });
+    if (!analysis) return { error: 'Analyse nicht gefunden' };
+
+    await prisma.analysis.update({
+      where: { id: analysisId },
+      data: {
+        status: 'completed',
+        result: result as Record<string, unknown>,
+        endedAt: new Date(),
+      },
+    });
+
+    // Send completion email (fire-and-forget, do not await to avoid blocking the response)
+    sendAnalysisCompleteEmail(analysisId).catch((err) =>
+      console.error('Failed to send analysis completion email:', err)
+    );
+
+    revalidatePath(`/projekte/${analysis.projectId}`);
+    return { success: true };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
+  }
+}
+
+/**
+ * Sends an email notification when an analysis completes.
+ */
+export async function sendAnalysisCompleteEmail(analysisId: string) {
+  try {
+    const analysis = await prisma.analysis.findUnique({
+      where: { id: analysisId },
+      include: { project: true },
+    });
+    if (!analysis || !analysis.startedBy) return;
+
+    const user = await prisma.user.findUnique({
+      where: { id: analysis.startedBy },
+    });
+    if (!user) return;
+
+    // Parse result for stats
+    const result = analysis.result as Record<string, unknown> | null;
+    const matchItems = Array.isArray(result?.matched) ? result.matched : [];
+    const partialItems = Array.isArray(result?.partial) ? result.partial : [];
+    const gapItems = Array.isArray(result?.unmatched) ? result.unmatched : [];
+    const matchCount = matchItems.length + partialItems.length;
+    const gapCount = gapItems.length;
+
+    // Calculate average confidence from matched + partial items
+    let avgConfidence = 0;
+    const allMatchedItems = [...matchItems, ...partialItems];
+    if (allMatchedItems.length > 0) {
+      const totalConfidence = allMatchedItems.reduce(
+        (sum: number, item: Record<string, unknown>) =>
+          sum + (typeof item.confidence === 'number' ? item.confidence : 0),
+        0
+      );
+      avgConfidence = Math.round((totalConfidence / allMatchedItems.length) * 100);
+    }
+
+    const resultUrl = `${process.env.BETTER_AUTH_URL}/projekte/${analysis.projectId}`;
+
+    await resend.emails.send({
+      from: EMAIL_FROM,
+      to: [user.email],
+      subject: `Analyse abgeschlossen: ${analysis.project?.name || 'Projekt'}`,
+      react: AnalysisCompleteEmail({
+        userName: user.name || user.email,
+        projectName: analysis.project?.name || 'Unbenanntes Projekt',
+        matchCount,
+        gapCount,
+        avgConfidence,
+        resultUrl,
+      }),
+    });
+  } catch (error) {
+    console.error('Failed to send analysis completion email:', error);
+  }
+}

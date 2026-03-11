@@ -109,6 +109,8 @@ class CatalogIndex:
         - baender: list of compatible hinges
         - schloesser: list of compatible locks
         - bodenabschluss: list of compatible bottom seals
+        - *_modell: concrete product model names (first compatible)
+        - elektro/glas details
         """
         if row_index < 0 or row_index >= len(self.df):
             return {}
@@ -133,6 +135,14 @@ class CatalogIndex:
                     result.append(str(self.df.columns[i]).strip())
             return result
 
+        def _first_ja_colname(start, end):
+            """Return the column name of the first 'ja' column in range."""
+            for i in range(start, min(end, ncols)):
+                v = row.iloc[i]
+                if pd.notna(v) and str(v).strip().lower() == "ja":
+                    return str(self.df.columns[i]).strip()
+            return ""
+
         # Zargen compatibility
         zargen_types = []
         for idx, label in [(53, "MBW"), (54, "LBW"), (55, "Steckzargen"), (56, "OS-Zarge")]:
@@ -156,6 +166,28 @@ class CatalogIndex:
         # Umfassung surface: from material column (e.g. "grundiert"), or same as Türblatt
         oberfl_umfassung = umf_material if umf_material else oberfl_tuerblatt
 
+        # Schloss: concrete model from cols 91-92 (Schlossart + Artikel)
+        schloss_art = _val(COL_LOCK_TYPE)
+        schloss_artikel = _val(COL_LOCK_ARTICLE)
+        schloss_modell = ""
+        if schloss_artikel:
+            schloss_modell = schloss_artikel
+        elif schloss_art:
+            schloss_modell = schloss_art
+
+        # Glas details from cols 260-263
+        glas_details = {}
+        glasart = _val(COL_GLASS_TYPE)
+        if glasart:
+            glas_details["glasart"] = glasart
+            glas_details["glas_artikel"] = _val(COL_GLASS_ARTICLE)
+            glas_details["glas_dicke"] = _val(COL_GLASS_THICKNESS)
+            glas_details["glas_schall"] = _val(COL_GLASS_SOUND)
+            # Find first compatible fire-rated glass (Contraflam/FireswissFoam)
+            brandschutz_glas = _first_ja_colname(264, 296)
+            if brandschutz_glas:
+                glas_details["brandschutz_glas"] = brandschutz_glas
+
         ext = {
             "kostentraeger": _val(COL_COST_CENTER),
             "tuerblatt": _val(COL_DOOR_TYPE),
@@ -170,10 +202,23 @@ class CatalogIndex:
             "widerstandsklasse": _val(COL_RESISTANCE),
             "glasausschnitt": _val(COL_GLASS_CUTOUT),
             "zargen_types": zargen_types,
+            # Lists (backward compat)
             "tuerschliesser": _ja_cols(76, 90),
             "baender": _ja_cols(210, 239),
             "schloesser": _ja_cols(120, 140),
             "bodenabschluss": _ja_cols(253, 259),
+            # Concrete model names (NEW)
+            "tuerschliesser_modell": _first_ja_colname(76, 90),
+            "baender_modell": _first_ja_colname(210, 239),
+            "schloss_modell": schloss_modell,
+            "bodenabschluss_modell": _first_ja_colname(253, 259),
+            "bandsicherung_info": _val(240),
+            # Elektro components (cols 189-209)
+            "kabeluebergang_typ": _first_ja_colname(189, 196),
+            "dmc_typ": _first_ja_colname(196, 198),
+            "tueroeffner_modell": _first_ja_colname(198, 207),
+            # Glas details
+            "glas_details": glas_details,
         }
         return ext
 
@@ -396,6 +441,17 @@ def get_catalog_index() -> CatalogIndex:
     Call this at startup to preload.
     """
     df = _load_catalog_df()
+    index = _build_catalog_index_from_df(df)
+
+    for cat, products in sorted(index.by_category.items(), key=lambda x: -len(x[1])):
+        logger.info(f"  {cat}: {len(products)} products")
+
+    return index
+
+
+def _build_catalog_index_from_df(df: pd.DataFrame) -> CatalogIndex:
+    """Build a CatalogIndex from a cleaned DataFrame. Shared logic for both
+    the default file-based catalog and blob-based custom catalogs."""
     col_names = list(df.columns)
 
     all_profiles = []
@@ -408,7 +464,6 @@ def get_catalog_index() -> CatalogIndex:
         if not category:
             continue
 
-        # Build profile based on category
         if "Schloss" in category:
             profile = _build_lock_profile(row, row_idx)
             accessories.setdefault("ZZ (Schloss)", []).append(profile)
@@ -425,7 +480,6 @@ def get_catalog_index() -> CatalogIndex:
         all_profiles.append(profile)
         by_category.setdefault(category, []).append(profile)
 
-    # Build category name lists
     category_names = sorted(by_category.keys())
     main_category_names = [c for c in category_names if "ZZ" not in c]
 
@@ -444,10 +498,32 @@ def get_catalog_index() -> CatalogIndex:
         f"{sum(len(v) for v in accessories.values())} accessories, "
         f"{len(category_names)} categories"
     )
-    for cat, products in sorted(by_category.items(), key=lambda x: -len(x[1])):
-        logger.info(f"  {cat}: {len(products)} products")
 
     return index
+
+
+def load_catalog_from_blob_url(blob_url: str) -> CatalogIndex:
+    """Download catalog Excel from Vercel Blob URL and build index."""
+    import httpx
+    response = httpx.get(blob_url, timeout=30.0)
+    response.raise_for_status()
+    return load_catalog_from_bytes(response.content)
+
+
+def load_catalog_from_bytes(excel_bytes: bytes) -> CatalogIndex:
+    """Build a CatalogIndex from raw Excel bytes (no caching)."""
+    import io
+    df = pd.read_excel(io.BytesIO(excel_bytes), sheet_name=0, header=CATALOG_HEADER_ROW)
+    df.columns = [str(c).strip() for c in df.columns]
+    df = df.dropna(how="all").reset_index(drop=True)
+
+    # Remove leftover header row
+    if len(df) > 0:
+        first_col = df.columns[0]
+        df = df[df[first_col].astype(str) != "Produktegruppen"].reset_index(drop=True)
+
+    logger.info(f"Loaded catalog from bytes: {len(df)} products, {len(df.columns)} columns")
+    return _build_catalog_index_from_df(df)
 
 
 def format_products_for_claude(profiles: list[ProductProfile]) -> str:

@@ -1,148 +1,36 @@
 """
-Offer Router – Offer generation and download endpoints (in-memory, no disk writes).
-POST /api/offer/generate       – Start offer generation (background job)
-GET  /api/offer/status/{job_id} – Poll job status
-GET  /api/offer/{id}/download
-GET  /api/report/{id}/download
+Result Router – Machbarkeitsanalyse generation and download (in-memory, no disk writes).
+
+V1 endpoints:
+  POST /api/result/generate       – Start result generation (background job)
+  GET  /api/result/status/{job_id} – Poll job status
+  GET  /api/result/{id}/download   – Download result Excel
+
+V2 endpoints:
+  POST /api/offer/generate        – Start v2 Excel generation from analysis_id
+  GET  /api/offer/status/{job_id} – Poll v2 job status
+  GET  /api/offer/{id}/download   – Download v2 Machbarkeitsanalyse Excel
 """
 
 import uuid
 import logging
+from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from services.local_llm import generate_offer_text, generate_gap_report_text
-from services.offer_generator import (
-    generate_offer_excel, generate_gap_report_excel,
-    generate_offer_word, generate_gap_report_word,
-)
 from services.memory_cache import offer_cache
 from services.job_store import create_job, get_job, run_in_background
-from services.price_calculator import get_price_calculator
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-
-class GenerateOfferRequest(BaseModel):
-    requirements: dict
-    matching: dict
-
-
-@router.post("/offer/generate")
-async def generate_offer(request: GenerateOfferRequest):
-    """Start offer generation as background job. Returns job_id immediately."""
-    job = create_job()
-    run_in_background(
-        job, _run_offer_generation,
-        request.requirements, request.matching,
-    )
-    return {"job_id": job.id, "status": "started"}
-
-
-@router.get("/offer/status/{job_id}")
-async def get_offer_status(job_id: str):
-    """Poll the status of an offer generation job."""
-    job = get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job nicht gefunden")
-    return job.to_dict()
-
-
-@router.get("/offer/{offer_id}/totals")
-async def get_offer_totals(offer_id: str):
-    """Get pricing totals for an offer"""
-    key = f"offer_{offer_id}_totals"
-    totals = offer_cache.get(key)
-    if totals is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Preisdaten nicht gefunden. Angebot möglicherweise abgelaufen."
-        )
-    return totals
-
-
-def _run_offer_generation(requirements: dict, matching: dict) -> dict:
-    """Run offer + gap report generation in background thread."""
-    matched = matching.get("matched", [])
-    partial = matching.get("partial", [])
-    unmatched = matching.get("unmatched", [])
-
-    offer_id = str(uuid.uuid4())[:8]
-    report_id = str(uuid.uuid4())[:8]
-
-    project_info = {
-        "projekt": requirements.get("projekt", "Ausschreibung"),
-        "auftraggeber": requirements.get("auftraggeber", ""),
-        "hinweise": requirements.get("hinweise", ""),
-    }
-
-    results = {
-        "offer_id": None,
-        "report_id": None,
-        "has_offer": False,
-        "has_gap_report": False,
-        "summary": matching.get("summary", {}),
-        "pricing_info": None,
-    }
-
-    # Calculate prices with ERP integration
-    price_calc = get_price_calculator()
-    
-    # Generate offer if there are matched/partial positions
-    offer_positions = matched + partial
-    if offer_positions:
-        # Enrich positions with pricing
-        for position in offer_positions:
-            matched_product = position.get("matched_product", {})
-            price_info = price_calc.calculate_position_price(matched_product)
-            position["price_calculation"] = price_info
-        
-        # Calculate totals
-        offer_totals = price_calc.calculate_offer_totals(offer_positions)
-        
-        offer_text = generate_offer_text(requirements, offer_positions, project_info)
-
-        xlsx_bytes = generate_offer_excel(offer_text, offer_positions, requirements, offer_id)
-        docx_bytes = generate_offer_word(offer_text, offer_positions, requirements, offer_id)
-
-        offer_cache.set(f"offer_{offer_id}_xlsx", xlsx_bytes, ttl_seconds=1800)
-        offer_cache.set(f"offer_{offer_id}_docx", docx_bytes, ttl_seconds=1800)
-        offer_cache.set(f"offer_{offer_id}_totals", offer_totals, ttl_seconds=1800)
-
-        results["offer_id"] = offer_id
-        results["has_offer"] = True
-        results["offer_positions_count"] = len(offer_positions)
-        results["pricing_info"] = offer_totals
-
-    # Generate gap report if there are unmatched/partial positions
-    gap_positions = unmatched + partial
-    if gap_positions:
-        gap_text = generate_gap_report_text(requirements, unmatched, project_info)
-
-        xlsx_bytes = generate_gap_report_excel(gap_text, unmatched, partial, requirements, report_id)
-        docx_bytes = generate_gap_report_word(gap_text, unmatched, partial, requirements, report_id)
-
-        offer_cache.set(f"report_{report_id}_xlsx", xlsx_bytes, ttl_seconds=1800)
-        offer_cache.set(f"report_{report_id}_docx", docx_bytes, ttl_seconds=1800)
-
-        results["report_id"] = report_id
-        results["has_gap_report"] = True
-        results["gap_positions_count"] = len(gap_positions)
-
-    # Build status message
-    msgs = []
-    if results["has_offer"]:
-        msgs.append(f"Angebot erstellt ({results.get('offer_positions_count', 0)} Positionen)")
-    if results["has_gap_report"]:
-        msgs.append(f"Gap-Report erstellt ({results.get('gap_positions_count', 0)} Positionen)")
-    if not msgs:
-        msgs.append("Keine Positionen zum Verarbeiten")
-
-    results["message"] = " · ".join(msgs)
-    return results
+# Lazy import for anthropic (only needed when generating Executive Summary)
+try:
+    import anthropic
+except ImportError:
+    anthropic = None  # type: ignore
 
 
 # ─────────────────────────────────────────────
@@ -214,55 +102,173 @@ async def download_result(result_id: str):
     )
 
 
-@router.get("/offer/{offer_id}/download")
-async def download_offer(offer_id: str, format: str = "xlsx"):
-    """Download offer as Excel (format=xlsx) or Word (format=docx) from memory cache."""
-    if format not in ("xlsx", "docx"):
-        raise HTTPException(status_code=400, detail="Format muss 'xlsx' oder 'docx' sein")
-    key = f"offer_{offer_id}_{format}"
-    data = offer_cache.get(key)
-    if data is None:
+# ─────────────────────────────────────────────
+# V2 OFFER GENERATION (from analysis_id)
+# ─────────────────────────────────────────────
+
+
+class GenerateV2ResultRequest(BaseModel):
+    analysis_id: str
+
+
+class ExecutiveSummaryResponse(BaseModel):
+    """Structured response for Claude Executive Summary generation."""
+    gesamtbewertung: str
+    empfehlungen: list[str]
+
+
+@router.post("/offer/generate")
+async def v2_generate_result(request: GenerateV2ResultRequest):
+    """Generate v2 Machbarkeitsanalyse Excel from analysis results.
+
+    Looks up stored analysis results by analysis_id, generates Executive
+    Summary via Claude Sonnet, produces 4-sheet Excel, and caches bytes.
+    """
+    # Lazy import _analysis_results
+    try:
+        from v2.routers.analyze_v2 import _analysis_results
+    except ImportError:
         raise HTTPException(
-            status_code=410,
-            detail="Angebot nicht gefunden oder abgelaufen. Bitte erneut generieren.",
+            status_code=501,
+            detail="V2 Analyse-Module nicht verfuegbar",
         )
 
-    if format == "docx":
-        media = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        fname = f"FTAG_Angebot_{offer_id}.docx"
-    else:
-        media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        fname = f"FTAG_Angebot_{offer_id}.xlsx"
+    if request.analysis_id not in _analysis_results:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Analyse-Ergebnis '{request.analysis_id}' nicht gefunden",
+        )
 
-    return Response(
-        content=data,
-        media_type=media,
-        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    job = create_job()
+    run_in_background(job, _run_v2_excel_generation, request.analysis_id)
+    return {"job_id": job.id, "status": "started"}
+
+
+def _run_v2_excel_generation(analysis_id: str) -> dict:
+    """Background task: generate v2 Excel with Executive Summary AI call.
+
+    Steps:
+    1. Look up stored analysis results
+    2. Generate Executive Summary via Claude Sonnet API (with fallback)
+    3. Call generate_v2_excel() to produce 4-sheet xlsx
+    4. Cache bytes with 1-hour TTL
+    """
+    from v2.routers.analyze_v2 import _analysis_results
+    from v2.output.excel_generator import generate_v2_excel
+
+    stored = _analysis_results[analysis_id]
+    positions = stored["positions"]
+    match_results = stored["match_results"]
+    adversarial_results = stored["adversarial_results"]
+    gap_reports = stored["gap_reports"]
+
+    # --- Generate Executive Summary via Claude Sonnet ---
+    ai_summary = ""
+    ai_recommendations = []
+
+    # Build statistics for prompt
+    total_pos = len(positions)
+    confirmed = sum(
+        1 for ar in adversarial_results
+        if ar.adjusted_confidence >= 0.95
+    )
+    uncertain = sum(
+        1 for ar in adversarial_results
+        if 0.60 <= ar.adjusted_confidence < 0.95
+    )
+    rejected = total_pos - confirmed - uncertain
+
+    total_gaps = sum(len(gr.gaps) for gr in gap_reports)
+    kritisch_gaps = sum(
+        1 for gr in gap_reports for g in gr.gaps
+        if g.schweregrad.value == "kritisch"
     )
 
+    if anthropic is not None:
+        try:
+            client = anthropic.Anthropic()
+            prompt = (
+                f"Analyseergebnisse:\n"
+                f"- {total_pos} Positionen analysiert\n"
+                f"- {confirmed} bestaetigt (95%+), {uncertain} unsicher (60-95%), "
+                f"{rejected} abgelehnt (<60%)\n"
+                f"- {total_gaps} Gaps identifiziert, davon {kritisch_gaps} kritisch\n\n"
+                f"Erstelle eine Gesamtbewertung (2-4 Saetze) und 2-4 konkrete Empfehlungen."
+            )
+            response = client.messages.parse(
+                model="claude-sonnet-4-20250514",
+                max_tokens=1024,
+                system="Du bist ein technischer Berater fuer Tueren und Brandschutz bei der Frank Tueren AG. "
+                       "Erstelle eine professionelle Zusammenfassung der Machbarkeitsanalyse auf Deutsch. "
+                       "Die Zusammenfassung ist fuer das Vertriebsteam und wird an Kunden weitergeleitet.",
+                messages=[{"role": "user", "content": prompt}],
+                response_model=ExecutiveSummaryResponse,
+            )
+            ai_summary = response.parsed.gesamtbewertung
+            ai_recommendations = response.parsed.empfehlungen
+            logger.info(f"[V2 Offer] Executive Summary generated via Claude for {analysis_id}")
+        except Exception as e:
+            logger.error(f"[V2 Offer] Claude Executive Summary failed: {e}")
+            # Fallback: statistics-only summary
+            ai_summary = (
+                f"Machbarkeitsanalyse: {total_pos} Positionen analysiert. "
+                f"{confirmed} bestaetigt, {uncertain} unsicher, {rejected} abgelehnt. "
+                f"{total_gaps} Gaps identifiziert ({kritisch_gaps} kritisch)."
+            )
+            ai_recommendations = []
+    else:
+        # No anthropic SDK available - fallback
+        ai_summary = (
+            f"Machbarkeitsanalyse: {total_pos} Positionen analysiert. "
+            f"{confirmed} bestaetigt, {uncertain} unsicher, {rejected} abgelehnt. "
+            f"{total_gaps} Gaps identifiziert ({kritisch_gaps} kritisch)."
+        )
 
-@router.get("/report/{report_id}/download")
-async def download_gap_report(report_id: str, format: str = "xlsx"):
-    """Download gap report as Excel (format=xlsx) or Word (format=docx) from memory cache."""
-    if format not in ("xlsx", "docx"):
-        raise HTTPException(status_code=400, detail="Format muss 'xlsx' oder 'docx' sein")
-    key = f"report_{report_id}_{format}"
-    data = offer_cache.get(key)
+    # --- Generate Excel ---
+    xlsx_bytes = generate_v2_excel(
+        positions=positions,
+        match_results=match_results,
+        adversarial_results=adversarial_results,
+        gap_reports=gap_reports,
+        ai_summary=ai_summary,
+        ai_recommendations=ai_recommendations,
+    )
+
+    # Cache with 1-hour TTL
+    offer_cache.set(f"v2_result_{analysis_id}_xlsx", xlsx_bytes, ttl_seconds=3600)
+
+    logger.info(
+        f"[V2 Offer] Excel generated for {analysis_id}: "
+        f"{len(xlsx_bytes)} bytes cached"
+    )
+
+    return {"result_id": analysis_id, "has_result": True}
+
+
+@router.get("/offer/status/{job_id}")
+async def v2_get_result_status(job_id: str):
+    """Poll the status of a v2 result generation job."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job nicht gefunden")
+    return job.to_dict()
+
+
+@router.get("/offer/{result_id}/download")
+async def v2_download_result(result_id: str):
+    """Download v2 Machbarkeitsanalyse Excel from memory cache."""
+    cache_key = f"v2_result_{result_id}_xlsx"
+    data = offer_cache.get(cache_key)
     if data is None:
         raise HTTPException(
             status_code=410,
-            detail="Gap-Report nicht gefunden oder abgelaufen. Bitte erneut generieren.",
+            detail="Ergebnis nicht gefunden oder abgelaufen. Bitte erneut generieren.",
         )
 
-    if format == "docx":
-        media = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        fname = f"FTAG_Gap_Report_{report_id}.docx"
-    else:
-        media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        fname = f"FTAG_Gap_Report_{report_id}.xlsx"
+    filename = f"Machbarkeitsanalyse_{datetime.now().strftime('%Y%m%d')}_{result_id}.xlsx"
 
     return Response(
         content=data,
-        media_type=media,
-        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

@@ -11,6 +11,14 @@ outputs/
 data/analysis_history.json
 data/projects.json
 data/produktuebersicht_backup_*.xlsx
+data/users.json
+data/.jwt_secret
+data/*.db
+data/*.db-journal
+
+# Logs
+logs/
+debug.log
 
 # Environment
 .env
@@ -28,6 +36,9 @@ nul
 *.ps1
 .DS_Store
 Thumbs.db
+
+# React build output
+frontend-react-dist/
 
 # IDE
 .vscode/

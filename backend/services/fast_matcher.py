@@ -1,14 +1,11 @@
 """
-Fast rule-based door matcher – no AI, no accessories.
+3-Stage Door Matcher – Semantic Search + Rules + Feedback.
 
-Matches customer door positions against FTAG catalog using:
-1. Category detection (keywords)
-2. Fire class compatibility (EI30=T30, higher fulfills lower)
-3. Sound class (dB comparison)
-4. Resistance class (RC2=WK2)
-5. Dimension check (breite x hoehe within product max)
-6. Leaf count (1-flg / 2-flg)
+Stage 1: Semantic pre-filter (TF-IDF cosine similarity) → top 50 candidates
+Stage 2: Rule-based scoring (fire, sound, RC, dimensions) → 0-100 score
+Stage 3: Feedback corrections from past user corrections
 
+Matches customer door positions against FTAG catalog.
 Returns machbar/nicht_machbar per position with best matching product.
 """
 
@@ -16,7 +13,7 @@ import re
 import logging
 from typing import Optional, Callable
 
-from services.catalog_index import get_catalog_index, ProductProfile
+from services.catalog_index import get_catalog_index, CatalogIndex, ProductProfile
 from services.feedback_store import find_relevant_feedback
 
 logger = logging.getLogger(__name__)
@@ -467,31 +464,41 @@ def _verify_critical_fields(
 def match_all(
     positions: list[dict],
     on_progress: Optional[Callable[[str], None]] = None,
+    catalog_index: Optional[CatalogIndex] = None,
 ) -> dict:
     """
     Fast rule-based matching. No AI calls, no accessories.
 
     Returns standard matching result dict with matched/partial/unmatched + summary.
     """
-    catalog = get_catalog_index()
+    catalog = catalog_index or get_catalog_index()
 
     if not positions:
         return _empty_result()
+
+    # Stage 1: Initialize semantic search index
+    semantic_index = None
+    try:
+        from services.semantic_search import get_semantic_index
+        semantic_index = get_semantic_index()
+        logger.info("[MATCH] Semantic search index available")
+    except Exception as e:
+        logger.warning(f"[MATCH] Semantic search unavailable, using category-only: {e}")
 
     def progress(msg: str):
         logger.info(msg)
         if on_progress:
             on_progress(msg)
 
-    progress(f"Schnell-Matching: {len(positions)} Positionen...")
+    progress(f"3-Stage Matching: {len(positions)} Positionen...")
 
     matched = []
     partial = []
     unmatched = []
 
     # Deduplicate
-    sig_map = {}  # signature -> (best_product, score, gaps, category, viable_products)
-    sig_groups = {}  # signature -> [indices]
+    sig_map = {}
+    sig_groups = {}
 
     for i, pos in enumerate(positions):
         _enrich_position(pos)
@@ -505,28 +512,56 @@ def match_all(
         door = positions[indices[0]]
         category = _detect_category(door)
 
-        # Get products for this category
+        # ── Stage 1: Semantic pre-filter ──
+        # Get candidate products via semantic search (broader than category alone)
+        semantic_candidates = set()
+        if semantic_index:
+            try:
+                query = _build_req_text(door)
+                results = semantic_index.search(query, fields=door, top_k=50, min_score=0.03)
+                semantic_candidates = {r.row_index for r in results}
+                if results:
+                    # Use top semantic result's category if keyword detection found nothing
+                    top_cat = results[0].category
+                    if not catalog.get_main_by_category(category):
+                        category = top_cat
+            except Exception as e:
+                logger.debug(f"Semantic search failed for position: {e}")
+
+        # Get products: category-based + semantic candidates
         cat_products = catalog.get_main_by_category(category)
         if not cat_products:
-            # Try broader categories
             for fallback_cat in ("Rahmentüre", "Zargentüre", "Futtertüre"):
                 cat_products = catalog.get_main_by_category(fallback_cat)
                 if cat_products:
                     category = fallback_cat
                     break
 
-        if not cat_products:
+        # Merge category products with semantic candidates (broader pool)
+        products_to_score = list(cat_products) if cat_products else []
+        if semantic_candidates:
+            cat_row_indices = {p.row_index for p in products_to_score}
+            for profile in catalog.main_products:
+                if profile.row_index in semantic_candidates and profile.row_index not in cat_row_indices:
+                    products_to_score.append(profile)
+
+        if not products_to_score:
             sig_map[sig] = (None, 0, [f"Keine Produkte in Kategorie '{category}'"], category, [])
             continue
 
-        # Score all products, collect all viable ones
+        # ── Stage 2: Rule-based scoring ──
         best_product = None
         best_score = -1
         best_gaps = []
         viable_products = []
 
-        for product in cat_products:
+        for product in products_to_score:
             score, gaps = _score_product(door, product)
+
+            # Boost score slightly for semantic matches (confidence signal)
+            if product.row_index in semantic_candidates:
+                score = min(score + 3, 100)
+
             if score >= MATCH_THRESHOLD:
                 viable_products.append((product, score, gaps))
             if score > best_score:
@@ -534,7 +569,7 @@ def match_all(
                 best_product = product
                 best_gaps = gaps
 
-        # Check feedback corrections for this door
+        # ── Stage 3: Feedback corrections ──
         try:
             req_text = _build_req_text(door)
             feedback = find_relevant_feedback(req_text, door, limit=3)
@@ -542,7 +577,7 @@ def match_all(
                 if fb.get("type") == "correction":
                     correct_idx = (fb.get("correct_product") or {}).get("row_index")
                     if correct_idx is not None:
-                        for prod in cat_products:
+                        for prod in products_to_score:
                             if prod.row_index == correct_idx:
                                 best_product = prod
                                 best_score = max(best_score, 85)
@@ -552,8 +587,8 @@ def match_all(
         except Exception as e:
             logger.debug(f"Feedback lookup failed: {e}")
 
-        # Cross-category search if best score is below threshold
-        if best_score < MATCH_THRESHOLD:
+        # Cross-category search only if semantic search wasn't available
+        if best_score < MATCH_THRESHOLD and not semantic_candidates:
             for alt_cat in catalog.main_category_names:
                 if alt_cat == category:
                     continue
@@ -568,7 +603,6 @@ def match_all(
                     if alt_score >= MATCH_THRESHOLD:
                         viable_products.append((product, alt_score, alt_gaps))
 
-        # Sort viable products by score descending (best first)
         viable_products.sort(key=lambda x: x[1], reverse=True)
         sig_map[sig] = (best_product, best_score, best_gaps, category, viable_products)
 

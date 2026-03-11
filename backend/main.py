@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 
-from config import settings, BASE_DIR
+from config import settings, Environment, BASE_DIR
 from services.logger_setup import setup_logging
 from routers import upload, analyze, offer, feedback, history, catalog, erp, auth
 from services.exceptions import FrankTuerenError
@@ -50,7 +50,16 @@ async def lifespan(app: FastAPI):
     # ─────── STARTUP ────────────
     startup_errors = []
     
-    # 0. Initialize Auth (Admin-User erstellen falls nötig)
+    # 0. Initialize Database
+    try:
+        from db.engine import init_db
+        await init_db()
+        logger.info("[OK] Database initialized")
+    except Exception as e:
+        logger.error(f"[ERROR] Database initialization failed: {e}")
+        startup_errors.append(f"DB init failed: {e}")
+
+    # 0a. Initialize Auth (Admin-User erstellen falls nötig)
     try:
         from services.auth_service import init_admin_user
         init_admin_user()
@@ -94,6 +103,14 @@ async def lifespan(app: FastAPI):
         logger.warning(msg)
         startup_errors.append(msg)
     
+    # 1b. Pre-build Semantic Search Index
+    try:
+        from services.semantic_search import get_semantic_index
+        sem_index = get_semantic_index()
+        logger.info(f"[OK] Semantic search index built | {len(sem_index._profiles)} products indexed")
+    except Exception as e:
+        logger.warning(f"[WARN] Semantic search index build failed: {e}")
+
     # 2. Initialize AI Service (Claude -> Ollama -> Regex failover)
     try:
         from services.ai_service import get_ai_service
@@ -195,6 +212,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"File cleanup failed: {e}")
     
+    # Close database connections
+    try:
+        from db.engine import close_db
+        await close_db()
+        logger.info("[OK] Database connections closed")
+    except Exception as e:
+        logger.warning(f"Database shutdown error: {e}")
+
     logger.info("[OK] Shutdown complete")
 
 
@@ -224,14 +249,20 @@ if settings.RATE_LIMIT_ENABLED and SLOWAPI_AVAILABLE:
 elif settings.RATE_LIMIT_ENABLED and not SLOWAPI_AVAILABLE:
     logger.warning("[WARN] Rate limiting enabled in config but slowapi not installed. Run: pip install slowapi")
 
-# 1. CORS Middleware
-_cors_origins = settings.CORS_ORIGINS if settings.ENVIRONMENT == "production" else ["*"]
+# 1. CORS Middleware (v2 - explicit origins for Next.js BFF + SSE)
+import os as _os
+_nextjs_origin = _os.environ.get("NEXTJS_ORIGIN", "http://localhost:3000")
+_cors_origins = [_nextjs_origin]
+if settings.ENVIRONMENT == Environment.DEVELOPMENT:
+    _cors_origins.extend(["http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:3000"])
+elif settings.ENVIRONMENT == Environment.PRODUCTION:
+    _cors_origins.extend(settings.CORS_ORIGINS)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
-    allow_credentials=("*" not in _cors_origins),  # credentials requires explicit origins
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=list(set(_cors_origins)),
+    allow_credentials=False,  # SSE tokens via query param, no cookies needed
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["X-Service-Key", "X-User-Id", "X-User-Role", "X-User-Email", "Content-Type"],
     max_age=3600,
 )
 
@@ -239,59 +270,13 @@ app.add_middleware(
 if settings.ENABLE_COMPRESSION:
     app.add_middleware(GZIPMiddleware, minimum_size=settings.COMPRESSION_MIN_SIZE_BYTES)
 
-# 3. Auth Middleware – schützt alle /api/* Routen (außer Whitelist)
-AUTH_WHITELIST = {
-    "/api/auth/login",
-    "/api/auth/logout",
-    "/health",
-    "/info",
-    "/",
-    "/docs",
-    "/redoc",
-    "/openapi.json",
-}
+# 3. Service Key Middleware (v2 – replaces JWT auth, validates X-Service-Key from BFF proxy)
+from services.service_auth import service_key_middleware
 
 @app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    """Check Bearer token for protected /api/* routes."""
-    path = request.url.path
-    method = request.method
-
-    # Skip auth for whitelisted paths, OPTIONS, static files, and downloads
-    if (
-        method == "OPTIONS"
-        or path in AUTH_WHITELIST
-        or path.startswith("/static/")
-        or not path.startswith("/api/")
-        or "/download" in path
-    ):
-        return await call_next(request)
-
-    # Extract Bearer token
-    auth_header = request.headers.get("authorization", "")
-    if not auth_header.startswith("Bearer "):
-        return JSONResponse(
-            status_code=401,
-            content={"detail": "Nicht authentifiziert"},
-        )
-
-    try:
-        from services.auth_service import verify_token
-        token = auth_header[7:]  # Remove "Bearer " prefix
-        user = verify_token(token)
-        if not user:
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Token ungueltig oder abgelaufen"},
-            )
-    except Exception as e:
-        logger.error(f"Auth verification error: {e}")
-        return JSONResponse(
-            status_code=401,
-            content={"detail": "Authentifizierung fehlgeschlagen"},
-        )
-
-    return await call_next(request)
+async def service_auth(request: Request, call_next):
+    """Validate X-Service-Key for protected /api/* routes (v2 BFF pattern)."""
+    return await service_key_middleware(request, call_next)
 
 # 4. Custom Middleware für Error-Handling & Caching Headers
 @app.middleware("http")
@@ -385,37 +370,25 @@ if settings.ERP_ENABLED:
     app.include_router(erp.router)
     logger.info("[OK] ERP router registered")
 
+# V2 Routers (lazy import to avoid breaking v1 if v2 imports fail)
+try:
+    from v2.routers import upload_v2, analyze_v2
+    app.include_router(upload_v2.router)
+    app.include_router(analyze_v2.router)
+    logger.info("[OK] V2 routers registered (upload, analyze)")
+except Exception as e:
+    logger.warning(f"[WARN] V2 routers not loaded: {e}")
 
-# ─────────────────────────────────────────────────────────────────────────────
-# STATIC FILES & FRONTEND
-# ─────────────────────────────────────────────────────────────────────────────
-
-frontend_path = BASE_DIR / "frontend"
-if frontend_path.exists():
-    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
-
-    @app.get("/", name="Frontend")
-    async def serve_frontend():
-        """Serve index.html with no-cache headers"""
-        index_file = frontend_path / "index.html"
-        if index_file.exists():
-            return FileResponse(
-                index_file,
-                headers={
-                    "Cache-Control": "no-cache, must-revalidate",
-                    "Content-Type": "text/html; charset=utf-8",
-                },
-            )
-        return JSONResponse(
-            status_code=404,
-            content={"error": "Frontend not found"},
-        )
-else:
-    logger.warning(f"Frontend directory not found: {frontend_path}")
+try:
+    from v2.routers import feedback_v2
+    app.include_router(feedback_v2.router)
+    logger.info("[OK] V2 feedback router registered")
+except Exception as e:
+    logger.warning(f"[WARN] V2 feedback router not loaded: {e}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HEALTH & INFO ENDPOINTS
+# HEALTH & INFO ENDPOINTS (must be registered BEFORE SPA catch-all)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/health", name="Health Check")
@@ -431,18 +404,12 @@ async def health_check() -> dict:
         from services.memory_cache import text_cache, offer_cache, project_cache
         from services.catalog_index import get_catalog_index
 
-        # Get Availability Manager Status
         availability_mgr = get_availability_manager()
         am_status = availability_mgr.get_status()
-
-        # Get AI Service status (unified engine status)
         ai_service = get_ai_service()
         ai_status = ai_service.get_status()
-
-        # Check Ollama (live check without cache, for backward compat)
         ollama_status = check_ollama_status_live()
 
-        # Check Catalog
         try:
             catalog = get_catalog_index()
             catalog_ok = len(catalog.main_products) > 0
@@ -452,10 +419,7 @@ async def health_check() -> dict:
             catalog_ok = False
             catalog_count = 0
 
-        # Add context usage to AI status
         ai_status["context"] = ai_service.get_context_usage()
-
-        # Health info with AI engine status for frontend
         ollama_available = ollama_status.get("available", False)
         health_response = {
             "status": "healthy" if availability_mgr.is_system_available() else "degraded",
@@ -468,7 +432,6 @@ async def health_check() -> dict:
             },
         }
 
-        # Detailed info only in development/debug mode
         if settings.DEBUG:
             health_response["ollama"].update({
                 "status": "ok" if ollama_available else "unavailable",
@@ -504,21 +467,22 @@ async def health_check() -> dict:
         }
 
 
+@app.get("/api/health", name="Health Check (API)", include_in_schema=False)
+async def health_check_api() -> dict:
+    """Alias for /health under /api prefix."""
+    return await health_check()
+
+
 @app.get("/api/availability/status", name="Detailed Availability Status")
 async def get_availability_status() -> dict:
-    """
-    Get detailed availability and uptime status for all services.
-    """
+    """Get detailed availability and uptime status for all services."""
     try:
         from services.availability_manager import get_availability_manager
         from services.ollama_watchdog import get_ollama_watchdog
-        
         availability_mgr = get_availability_manager()
         ollama_watchdog = get_ollama_watchdog()
-        
         status = availability_mgr.get_status()
         uptime = availability_mgr.get_uptime_stats()
-        
         return {
             "timestamp": status["timestamp"],
             "overall_health": status["overall_status"],
@@ -527,70 +491,120 @@ async def get_availability_status() -> dict:
             "uptime_statistics": uptime["services"],
             "ollama_watchdog": ollama_watchdog.get_status(),
             "24_7_monitoring": {
-                "enabled": True,
-                "check_interval_seconds": 30,
-                "auto_recovery": True,
-                "recovery_attempts_max": 5,
-                "ollama_watchdog_enabled": True,
-                "ollama_auto_restart": True,
+                "enabled": True, "check_interval_seconds": 30,
+                "auto_recovery": True, "recovery_attempts_max": 5,
+                "ollama_watchdog_enabled": True, "ollama_auto_restart": True,
                 "windows_task_scheduler_enabled": True,
             },
         }
     except Exception as e:
         logger.exception(f"Availability status error: {e}")
-        return {
-            "error": str(e) if settings.DEBUG else "Failed to get availability status"
-        }
+        return {"error": str(e) if settings.DEBUG else "Failed to get availability status"}
 
 
 @app.get("/api/ollama/status", name="Ollama Watchdog Status")
 async def get_ollama_watchdog_status() -> dict:
-    """
-    Get detailed Ollama Watchdog status - 24/7 Monitoring
-    """
+    """Get detailed Ollama Watchdog status."""
     try:
         from services.ollama_watchdog import get_ollama_watchdog
         from services.local_llm import check_ollama_status
-        
         watchdog = get_ollama_watchdog()
         status = watchdog.get_status()
-        
         return {
             "timestamp": datetime.now().isoformat(),
             "watchdog": status,
             "health_check": check_ollama_status(),
             "24_7_guarantee": {
-                "monitoring": True,
-                "auto_restart": True,
+                "monitoring": True, "auto_restart": True,
                 "health_check_interval_seconds": watchdog.health_check_interval,
                 "max_restart_attempts": watchdog.max_restart_attempts,
-                "exponential_backoff": True,
-                "windows_autostart": True,
+                "exponential_backoff": True, "windows_autostart": True,
             },
         }
     except Exception as e:
         logger.exception(f"Ollama watchdog status error: {e}")
-        return {
-            "error": str(e) if settings.DEBUG else "Failed to get Ollama status",
-            "timestamp": datetime.now().isoformat()
-        }
+        return {"error": str(e) if settings.DEBUG else "Failed to get Ollama status", "timestamp": datetime.now().isoformat()}
 
 
 @app.get("/info", name="Application Info")
 async def app_info() -> dict:
     """Get application information and settings (only in debug mode)"""
     if not settings.DEBUG:
-        return {
-            "name": settings.API_TITLE,
-            "version": settings.API_VERSION,
-        }
+        return {"name": settings.API_TITLE, "version": settings.API_VERSION}
     return {
-        "name": settings.API_TITLE,
-        "version": settings.API_VERSION,
-        "environment": settings.ENVIRONMENT.value,
-        "debug": settings.DEBUG,
+        "name": settings.API_TITLE, "version": settings.API_VERSION,
+        "environment": settings.ENVIRONMENT.value, "debug": settings.DEBUG,
         "settings": settings.to_dict(),
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STATIC FILES & FRONTEND
+# ─────────────────────────────────────────────────────────────────────────────
+
+# React Frontend (production build)
+react_dist_path = BASE_DIR / "frontend-react-dist"
+if react_dist_path.exists():
+    # Serve static assets (JS, CSS, images)
+    assets_path = react_dist_path / "assets"
+    if assets_path.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_path)), name="react-assets")
+
+    @app.get("/", name="Frontend")
+    async def serve_react_frontend():
+        """Serve React SPA index.html"""
+        return FileResponse(
+            react_dist_path / "index.html",
+            headers={
+                "Cache-Control": "no-cache, must-revalidate",
+                "Content-Type": "text/html; charset=utf-8",
+            },
+        )
+
+    # Non-API routes handled by React Router (client-side routing)
+    _react_spa_routes = {"analyse", "katalog", "historie", "benutzer", "login", "settings"}
+
+    @app.get("/{full_path:path}", name="React SPA Fallback")
+    async def serve_react_spa(full_path: str):
+        """Serve React SPA for known client-side routes only."""
+        first_segment = full_path.split("/")[0] if full_path else ""
+        if first_segment in _react_spa_routes:
+            return FileResponse(
+                react_dist_path / "index.html",
+                headers={
+                    "Cache-Control": "no-cache, must-revalidate",
+                    "Content-Type": "text/html; charset=utf-8",
+                },
+            )
+        # Let other paths (health, info, etc.) fall through to 404
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
+
+    logger.info(f"[OK] React frontend serving from: {react_dist_path}")
+
+else:
+    # Fallback: serve old vanilla JS frontend
+    frontend_path = BASE_DIR / "frontend"
+    if frontend_path.exists():
+        app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+
+        @app.get("/", name="Frontend")
+        async def serve_frontend():
+            """Serve index.html with no-cache headers"""
+            index_file = frontend_path / "index.html"
+            if index_file.exists():
+                return FileResponse(
+                    index_file,
+                    headers={
+                        "Cache-Control": "no-cache, must-revalidate",
+                        "Content-Type": "text/html; charset=utf-8",
+                    },
+                )
+            return JSONResponse(
+                status_code=404,
+                content={"error": "Frontend not found"},
+            )
+    else:
+        logger.warning(f"Frontend directory not found: {frontend_path}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

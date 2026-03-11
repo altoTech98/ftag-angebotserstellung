@@ -168,3 +168,7 @@ def sample_word_bytes():
     doc.save(buf)
     buf.seek(0)
     return buf.getvalue()
+
+
+# Import v2 fixtures so they are available to all test modules
+from tests.conftest_v2 import *  # noqa: F401, F403, E402
