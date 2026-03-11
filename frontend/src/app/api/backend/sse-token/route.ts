@@ -5,11 +5,6 @@ import { createHmac } from 'crypto';
 
 const TOKEN_EXPIRY_SECONDS = 600; // 10 minutes
 
-function base64urlEncode(data: string | Buffer): string {
-  const buf = typeof data === 'string' ? Buffer.from(data) : data;
-  return buf.toString('base64url');
-}
-
 export async function GET(_request: Request) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) {
@@ -31,13 +26,13 @@ export async function GET(_request: Request) {
   };
 
   const payloadStr = JSON.stringify(payload);
-  const payloadB64 = base64urlEncode(payloadStr);
+  const payloadB64 = Buffer.from(payloadStr).toString('base64url');
 
-  const hmac = createHmac('sha256', secret);
-  hmac.update(payloadStr);
-  const signatureB64 = base64urlEncode(hmac.digest());
+  const signatureHex = createHmac('sha256', secret)
+    .update(payloadStr)
+    .digest('hex');
 
-  const token = `${payloadB64}.${signatureB64}`;
+  const token = `${payloadB64}.${signatureHex}`;
 
   return NextResponse.json({
     token,

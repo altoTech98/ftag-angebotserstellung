@@ -51,7 +51,7 @@ describe('[INFRA-03] SSE Token', () => {
     expect(typeof body.expires_in).toBe('number');
   });
 
-  it('returns token in base64url.base64url format', async () => {
+  it('returns token in base64url.hex format', async () => {
     mockGetSession.mockResolvedValue({
       user: { id: 'user-1', email: 'test@test.com', role: 'analyst' },
       session: {},
@@ -63,8 +63,9 @@ describe('[INFRA-03] SSE Token', () => {
     const body = await response.json();
     const parts = body.token.split('.');
     expect(parts.length).toBe(2);
-    // Both parts should be non-empty strings
+    // Payload part should be non-empty
     expect(parts[0].length).toBeGreaterThan(0);
-    expect(parts[1].length).toBeGreaterThan(0);
+    // Signature part should be exactly 64 hex characters (SHA-256 hex digest)
+    expect(parts[1]).toMatch(/^[0-9a-f]{64}$/);
   });
 });
