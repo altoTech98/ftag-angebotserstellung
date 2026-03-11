@@ -208,11 +208,11 @@ export function AnalyseWizardClient({ project, initialResult }: AnalyseWizardCli
         return;
       }
 
-      // 3. Start analysis on Python backend
+      // 3. Start analysis on Python backend (use Python-generated project_id, not Prisma ID)
       const response = await fetch('/api/backend/analyze/project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: project.id }),
+        body: JSON.stringify({ project_id: prepareResult.pythonProjectId }),
       });
       if (!response.ok) {
         const errData = await response.json().catch(() => ({ error: 'Analyse konnte nicht gestartet werden' }));

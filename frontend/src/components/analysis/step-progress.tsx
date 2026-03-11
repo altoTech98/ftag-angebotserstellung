@@ -125,21 +125,11 @@ export function StepProgress({ jobId, onComplete, onFailed, onCancel }: StepProg
     };
   }, [jobId, handleEvent, onFailed]);
 
-  async function handleCancelConfirm() {
+  function handleCancelConfirm() {
     setCancelDialogOpen(false);
     connectionRef.current?.close();
     connectionRef.current = null;
-
-    if (jobId) {
-      try {
-        await fetch(`/api/backend/analyze/cancel/${jobId}`, {
-          method: 'POST',
-        });
-      } catch {
-        // Best effort cancel
-      }
-    }
-
+    // No backend cancel endpoint exists -- closing SSE connection is sufficient.
     onCancel();
   }
 

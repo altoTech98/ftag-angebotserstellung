@@ -17,7 +17,7 @@ const PYTHON_SERVICE_KEY = process.env.PYTHON_SERVICE_KEY || '';
 export async function prepareFilesForPython(
   projectId: string,
   fileIds: string[]
-): Promise<{ success: true } | { error: string }> {
+): Promise<{ success: true; pythonProjectId: string } | { error: string }> {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) return { error: 'Nicht authentifiziert' };
@@ -33,7 +33,6 @@ export async function prepareFilesForPython(
 
     // Download each file from Vercel Blob and build FormData
     const formData = new FormData();
-    formData.append('project_id', projectId);
 
     for (const file of files) {
       const response = await fetch(file.downloadUrl);
@@ -47,11 +46,11 @@ export async function prepareFilesForPython(
 
     // POST to Python upload endpoint to populate project_cache
     const uploadResponse = await fetch(
-      `${PYTHON_BACKEND_URL}/api/upload/project`,
+      `${PYTHON_BACKEND_URL}/api/upload/folder`,
       {
         method: 'POST',
         headers: {
-          'X-API-Key': PYTHON_SERVICE_KEY,
+          'X-Service-Key': PYTHON_SERVICE_KEY,
         },
         body: formData,
       }
@@ -62,7 +61,8 @@ export async function prepareFilesForPython(
       return { error: `Python-Upload fehlgeschlagen: ${errorText}` };
     }
 
-    return { success: true };
+    const uploadData = await uploadResponse.json();
+    return { success: true, pythonProjectId: uploadData.project_id };
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
   }
@@ -159,8 +159,8 @@ export async function sendAnalysisCompleteEmail(analysisId: string) {
 
     // Parse result for stats
     const result = analysis.result as Record<string, unknown> | null;
-    const matchItems = Array.isArray(result?.match_items) ? result.match_items : [];
-    const gapItems = Array.isArray(result?.gap_items) ? result.gap_items : [];
+    const matchItems = Array.isArray(result?.matched) ? result.matched : [];
+    const gapItems = Array.isArray(result?.unmatched) ? result.unmatched : [];
     const matchCount = matchItems.length;
     const gapCount = gapItems.length;
 
