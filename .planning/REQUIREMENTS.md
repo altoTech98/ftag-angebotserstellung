@@ -22,8 +22,8 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 - [x] **UI-02**: Responsive Layout (Desktop, Tablet, Mobil)
 - [x] **UI-03**: Sidebar-Navigation mit rotem Akzent fuer aktives Item
 - [x] **UI-04**: Breadcrumb-Navigation auf allen Seiten
-- [ ] **UI-05**: Keyboard-Shortcuts fuer Power-User (N=Neue Analyse etc.)
-- [ ] **UI-06**: Skeleton-Loader statt Spinner, benutzerfreundliche Fehlermeldungen
+- [x] **UI-05**: Keyboard-Shortcuts fuer Power-User (N=Neue Analyse etc.)
+- [x] **UI-06**: Skeleton-Loader statt Spinner, benutzerfreundliche Fehlermeldungen
 
 ### Dashboard
 
@@ -129,8 +129,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | UI-02 | Phase 10 | Complete |
 | UI-03 | Phase 10 | Complete |
 | UI-04 | Phase 10 | Complete |
-| UI-05 | Phase 15 | Pending |
-| UI-06 | Phase 15 | Pending |
+| UI-05 | Phase 15 | Complete |
+| UI-06 | Phase 15 | Complete |
 | DASH-01 | Phase 15 | Complete |
 | DASH-02 | Phase 15 | Complete |
 | DASH-03 | Phase 15 | Complete |
