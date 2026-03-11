@@ -155,7 +155,7 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14 -> 15
 | 8. Quality, Observability & End-to-End | v1.0 | 3/3 | Complete | 2026-03-10 |
 | 9. Frontend V2 Offer & Feedback Wiring | v1.0 | 2/2 | Complete | 2026-03-10 |
 | 10. Foundation | 6/6 | Complete   | 2026-03-11 | 2026-03-11 |
-| 11. Python Integration | v2.0 | 0/2 | Not started | - |
+| 11. Python Integration | 1/2 | In Progress|  | - |
 | 12. File Handling + Projects | v2.0 | 0/? | Not started | - |
 | 13. Analysis Wizard + Results | v2.0 | 0/? | Not started | - |
 | 14. Catalog Management | v2.0 | 0/? | Not started | - |

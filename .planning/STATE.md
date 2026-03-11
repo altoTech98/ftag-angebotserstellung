@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Tender Matcher -- Web-Oberflaeche & Platform
-status: completed
-stopped_at: Phase 11 context gathered
-last_updated: "2026-03-11T01:45:53.421Z"
-last_activity: 2026-03-11 -- Completed Plan 10-05 (Gap Closure)
+status: in-progress
+stopped_at: Completed 11-01 (Service Auth & SSE Token)
+last_updated: "2026-03-11T02:27:09Z"
+last_activity: 2026-03-11 -- Completed Plan 11-01 (Service Auth & SSE Token)
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 7
+  completed_plans: 7
   percent: 100
 ---
 
@@ -21,29 +21,30 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** 100% korrekte Zuordnung jeder Anforderung zum richtigen Produkt -- oder eine explizite, begruendete Gap-Meldung.
-**Current focus:** Phase 10 - Foundation (Auth + Database + Design System)
+**Current focus:** Phase 11 - Python Backend Integration (BFF + Service Auth)
 
 ## Current Position
 
-Phase: 10 of 15 (Foundation)
-Plan: 5 of 5 (complete)
-Status: Phase 10 Complete
-Last activity: 2026-03-11 -- Completed Plan 10-05 (Gap Closure)
+Phase: 11 of 15 (Python Backend Integration)
+Plan: 1 of 1 (complete)
+Status: Plan 11-01 Complete
+Last activity: 2026-03-11 -- Completed Plan 11-01 (Service Auth & SSE Token)
 
 Progress: [##########] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6 (v2.0)
-- Average duration: 5min
-- Total execution time: 27min
+- Total plans completed: 7 (v2.0)
+- Average duration: 4.4min
+- Total execution time: 31min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 10-foundation | 6/6 | 27min | 4.5min |
+| 11-python-backend | 1/1 | 4min | 4min |
 
 ## Accumulated Context
 
@@ -68,6 +69,9 @@ Progress: [##########] 100%
 - [Phase 10-03]: shadcn v4 dropdown-menu uses base-ui without asChild prop
 - [Phase 10-04]: AppShellClient is a dedicated client component wrapping session timeout logic separately from AppShell
 - [Phase 10-04]: Root page uses server-side session check for redirect (no client-side flash)
+- [Phase 11-01]: Used os.environ.get() in service_auth.py/sse_token_validator.py for self-contained testability
+- [Phase 11-01]: SSE stream paths skip service key check, use dedicated HMAC token auth via query param
+- [Phase 11-01]: CORS allows explicit headers (X-Service-Key, X-User-*), credentials=False (tokens via query param)
 
 ### Pending Todos
 
@@ -81,6 +85,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T01:45:53.410Z
-Stopped at: Phase 11 context gathered
-Resume file: .planning/phases/11-python-backend-integration-bff-service-auth/11-CONTEXT.md
+Last session: 2026-03-11T02:27:09Z
+Stopped at: Completed 11-01 (Service Auth & SSE Token)
+Resume file: .planning/phases/11-python-backend-integration-bff-service-auth/11-01-SUMMARY.md
