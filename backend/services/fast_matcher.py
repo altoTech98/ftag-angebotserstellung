@@ -13,7 +13,7 @@ import re
 import logging
 from typing import Optional, Callable
 
-from services.catalog_index import get_catalog_index, ProductProfile
+from services.catalog_index import get_catalog_index, CatalogIndex, ProductProfile
 from services.feedback_store import find_relevant_feedback
 
 logger = logging.getLogger(__name__)
@@ -464,13 +464,14 @@ def _verify_critical_fields(
 def match_all(
     positions: list[dict],
     on_progress: Optional[Callable[[str], None]] = None,
+    catalog_index: Optional[CatalogIndex] = None,
 ) -> dict:
     """
     Fast rule-based matching. No AI calls, no accessories.
 
     Returns standard matching result dict with matched/partial/unmatched + summary.
     """
-    catalog = get_catalog_index()
+    catalog = catalog_index or get_catalog_index()
 
     if not positions:
         return _empty_result()

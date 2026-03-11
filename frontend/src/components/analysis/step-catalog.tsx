@@ -19,6 +19,7 @@ export interface CatalogInfo {
   productCount: number;
   updatedAt: Date | string;
   isActive: boolean;
+  blobUrl: string | null;
 }
 
 interface StepCatalogProps {

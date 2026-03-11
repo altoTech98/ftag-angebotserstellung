@@ -169,6 +169,7 @@ export function AnalyseWizardClient({ project, initialResult }: AnalyseWizardCli
           productCount: c.versions[0]?.totalProducts ?? 0,
           updatedAt: c.updatedAt,
           isActive: !!c.versions[0]?.isActive,
+          blobUrl: c.versions[0]?.blobUrl ?? null,
         }));
         setCatalogs(mapped);
       } catch {
@@ -209,10 +210,14 @@ export function AnalyseWizardClient({ project, initialResult }: AnalyseWizardCli
       }
 
       // 3. Start analysis on Python backend (use Python-generated project_id, not Prisma ID)
+      const selectedCatalog = catalogs.find(c => c.id === state.catalogId);
       const response = await fetch('/api/backend/analyze/project', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: prepareResult.pythonProjectId }),
+        body: JSON.stringify({
+          project_id: prepareResult.pythonProjectId,
+          catalog_blob_url: selectedCatalog?.blobUrl ?? null,
+        }),
       });
       if (!response.ok) {
         const errData = await response.json().catch(() => ({ error: 'Analyse konnte nicht gestartet werden' }));
@@ -230,7 +235,7 @@ export function AnalyseWizardClient({ project, initialResult }: AnalyseWizardCli
     } finally {
       setIsStarting(false);
     }
-  }, [project.id, state.selectedFileIds]);
+  }, [project.id, state.selectedFileIds, state.catalogId, catalogs]);
 
   // Handle analysis completion from StepProgress
   const handleAnalysisComplete = useCallback(

@@ -239,6 +239,7 @@ def _run_text_analysis(file_id: str, text: str) -> dict:
 class AnalyzeProjectRequest(BaseModel):
     project_id: str
     file_overrides: dict = {}
+    catalog_blob_url: str | None = None
 
 
 @router.post("/analyze/project")
@@ -262,12 +263,12 @@ async def analyze_project(request: AnalyzeProjectRequest):
             raise HTTPException(status_code=400, detail=str(e))
 
     job = create_job()
-    run_in_background(job, _run_project_analysis, job.id, request.project_id, cached_files)
+    run_in_background(job, _run_project_analysis, job.id, request.project_id, cached_files, request.catalog_blob_url)
 
     return {"job_id": job.id, "status": "started"}
 
 
-def _run_project_analysis(job_id: str, project_id: str, cached_files: dict) -> dict:
+def _run_project_analysis(job_id: str, project_id: str, cached_files: dict, catalog_blob_url: str | None = None) -> dict:
     """Run full project analysis pipeline (called in background thread)."""
 
     project = get_project(project_id)
@@ -571,10 +572,22 @@ def _run_project_analysis(job_id: str, project_id: str, cached_files: dict) -> d
     def on_match_progress(msg):
         update_job(job_id, progress=msg)
 
+    # Resolve custom catalog if blob URL provided
+    custom_catalog_index = None
+    if catalog_blob_url:
+        logger.info(f"Loading catalog from blob URL: {catalog_blob_url[:80]}...")
+        try:
+            from services.catalog_index import load_catalog_from_blob_url
+            custom_catalog_index = load_catalog_from_blob_url(catalog_blob_url)
+            logger.info(f"Loaded custom catalog with {len(custom_catalog_index.all_profiles)} products")
+        except Exception as e:
+            logger.warning(f"Failed to load custom catalog, falling back to default: {e}")
+
     try:
         match_result = fast_match_all(
             positions,
             on_progress=on_match_progress,
+            catalog_index=custom_catalog_index,
         )
     except Exception as e:
         logger.error(f"AI matching failed: {e}", exc_info=True)
