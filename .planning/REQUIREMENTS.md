@@ -9,11 +9,11 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 
 ### Auth & Security
 
-- [ ] **AUTH-01**: User kann sich mit E-Mail und Passwort einloggen
-- [ ] **AUTH-02**: User kann Passwort per E-Mail-Link zuruecksetzen
-- [ ] **AUTH-03**: Session wird automatisch nach konfigurierbarer Inaktivitaet beendet (mit Warnung)
+- [x] **AUTH-01**: User kann sich mit E-Mail und Passwort einloggen
+- [x] **AUTH-02**: User kann Passwort per E-Mail-Link zuruecksetzen
+- [x] **AUTH-03**: Session wird automatisch nach konfigurierbarer Inaktivitaet beendet (mit Warnung)
 - [x] **AUTH-04**: System unterstuetzt 4 Rollen: Admin, Manager, Analyst, Viewer
-- [ ] **AUTH-05**: Routen und API-Endpoints sind rollenbasiert geschuetzt
+- [x] **AUTH-05**: Routen und API-Endpoints sind rollenbasiert geschuetzt
 - [ ] **AUTH-06**: JWT-Token-Bridging zwischen Next.js und Python-Backend
 
 ### Design System & Layout
@@ -119,11 +119,11 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 10 | Pending |
-| AUTH-02 | Phase 10 | Pending |
-| AUTH-03 | Phase 10 | Pending |
+| AUTH-01 | Phase 10 | Complete |
+| AUTH-02 | Phase 10 | Complete |
+| AUTH-03 | Phase 10 | Complete |
 | AUTH-04 | Phase 10 | Complete |
-| AUTH-05 | Phase 10 | Pending |
+| AUTH-05 | Phase 10 | Complete |
 | AUTH-06 | Phase 11 | Pending |
 | UI-01 | Phase 10 | Complete |
 | UI-02 | Phase 10 | Pending |
