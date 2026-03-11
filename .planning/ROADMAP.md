@@ -82,12 +82,12 @@ Plans:
   2. User can create a project with name, customer, deadline, and description, and see it in a project list
   3. User can view a project detail page showing multiple past analyses with their status and dates
   4. User can archive and delete projects, and share a project with other users who then see it in their project list
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 12-01: TBD
-- [ ] 12-02: TBD
-- [ ] 12-03: TBD
+- [ ] 12-01-PLAN.md -- Prisma schema (Project, File, Analysis, ProjectShare), Vercel Blob upload route, server actions
+- [ ] 12-02-PLAN.md -- Project list, create form, detail page with drag-and-drop upload and archive/delete
+- [ ] 12-03-PLAN.md -- Project sharing dialog with user search, share management, and detail page wiring
 
 ### Phase 13: Analysis Wizard + Results View
 **Goal**: Users can run the full AI tender analysis through a guided wizard and explore results with filtering, detail expansion, and Excel export
@@ -157,7 +157,7 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14 -> 15
 | 9. Frontend V2 Offer & Feedback Wiring | v1.0 | 2/2 | Complete | 2026-03-10 |
 | 10. Foundation | 6/6 | Complete   | 2026-03-11 | 2026-03-11 |
 | 11. Python Integration | v2.0 | Complete    | 2026-03-11 | 2026-03-11 |
-| 12. File Handling + Projects | v2.0 | 0/? | Not started | - |
+| 12. File Handling + Projects | v2.0 | 0/3 | Not started | - |
 | 13. Analysis Wizard + Results | v2.0 | 0/? | Not started | - |
 | 14. Catalog Management | v2.0 | 0/? | Not started | - |
 | 15. Admin + Dashboard + Polish | v2.0 | 0/? | Not started | - |
