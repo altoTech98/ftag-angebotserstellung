@@ -111,9 +111,6 @@ describe('[ANLZ-04] Progress display step', () => {
   it('calls onCancel after confirming cancel dialog', async () => {
     const user = userEvent.setup();
 
-    // Mock fetch for cancel endpoint
-    global.fetch = vi.fn().mockResolvedValue({ ok: true });
-
     render(<StepProgress {...defaultProps} />);
 
     // Click cancel button
@@ -128,5 +125,35 @@ describe('[ANLZ-04] Progress display step', () => {
     await user.click(screen.getByTestId('confirm-cancel-btn'));
 
     expect(defaultProps.onCancel).toHaveBeenCalled();
+  });
+
+  it('handleCancelConfirm does NOT call fetch (no backend cancel endpoint)', async () => {
+    const user = userEvent.setup();
+    const fetchSpy = vi.fn();
+    global.fetch = fetchSpy;
+
+    render(<StepProgress {...defaultProps} />);
+
+    // Click cancel button to open dialog
+    await user.click(screen.getByTestId('cancel-analysis-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('confirm-cancel-btn')).toBeDefined();
+    });
+
+    // Reset spy to only track calls after confirm
+    fetchSpy.mockClear();
+
+    // Confirm cancel
+    await user.click(screen.getByTestId('confirm-cancel-btn'));
+
+    // fetch should NOT have been called -- no cancel endpoint exists
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    // But onCancel should still be called
+    expect(defaultProps.onCancel).toHaveBeenCalled();
+
+    // And SSE connection should be closed
+    expect(mockClose).toHaveBeenCalled();
   });
 });
