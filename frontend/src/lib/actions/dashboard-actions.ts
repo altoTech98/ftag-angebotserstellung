@@ -89,28 +89,39 @@ export async function getMatchGapStatistics(): Promise<MatchGapStatistics> {
 
     const result = analysis.result as Record<string, unknown>;
 
-    // Count matches
-    const matchedItems = result.matched_items;
-    if (Array.isArray(matchedItems)) {
-      totalMatches += matchedItems.length;
-      for (const item of matchedItems) {
-        if (
-          item &&
-          typeof item === 'object' &&
-          'confidence' in item &&
-          typeof (item as Record<string, unknown>).confidence === 'number'
-        ) {
-          confidenceSum += (item as Record<string, unknown>).confidence as number;
-          confidenceCount++;
-        }
+    // Count matched entries (fully matched products)
+    const matched = Array.isArray(result.matched) ? result.matched : [];
+    totalMatches += matched.length;
+    for (const item of matched) {
+      if (
+        item &&
+        typeof item === 'object' &&
+        'confidence' in item &&
+        typeof (item as Record<string, unknown>).confidence === 'number'
+      ) {
+        confidenceSum += (item as Record<string, unknown>).confidence as number;
+        confidenceCount++;
       }
     }
 
-    // Count gaps
-    const gapItems = result.gap_items;
-    if (Array.isArray(gapItems)) {
-      totalGaps += gapItems.length;
+    // Count partial entries (have products but also gaps) - count as matches
+    const partial = Array.isArray(result.partial) ? result.partial : [];
+    totalMatches += partial.length;
+    for (const item of partial) {
+      if (
+        item &&
+        typeof item === 'object' &&
+        'confidence' in item &&
+        typeof (item as Record<string, unknown>).confidence === 'number'
+      ) {
+        confidenceSum += (item as Record<string, unknown>).confidence as number;
+        confidenceCount++;
+      }
     }
+
+    // Count unmatched entries (gaps)
+    const unmatched = Array.isArray(result.unmatched) ? result.unmatched : [];
+    totalGaps += unmatched.length;
   }
 
   const avgConfidence =
