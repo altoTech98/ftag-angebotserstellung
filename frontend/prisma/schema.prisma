@@ -135,3 +135,51 @@ model ProjectShare {
   @@unique([projectId, userId])
   @@map("project_share")
 }
+
+model Catalog {
+  id              String           @id @default(cuid())
+  name            String
+  description     String?
+  activeVersionId String?
+  createdBy       String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  versions        CatalogVersion[]
+  overrides       ProductOverride[]
+
+  @@map("catalog")
+}
+
+model CatalogVersion {
+  id               String   @id @default(cuid())
+  catalogId        String
+  catalog          Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  versionNum       Int
+  blobUrl          String
+  fileName         String
+  fileSize         Int
+  totalProducts    Int
+  mainProducts     Int
+  categories       Int
+  uploadedBy       String
+  notes            String?
+  isActive         Boolean  @default(false)
+  validationResult Json?
+  createdAt        DateTime @default(now())
+
+  @@map("catalog_version")
+}
+
+model ProductOverride {
+  id         String   @id @default(cuid())
+  catalogId  String
+  catalog    Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  productKey String
+  action     String
+  data       Json?
+  editedBy   String
+  createdAt  DateTime @default(now())
+
+  @@unique([catalogId, productKey])
+  @@map("product_override")
+}
