@@ -99,12 +99,12 @@ Plans:
   3. User can view all matched requirements in a sortable, filterable table with green/yellow/red confidence color coding
   4. User can expand any requirement row to see the AI reasoning, 6-dimension confidence breakdown, and a side-by-side comparison of requirement vs. matched product
   5. User can download the complete Excel result file (identical to v1.0 4-sheet format) from the results view
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 13-01: TBD
-- [ ] 13-02: TBD
-- [ ] 13-03: TBD
+- [ ] 13-01-PLAN.md -- Types, shadcn components, wizard shell with stepper, steps 1-3 (files, catalog, config)
+- [ ] 13-02-PLAN.md -- Server actions, step 4 SSE progress display, step 5 results table with filtering and Excel download
+- [ ] 13-03-PLAN.md -- Detail expansion (AI reasoning, dimension bars, comparison card) and project detail wiring
 
 ### Phase 14: Catalog Management
 **Goal**: Managers and Admins can upload, browse, version, and edit the FTAG product catalog without touching files on the server
@@ -158,6 +158,6 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14 -> 15
 | 10. Foundation | 6/6 | Complete   | 2026-03-11 | 2026-03-11 |
 | 11. Python Integration | v2.0 | Complete    | 2026-03-11 | 2026-03-11 |
 | 12. File Handling + Projects | 3/3 | Complete    | 2026-03-11 | - |
-| 13. Analysis Wizard + Results | v2.0 | 0/? | Not started | - |
+| 13. Analysis Wizard + Results | v2.0 | 0/3 | Not started | - |
 | 14. Catalog Management | v2.0 | 0/? | Not started | - |
 | 15. Admin + Dashboard + Polish | v2.0 | 0/? | Not started | - |
