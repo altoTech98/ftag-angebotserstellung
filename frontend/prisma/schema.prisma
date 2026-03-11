@@ -25,6 +25,7 @@ model User {
   uploadedFiles  File[]         @relation("UploadedFiles")
   analyses       Analysis[]     @relation("UserAnalyses")
   sharedProjects ProjectShare[] @relation("SharedProjects")
+  auditLogs      AuditLog[]     @relation("UserAuditLogs")
 
   @@map("user")
 }
@@ -182,4 +183,33 @@ model ProductOverride {
 
   @@unique([catalogId, productKey])
   @@map("product_override")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation("UserAuditLogs", fields: [userId], references: [id])
+  action     String
+  details    String
+  targetId   String?
+  targetType String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+model SystemSettings {
+  id                String   @id @default("default")
+  defaultConfidence Float    @default(0.7)
+  maxUploadSizeMB   Int      @default(50)
+  sessionTimeoutMin Int      @default(480)
+  validationPasses  Int      @default(1)
+  claudeApiKey      String?
+  updatedAt         DateTime @updatedAt
+  updatedBy         String?
+
+  @@map("system_settings")
 }

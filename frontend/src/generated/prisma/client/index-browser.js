@@ -170,9 +170,116 @@ exports.Prisma.VerificationScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.ProjectScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  customer: 'customer',
+  deadline: 'deadline',
+  description: 'description',
+  status: 'status',
+  ownerId: 'ownerId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.FileScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  blobUrl: 'blobUrl',
+  downloadUrl: 'downloadUrl',
+  size: 'size',
+  contentType: 'contentType',
+  projectId: 'projectId',
+  uploadedBy: 'uploadedBy',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.AnalysisScalarFieldEnum = {
+  id: 'id',
+  projectId: 'projectId',
+  status: 'status',
+  result: 'result',
+  startedAt: 'startedAt',
+  endedAt: 'endedAt',
+  startedBy: 'startedBy',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ProjectShareScalarFieldEnum = {
+  id: 'id',
+  projectId: 'projectId',
+  userId: 'userId',
+  role: 'role',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.CatalogScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  description: 'description',
+  activeVersionId: 'activeVersionId',
+  createdBy: 'createdBy',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.CatalogVersionScalarFieldEnum = {
+  id: 'id',
+  catalogId: 'catalogId',
+  versionNum: 'versionNum',
+  blobUrl: 'blobUrl',
+  fileName: 'fileName',
+  fileSize: 'fileSize',
+  totalProducts: 'totalProducts',
+  mainProducts: 'mainProducts',
+  categories: 'categories',
+  uploadedBy: 'uploadedBy',
+  notes: 'notes',
+  isActive: 'isActive',
+  validationResult: 'validationResult',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.ProductOverrideScalarFieldEnum = {
+  id: 'id',
+  catalogId: 'catalogId',
+  productKey: 'productKey',
+  action: 'action',
+  data: 'data',
+  editedBy: 'editedBy',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.AuditLogScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  action: 'action',
+  details: 'details',
+  targetId: 'targetId',
+  targetType: 'targetType',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.SystemSettingsScalarFieldEnum = {
+  id: 'id',
+  defaultConfidence: 'defaultConfidence',
+  maxUploadSizeMB: 'maxUploadSizeMB',
+  sessionTimeoutMin: 'sessionTimeoutMin',
+  validationPasses: 'validationPasses',
+  claudeApiKey: 'claudeApiKey',
+  updatedAt: 'updatedAt',
+  updatedBy: 'updatedBy'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
+};
+
+exports.Prisma.NullableJsonNullValueInput = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull
 };
 
 exports.Prisma.QueryMode = {
@@ -185,12 +292,27 @@ exports.Prisma.NullsOrder = {
   last: 'last'
 };
 
+exports.Prisma.JsonNullValueFilter = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull,
+  AnyNull: Prisma.AnyNull
+};
+
 
 exports.Prisma.ModelName = {
   User: 'User',
   Session: 'Session',
   Account: 'Account',
-  Verification: 'Verification'
+  Verification: 'Verification',
+  Project: 'Project',
+  File: 'File',
+  Analysis: 'Analysis',
+  ProjectShare: 'ProjectShare',
+  Catalog: 'Catalog',
+  CatalogVersion: 'CatalogVersion',
+  ProductOverride: 'ProductOverride',
+  AuditLog: 'AuditLog',
+  SystemSettings: 'SystemSettings'
 };
 
 /**

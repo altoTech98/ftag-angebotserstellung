@@ -8,19 +8,24 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  image         String?
-  role          String    @default("viewer")
-  banned        Boolean?
-  banReason     String?
-  banExpiresAt  DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
+  id             String         @id @default(cuid())
+  name           String
+  email          String         @unique
+  emailVerified  Boolean        @default(false)
+  image          String?
+  role           String         @default("viewer")
+  banned         Boolean?
+  banReason      String?
+  banExpiresAt   DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  sessions       Session[]
+  accounts       Account[]
+  ownedProjects  Project[]      @relation("OwnedProjects")
+  uploadedFiles  File[]         @relation("UploadedFiles")
+  analyses       Analysis[]     @relation("UserAnalyses")
+  sharedProjects ProjectShare[] @relation("SharedProjects")
+  auditLogs      AuditLog[]     @relation("UserAuditLogs")
 
   @@map("user")
 }
@@ -67,4 +72,144 @@ model Verification {
   updatedAt  DateTime @updatedAt
 
   @@map("verification")
+}
+
+model Project {
+  id          String         @id @default(cuid())
+  name        String
+  customer    String?
+  deadline    DateTime?
+  description String?
+  status      String         @default("active")
+  ownerId     String
+  owner       User           @relation("OwnedProjects", fields: [ownerId], references: [id])
+  files       File[]
+  analyses    Analysis[]
+  shares      ProjectShare[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@map("project")
+}
+
+model File {
+  id          String   @id @default(cuid())
+  name        String
+  blobUrl     String
+  downloadUrl String
+  size        Int
+  contentType String
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy  String
+  uploader    User     @relation("UploadedFiles", fields: [uploadedBy], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@map("file")
+}
+
+model Analysis {
+  id        String    @id @default(cuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status    String    @default("pending")
+  result    Json?
+  startedAt DateTime?
+  endedAt   DateTime?
+  startedBy String
+  user      User      @relation("UserAnalyses", fields: [startedBy], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("analysis")
+}
+
+model ProjectShare {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("SharedProjects", fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("viewer")
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@map("project_share")
+}
+
+model Catalog {
+  id              String            @id @default(cuid())
+  name            String
+  description     String?
+  activeVersionId String?
+  createdBy       String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  versions        CatalogVersion[]
+  overrides       ProductOverride[]
+
+  @@map("catalog")
+}
+
+model CatalogVersion {
+  id               String   @id @default(cuid())
+  catalogId        String
+  catalog          Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  versionNum       Int
+  blobUrl          String
+  fileName         String
+  fileSize         Int
+  totalProducts    Int
+  mainProducts     Int
+  categories       Int
+  uploadedBy       String
+  notes            String?
+  isActive         Boolean  @default(false)
+  validationResult Json?
+  createdAt        DateTime @default(now())
+
+  @@map("catalog_version")
+}
+
+model ProductOverride {
+  id         String   @id @default(cuid())
+  catalogId  String
+  catalog    Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  productKey String
+  action     String
+  data       Json?
+  editedBy   String
+  createdAt  DateTime @default(now())
+
+  @@unique([catalogId, productKey])
+  @@map("product_override")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation("UserAuditLogs", fields: [userId], references: [id])
+  action     String
+  details    String
+  targetId   String?
+  targetType String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+model SystemSettings {
+  id                String   @id @default("default")
+  defaultConfidence Float    @default(0.7)
+  maxUploadSizeMB   Int      @default(50)
+  sessionTimeoutMin Int      @default(480)
+  validationPasses  Int      @default(1)
+  claudeApiKey      String?
+  updatedAt         DateTime @updatedAt
+  updatedBy         String?
+
+  @@map("system_settings")
 }
