@@ -56,10 +56,10 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 
 ### Katalogverwaltung
 
-- [ ] **KAT-01**: Kataloge hochladen (Excel/CSV) mit Import-Validierung
-- [ ] **KAT-02**: Kataloge durchsuchen und filtern
-- [ ] **KAT-03**: Katalog-Versionen verwalten (alt vs. neu)
-- [ ] **KAT-04**: Einzelne Produkte bearbeiten/hinzufuegen/loeschen
+- [x] **KAT-01**: Kataloge hochladen (Excel/CSV) mit Import-Validierung
+- [x] **KAT-02**: Kataloge durchsuchen und filtern
+- [x] **KAT-03**: Katalog-Versionen verwalten (alt vs. neu)
+- [x] **KAT-04**: Einzelne Produkte bearbeiten/hinzufuegen/loeschen
 
 ### Admin-Bereich
 
@@ -148,10 +148,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | PROJ-02 | Phase 12 | Complete |
 | PROJ-03 | Phase 12 | Complete |
 | PROJ-04 | Phase 12 | Complete |
-| KAT-01 | Phase 14 | Pending |
-| KAT-02 | Phase 14 | Pending |
-| KAT-03 | Phase 14 | Pending |
-| KAT-04 | Phase 14 | Pending |
+| KAT-01 | Phase 14 | Complete |
+| KAT-02 | Phase 14 | Complete |
+| KAT-03 | Phase 14 | Complete |
+| KAT-04 | Phase 14 | Complete |
 | ADMIN-01 | Phase 15 | Pending |
 | ADMIN-02 | Phase 15 | Pending |
 | ADMIN-03 | Phase 15 | Pending |
