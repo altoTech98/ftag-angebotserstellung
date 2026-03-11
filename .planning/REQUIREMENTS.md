@@ -72,7 +72,7 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 
 - [x] **INFRA-01**: Next.js 16 App Router + Prisma 7 + Neon Postgres (via Vercel)
 - [x] **INFRA-02**: Python/FastAPI auf Railway deployen mit Service-Auth
-- [ ] **INFRA-03**: BFF-Pattern: Next.js API Routes proxyen zu Python-Backend
+- [x] **INFRA-03**: BFF-Pattern: Next.js API Routes proxyen zu Python-Backend
 - [ ] **INFRA-04**: Vercel Blob Storage fuer Datei-Uploads (signed URLs)
 - [ ] **INFRA-05**: E-Mail-Versand (Passwort-Reset, Analyse-fertig-Benachrichtigung)
 
@@ -158,7 +158,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | ADMIN-04 | Phase 15 | Pending |
 | INFRA-01 | Phase 10 | Complete |
 | INFRA-02 | Phase 11 | Complete |
-| INFRA-03 | Phase 11 | Pending |
+| INFRA-03 | Phase 11 | Complete |
 | INFRA-04 | Phase 12 | Pending |
 | INFRA-05 | Phase 15 | Pending |
 
