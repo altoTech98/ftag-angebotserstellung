@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Tender Matcher -- Web-Oberflaeche & Platform
 status: executing
-stopped_at: Completed 15-00-PLAN.md
-last_updated: "2026-03-11T15:25:09.447Z"
-last_activity: 2026-03-11 -- Completed Plan 15-00 (Infrastructure Setup)
+stopped_at: Completed 15-01-PLAN.md
+last_updated: "2026-03-11T15:32:10.080Z"
+last_activity: 2026-03-11 -- Completed Plan 15-01 (Admin Page)
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 23
-  completed_plans: 20
-  percent: 87
+  completed_plans: 21
+  percent: 91
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 15 of 15 (Admin, Dashboard & Polish)
-Plan: 1 of 4 (15-00 complete)
+Plan: 2 of 4 (15-01 complete)
 Status: In Progress
-Last activity: 2026-03-11 -- Completed Plan 15-00 (Infrastructure Setup)
+Last activity: 2026-03-11 -- Completed Plan 15-01 (Admin Page)
 
-Progress: [==========-] 87%
+Progress: [█████████░] 91%
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ Progress: [==========-] 87%
 | 13-analysis-wizard | 4/4 | 19min | 4.8min |
 | 14-catalog-management | 2/3 | 13min | 4.3min |
 | Phase 15 P00 | 4min | 2 tasks | 27 files |
+| Phase 15 P01 | 4min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -105,6 +106,9 @@ Progress: [==========-] 87%
 - [Phase 14-02]: Product edit dialog exposes 11 key fields from 318-column catalog as practical subset
 - [Phase 15]: Used it.todo() pattern for 11 test stubs (consistent with Phase 14-00 decision)
 - [Phase 15]: Audit log uses Prisma server actions (direct DB writes, not Python API callback)
+- [Phase 15]: Used requireAdminPermission helper with specific permission parameter instead of generic requireAdmin
+- [Phase 15]: Invite generates random UUID password; user resets via OTP flow
+- [Phase 15]: System settings uses button-based sub-sections instead of nested tabs
 
 ### Pending Todos
 
@@ -118,6 +122,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T15:25:09.439Z
-Stopped at: Completed 15-00-PLAN.md
+Last session: 2026-03-11T15:32:10.075Z
+Stopped at: Completed 15-01-PLAN.md
 Resume file: None

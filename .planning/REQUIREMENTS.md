@@ -63,7 +63,7 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 
 ### Admin-Bereich
 
-- [ ] **ADMIN-01**: Benutzerverwaltung (anlegen, bearbeiten, deaktivieren, Rollen zuweisen)
+- [x] **ADMIN-01**: Benutzerverwaltung (anlegen, bearbeiten, deaktivieren, Rollen zuweisen)
 - [x] **ADMIN-02**: Aktivitaets-Log / Audit-Trail
 - [x] **ADMIN-03**: System-Einstellungen (Standard-Schwellenwerte, Max-Upload-Groesse, Session-Timeout)
 - [x] **ADMIN-04**: API-Key-Verwaltung (Claude API Key etc.)
@@ -152,7 +152,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | KAT-02 | Phase 14 | Complete |
 | KAT-03 | Phase 14 | Complete |
 | KAT-04 | Phase 14 | Complete |
-| ADMIN-01 | Phase 15 | Pending |
+| ADMIN-01 | Phase 15 | Complete |
 | ADMIN-02 | Phase 15 | Complete |
 | ADMIN-03 | Phase 15 | Complete |
 | ADMIN-04 | Phase 15 | Complete |
