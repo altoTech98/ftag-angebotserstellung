@@ -116,11 +116,12 @@ Plans:
   2. User can browse and search across all products in the catalog with filtering
   3. User can view catalog version history, compare versions, and roll back to a previous version
   4. User can add, edit, or delete individual products in the current catalog
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 14-01: TBD
-- [ ] 14-02: TBD
+- [ ] 14-00-PLAN.md -- Wave 0: Create test stub files for all catalog components
+- [ ] 14-01-PLAN.md -- Prisma schema (Catalog, CatalogVersion, ProductOverride), Python catalog endpoints, server actions
+- [ ] 14-02-PLAN.md -- Catalog list with upload, product browser with search/filter, version history with rollback, product edit dialog, step-catalog wiring
 
 ### Phase 15: Admin + Dashboard + Polish
 **Goal**: Admins can manage users and system settings, all users see a useful dashboard, and the app feels polished with keyboard shortcuts and proper loading states
@@ -160,5 +161,5 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14 -> 15
 | 11. Python Integration | v2.0 | Complete    | 2026-03-11 | 2026-03-11 |
 | 12. File Handling + Projects | 3/3 | Complete    | 2026-03-11 | - |
 | 13. Analysis Wizard + Results | 4/4 | Complete    | 2026-03-11 | - |
-| 14. Catalog Management | v2.0 | 0/? | Not started | - |
+| 14. Catalog Management | v2.0 | 0/3 | Not started | - |
 | 15. Admin + Dashboard + Polish | v2.0 | 0/? | Not started | - |
