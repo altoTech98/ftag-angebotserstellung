@@ -68,6 +68,10 @@ class Settings:
         "jpg", "jpeg", "png", "bmp", "tif", "tiff",
         # CAD
         "dwg", "dxf",
+        # GAEB (German construction tender format)
+        "x83", "x84", "d83", "d84", "p83", "p84", "gaeb",
+        # BIM/IFC
+        "ifc",
     }
     MAX_FILE_SIZE_MB: int = int(os.environ.get("MAX_FILE_SIZE_MB", 500))
     MAX_FILES_PER_UPLOAD: int = int(os.environ.get("MAX_FILES_PER_UPLOAD", 200))
@@ -84,6 +88,8 @@ class Settings:
     CACHE_TTL_PROJECT: int = PROJECT_CACHE_TTL_SECONDS
     CACHE_TTL_OFFER: int = OFFER_CACHE_TTL_SECONDS
     ERP_CACHE_TTL: int = ERP_PRICE_CACHE_TTL_SECONDS
+    # Redis (optional, falls gesetzt wird Redis statt In-Memory verwendet)
+    REDIS_URL: Optional[str] = os.environ.get("REDIS_URL")  # z.B. "redis://localhost:6379/0"
     
     # ERP Integration (Bohr System)
     ERP_ENABLED: bool = os.environ.get("ERP_ENABLED", "false").lower() == "true"
@@ -120,7 +126,7 @@ class Settings:
     CATALOG_RELOAD_INTERVAL_MINUTES: int = 60
     
     # Processing
-    BACKGROUND_JOB_TIMEOUT_SECONDS: int = 3600  # 1 Stunde
+    BACKGROUND_JOB_TIMEOUT_SECONDS: int = 7200  # 2 Stunden (grosse PDFs brauchen Zeit)
     MAX_CONCURRENT_JOBS: int = int(os.environ.get("MAX_CONCURRENT_JOBS", 10))
     
     # Performance
@@ -132,6 +138,11 @@ class Settings:
     RATE_LIMIT_REQUESTS: int = 100  # Requests
     RATE_LIMIT_PERIOD_SECONDS: int = 60  # Pro Minute
     
+    # Service Auth (v2 - replaces JWT auth)
+    PYTHON_SERVICE_KEY: str = os.environ.get("PYTHON_SERVICE_KEY", "")
+    SSE_TOKEN_SECRET: str = os.environ.get("SSE_TOKEN_SECRET", os.environ.get("PYTHON_SERVICE_KEY", ""))
+    NEXTJS_ORIGIN: str = os.environ.get("NEXTJS_ORIGIN", "http://localhost:3000")
+
     # CORS
     CORS_ORIGINS: list = [
         "http://localhost",

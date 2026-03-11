@@ -27,6 +27,7 @@ from services.fast_matcher import match_all as fast_match_all
 from services.history_store import save_analysis
 from services.memory_cache import text_cache, project_cache
 from services.job_store import create_job, get_job, update_job, run_in_background, subscribe_job, unsubscribe_job
+from services.sse_token_validator import validate_sse_token
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +48,14 @@ async def get_analyze_status(job_id: str):
 
 
 @router.get("/analyze/stream/{job_id}")
-async def stream_analyze_status(job_id: str):
-    """SSE endpoint for real-time job progress streaming."""
+async def stream_analyze_status(job_id: str, token: str = ""):
+    """SSE endpoint with token-based auth for direct browser connections."""
+    if not token:
+        raise HTTPException(status_code=401, detail="SSE token required")
+    payload = validate_sse_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired SSE token")
+
     job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job nicht gefunden")
@@ -268,15 +275,13 @@ def _run_project_analysis(job_id: str, project_id: str, cached_files: dict) -> d
     update_project(project_id, {"status": "analyzing"})
 
     parsed_files_info = []
+    doors = []
+    column_mapping = {}
 
-    # Step 1: Parse Excel Türlisten
+    # Step 1: Parse Excel Türlisten (primary source)
     update_job(job_id, progress="Excel-Türlisten werden geparst...")
     tuerlisten_files = [f for f in files if f["category"] == "tuerliste"]
     logger.info(f"Found {len(tuerlisten_files)} Türlisten, {len(files)} total files")
-
-    if not tuerlisten_files:
-        update_project(project_id, {"status": "error"})
-        raise ValueError("Keine Türliste gefunden. Bitte mindestens eine Excel-Datei als 'Türliste' klassifizieren.")
 
     parsed_tuerlisten = []
     for tf in tuerlisten_files:
@@ -303,52 +308,156 @@ def _run_project_analysis(job_id: str, project_id: str, cached_files: dict) -> d
                 "status": "error", "error": str(e), "doors_found": 0,
             })
 
+    # Step 1b: If no Türliste found/parsed, try ALL Excel files as potential door lists
     if not parsed_tuerlisten:
-        update_project(project_id, {"status": "error"})
-        raise ValueError("Keine Türliste konnte gelesen werden. Bitte Dateien prüfen.")
+        other_excel_files = [
+            f for f in files
+            if f["category"] != "tuerliste"
+            and os.path.splitext(f["filename"])[1].lower() in (".xlsx", ".xls", ".xlsm")
+        ]
+        if other_excel_files:
+            logger.info(f"No Türliste found, trying {len(other_excel_files)} other Excel files as potential door lists")
+            update_job(job_id, progress="Keine Türliste erkannt – andere Excel-Dateien werden geprüft...")
+            for ef in other_excel_files:
+                file_bytes = cached_files.get(ef["file_id"])
+                if not file_bytes:
+                    continue
+                try:
+                    parsed = parse_tuerliste_bytes(file_bytes)
+                    if parsed["doors"]:
+                        parsed_tuerlisten.append(parsed)
+                        # Reclassify this file as tuerliste
+                        ef["category"] = "tuerliste"
+                        try:
+                            update_file_classification(project_id, ef["file_id"], "tuerliste")
+                        except Exception:
+                            pass
+                        parsed_files_info.append({
+                            "filename": ef["filename"], "category": "tuerliste",
+                            "status": "ok", "doors_found": parsed["total_rows"],
+                            "columns_mapped": len(parsed["column_mapping"]),
+                            "sheet_name": parsed["sheet_name"],
+                            "auto_detected": True,
+                        })
+                        logger.info(f"Auto-detected Türliste in {ef['filename']}: {parsed['total_rows']} doors")
+                except Exception as e:
+                    logger.debug(f"Excel {ef['filename']} is not a Türliste: {e}")
 
-    # Step 2: Merge
-    merged = merge_tuerlisten(parsed_tuerlisten) if len(parsed_tuerlisten) > 1 else parsed_tuerlisten[0]
-    doors = merged["doors"]
-    column_mapping = merged["column_mapping"]
-    logger.info(f"Parsed {len(doors)} doors, mapping: {column_mapping}")
+    # Step 2: Merge Türlisten (if any found)
+    if parsed_tuerlisten:
+        merged = merge_tuerlisten(parsed_tuerlisten) if len(parsed_tuerlisten) > 1 else parsed_tuerlisten[0]
+        doors = merged["doors"]
+        column_mapping = merged["column_mapping"]
+        logger.info(f"Parsed {len(doors)} doors from Excel, mapping: {column_mapping}")
+    else:
+        logger.info("No Türliste found in any Excel file – will try extracting doors from other documents")
 
-    if not doors:
-        update_project(project_id, {"status": "error"})
-        raise ValueError("Keine Türpositionen in der Türliste gefunden.")
+    # Step 2.5: Parse GAEB/IFC files as additional door sources
+    gaeb_ifc_positions = []
+    for f in files:
+        ext = os.path.splitext(f["filename"])[1].lower()
+        if ext in (".x83", ".x84", ".d83", ".d84", ".p83", ".p84", ".gaeb"):
+            file_bytes = cached_files.get(f["file_id"])
+            if file_bytes:
+                try:
+                    from services.gaeb_parser import parse_gaeb_bytes
+                    gaeb_result = parse_gaeb_bytes(file_bytes)
+                    gaeb_pos = gaeb_result.get("positionen", [])
+                    if gaeb_pos:
+                        gaeb_ifc_positions.extend(gaeb_pos)
+                        logger.info(f"GAEB import: {len(gaeb_pos)} positions from {f['filename']}")
+                        parsed_files_info.append({
+                            "filename": f["filename"], "category": "gaeb",
+                            "status": "ok", "doors_found": len(gaeb_pos),
+                        })
+                except Exception as e:
+                    logger.warning(f"GAEB parse failed for {f['filename']}: {e}")
+        elif ext == ".ifc":
+            file_bytes = cached_files.get(f["file_id"])
+            if file_bytes:
+                try:
+                    from services.ifc_parser import parse_ifc_bytes
+                    ifc_result = parse_ifc_bytes(file_bytes)
+                    ifc_pos = ifc_result.get("positionen", [])
+                    if ifc_pos:
+                        gaeb_ifc_positions.extend(ifc_pos)
+                        logger.info(f"IFC import: {len(ifc_pos)} doors from {f['filename']}")
+                        parsed_files_info.append({
+                            "filename": f["filename"], "category": "ifc",
+                            "status": "ok", "doors_found": len(ifc_pos),
+                        })
+                except Exception as e:
+                    logger.warning(f"IFC parse failed for {f['filename']}: {e}")
 
-    # Step 3: Parse PDF specs
-    update_job(job_id, progress="PDF-Spezifikationen werden gelesen...")
+    # Step 3: Parse PDF specs (parallel für mehrere Dateien)
     spec_files = [f for f in files if f["category"] == "spezifikation" and f["parseable"]]
     supplementary_context = ""
-    for sf in spec_files[:3]:
+
+    def _parse_single_spec(sf):
+        """Parse a single spec file. Returns (filename, text, error)."""
         file_bytes = cached_files.get(sf["file_id"])
         if not file_bytes:
-            continue
+            return (sf["filename"], None, "not in cache")
         try:
             ext = os.path.splitext(sf["filename"])[1].lower()
             if ext == ".pdf":
-                text = parse_pdf_specs_bytes(file_bytes, max_chars=4000)
+                text = parse_pdf_specs_bytes(file_bytes, max_chars=0)
             else:
                 text = parse_document_bytes(file_bytes, ext)
-                if len(text) > 4000:
-                    text = text[:4000] + "\n... [gekürzt]"
-            if text.strip():
-                supplementary_context += f"\n--- {sf['filename']} ---\n{text}\n"
+            return (sf["filename"], text if text.strip() else None, None)
+        except Exception as e:
+            return (sf["filename"], None, str(e))
+
+    update_job(job_id, progress=f"PDF-Spezifikationen werden gelesen ({len(spec_files)} Dateien parallel)...")
+    logger.info(f"Parsing {len(spec_files)} spec files in parallel")
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    with ThreadPoolExecutor(max_workers=min(3, len(spec_files) or 1)) as pool:
+        futures = {pool.submit(_parse_single_spec, sf): sf for sf in spec_files}
+        for future in as_completed(futures):
+            filename, text, error = future.result()
+            if error:
+                logger.warning(f"Failed to parse spec {filename}: {error}")
                 parsed_files_info.append({
-                    "filename": sf["filename"], "category": "spezifikation",
+                    "filename": filename, "category": "spezifikation",
+                    "status": "error", "error": error,
+                })
+            elif text:
+                supplementary_context += f"\n--- {filename} ---\n{text}\n"
+                parsed_files_info.append({
+                    "filename": filename, "category": "spezifikation",
                     "status": "ok", "text_length": len(text),
                 })
-        except Exception as e:
-            logger.warning(f"Failed to parse spec {sf['filename']}: {e}")
-            parsed_files_info.append({
-                "filename": sf["filename"], "category": "spezifikation",
-                "status": "error", "error": str(e),
-            })
+                logger.info(f"Spec parsed OK: {filename} ({len(text)} chars)")
 
+    # Also parse "sonstig" files that might be parseable (PDFs, Word docs not yet classified)
     for f in files:
+        if f["category"] == "sonstig" and f.get("parseable"):
+            # Try parsing as spec too
+            file_bytes = cached_files.get(f["file_id"])
+            if file_bytes:
+                try:
+                    ext = os.path.splitext(f["filename"])[1].lower()
+                    if ext == ".pdf":
+                        text = parse_pdf_specs_bytes(file_bytes, max_chars=0)
+                    else:
+                        text = parse_document_bytes(file_bytes, ext)
+                    if text and text.strip():
+                        supplementary_context += f"\n--- {f['filename']} ---\n{text}\n"
+                        parsed_files_info.append({
+                            "filename": f["filename"], "category": "sonstig",
+                            "status": "ok", "text_length": len(text),
+                            "note": "als Spezifikation mitanalysiert",
+                        })
+                        logger.info(f"Sonstig file parsed as spec: {f['filename']} ({len(text)} chars)")
+                        continue
+                except Exception as e:
+                    logger.debug(f"Could not parse sonstig file {f['filename']}: {e}")
+
         if f["category"] in ("plan", "foto", "sonstig"):
-            parsed_files_info.append({"filename": f["filename"], "category": f["category"], "status": "skipped"})
+            # Only add to parsed_files_info if not already added above
+            if not any(p["filename"] == f["filename"] for p in parsed_files_info):
+                parsed_files_info.append({"filename": f["filename"], "category": f["category"], "status": "skipped"})
 
     # Step 3.5: Extract project metadata from spec documents
     update_job(job_id, progress="Projektmetadaten werden extrahiert...")
@@ -362,14 +471,80 @@ def _run_project_analysis(job_id: str, project_id: str, cached_files: dict) -> d
             logger.warning(f"Metadata extraction failed: {e}")
 
     # Step 3.6: Scan documents for additional door data and enrich Tuerliste
-    update_job(job_id, progress="Dokumente werden auf Tuerdaten gescannt...")
-    try:
-        def on_scan_progress(msg):
-            update_job(job_id, progress=msg)
-        scan_and_enrich(doors, spec_files, cached_files, on_progress=on_scan_progress)
-        logger.info("Document scanning and enrichment complete")
-    except Exception as e:
-        logger.warning(f"Document scanning failed (continuing without enrichment): {e}")
+    if doors:
+        update_job(job_id, progress="Dokumente werden auf Tuerdaten gescannt...")
+        try:
+            def on_scan_progress(msg):
+                update_job(job_id, progress=msg)
+            scan_and_enrich(doors, spec_files, cached_files, on_progress=on_scan_progress)
+            logger.info("Document scanning and enrichment complete")
+        except Exception as e:
+            logger.warning(f"Document scanning failed (continuing without enrichment): {e}")
+
+    # Step 3.7: Merge GAEB/IFC positions into door list
+    if gaeb_ifc_positions:
+        logger.info(f"Merging {len(gaeb_ifc_positions)} GAEB/IFC positions with {len(doors)} Türliste doors")
+        for gpos in gaeb_ifc_positions:
+            # Only add if not already in Türliste (avoid duplicates)
+            pos_nr = gpos.get("position", "")
+            already_exists = any(
+                d.get("tuer_nr", d.get("position", "")) == pos_nr
+                for d in doors
+            ) if pos_nr else False
+            if not already_exists:
+                doors.append(gpos)
+
+    # Step 3.8: AI extraction fallback – if still no doors, use Claude to extract from all text
+    if not doors and supplementary_context.strip():
+        update_job(job_id, progress="Keine Türliste gefunden – KI analysiert alle Dokumente auf Türdaten...")
+        logger.info(f"No doors from Excel/GAEB/IFC – trying AI extraction from {len(supplementary_context)} chars of text")
+        try:
+            ai_requirements = extract_requirements_from_text(supplementary_context)
+            ai_positions = ai_requirements.get("positionen", [])
+            if ai_positions:
+                doors = ai_positions
+                logger.info(f"AI extracted {len(doors)} door positions from documents")
+                parsed_files_info.append({
+                    "filename": "(KI-Extraktion aus Dokumenten)",
+                    "category": "ai_extraction",
+                    "status": "ok",
+                    "doors_found": len(doors),
+                    "note": "Türpositionen durch KI aus PDFs/Spezifikationen extrahiert",
+                })
+        except Exception as e:
+            logger.warning(f"AI extraction from documents failed: {e}")
+
+    # Step 3.9: Also try Vision extraction on PDFs if still no doors
+    if not doors:
+        pdf_files = [f for f in files if os.path.splitext(f["filename"])[1].lower() == ".pdf"]
+        for pf in pdf_files[:3]:  # Limit to 3 PDFs for Vision
+            file_bytes = cached_files.get(pf["file_id"])
+            if not file_bytes:
+                continue
+            try:
+                update_job(job_id, progress=f"Vision-Analyse: {pf['filename']}...")
+                from services.document_parser import parse_pdf_with_vision
+                vision_result = parse_pdf_with_vision(file_bytes)
+                vision_positions = vision_result.get("positions", [])
+                if vision_positions:
+                    doors.extend(vision_positions)
+                    logger.info(f"Vision extracted {len(vision_positions)} positions from {pf['filename']}")
+                    parsed_files_info.append({
+                        "filename": pf["filename"],
+                        "category": "vision_extraction",
+                        "status": "ok",
+                        "doors_found": len(vision_positions),
+                    })
+            except Exception as e:
+                logger.debug(f"Vision extraction failed for {pf['filename']}: {e}")
+
+    # Final check: fail only if absolutely no doors found anywhere
+    if not doors:
+        update_project(project_id, {"status": "error"})
+        raise ValueError(
+            "Keine Türpositionen gefunden. Weder in Excel-Dateien noch in PDFs/Spezifikationen "
+            "konnten Türdaten erkannt werden. Bitte prüfen Sie die hochgeladenen Dateien."
+        )
 
     # Step 4: Prepare positions for matching
     # Use raw structured doors directly for AI matching (richer data than
@@ -408,12 +583,22 @@ def _run_project_analysis(job_id: str, project_id: str, cached_files: dict) -> d
     # Step 6: Save to history
     update_job(job_id, progress="Ergebnisse werden gespeichert...")
     try:
-        filenames = ", ".join(tf["filename"] for tf in tuerlisten_files)
+        all_source_files = [f for f in files if f["category"] in ("tuerliste",)]
+        if not all_source_files:
+            all_source_files = [f for f in files if os.path.splitext(f["filename"])[1].lower() in (".pdf", ".xlsx", ".xls", ".docx")]
+        filenames = ", ".join(f["filename"] for f in all_source_files) if all_source_files else project_id
         save_analysis(file_id=project_id, filename=filenames, requirements=requirements, matching=match_result)
     except Exception as e:
         logger.warning(f"Failed to save project analysis to history: {e}")
 
     update_project(project_id, {"status": "analyzed"})
+
+    # Build source description for message
+    source_desc = ""
+    if tuerlisten_files:
+        source_desc = f"aus {len(tuerlisten_files)} Türliste(n)"
+    else:
+        source_desc = "aus Dokumentenanalyse (keine Türliste erkannt)"
 
     return {
         "project_id": project_id,
@@ -423,8 +608,8 @@ def _run_project_analysis(job_id: str, project_id: str, cached_files: dict) -> d
         "column_mapping": column_mapping,
         "status": "analyzed",
         "message": (
-            f"Projektanalyse abgeschlossen: {match_result['summary']['total_positions']} Positionen aus "
-            f"{len(tuerlisten_files)} Türliste(n), "
+            f"Projektanalyse abgeschlossen: {match_result['summary']['total_positions']} Positionen "
+            f"{source_desc}, "
             f"{match_result['summary']['matched_count']} erfüllbar, "
             f"{match_result['summary']['unmatched_count']} nicht erfüllbar"
         ),

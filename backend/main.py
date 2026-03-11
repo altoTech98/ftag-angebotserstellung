@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 
-from config import settings, BASE_DIR
+from config import settings, Environment, BASE_DIR
 from services.logger_setup import setup_logging
 from routers import upload, analyze, offer, feedback, history, catalog, erp, auth
 from services.exceptions import FrankTuerenError
@@ -249,14 +249,20 @@ if settings.RATE_LIMIT_ENABLED and SLOWAPI_AVAILABLE:
 elif settings.RATE_LIMIT_ENABLED and not SLOWAPI_AVAILABLE:
     logger.warning("[WARN] Rate limiting enabled in config but slowapi not installed. Run: pip install slowapi")
 
-# 1. CORS Middleware
-_cors_origins = settings.CORS_ORIGINS if settings.ENVIRONMENT == "production" else ["*"]
+# 1. CORS Middleware (v2 - explicit origins for Next.js BFF + SSE)
+import os as _os
+_nextjs_origin = _os.environ.get("NEXTJS_ORIGIN", "http://localhost:3000")
+_cors_origins = [_nextjs_origin]
+if settings.ENVIRONMENT == Environment.DEVELOPMENT:
+    _cors_origins.extend(["http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:3000"])
+elif settings.ENVIRONMENT == Environment.PRODUCTION:
+    _cors_origins.extend(settings.CORS_ORIGINS)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
-    allow_credentials=("*" not in _cors_origins),  # credentials requires explicit origins
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=list(set(_cors_origins)),
+    allow_credentials=False,  # SSE tokens via query param, no cookies needed
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["X-Service-Key", "X-User-Id", "X-User-Role", "X-User-Email", "Content-Type"],
     max_age=3600,
 )
 
@@ -264,64 +270,13 @@ app.add_middleware(
 if settings.ENABLE_COMPRESSION:
     app.add_middleware(GZIPMiddleware, minimum_size=settings.COMPRESSION_MIN_SIZE_BYTES)
 
-# 3. Auth Middleware – schützt alle /api/* Routen (außer Whitelist)
-AUTH_WHITELIST = {
-    "/api/auth/login",
-    "/api/auth/logout",
-    "/health",
-    "/api/health",
-    "/info",
-    "/",
-    "/docs",
-    "/redoc",
-    "/openapi.json",
-}
+# 3. Service Key Middleware (v2 – replaces JWT auth, validates X-Service-Key from BFF proxy)
+from services.service_auth import service_key_middleware
 
 @app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    """Check Bearer token for protected /api/* routes."""
-    path = request.url.path
-    method = request.method
-
-    # Skip auth for whitelisted paths, OPTIONS, and static files
-    if (
-        method == "OPTIONS"
-        or path in AUTH_WHITELIST
-        or path.startswith("/static/")
-        or not path.startswith("/api/")
-    ):
-        return await call_next(request)
-
-    # Extract Bearer token (header or query param for SSE)
-    auth_header = request.headers.get("authorization", "")
-    token = None
-    if auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-    elif request.query_params.get("token"):
-        token = request.query_params.get("token")
-
-    if not token:
-        return JSONResponse(
-            status_code=401,
-            content={"detail": "Nicht authentifiziert"},
-        )
-
-    try:
-        from services.auth_service import verify_token
-        user = verify_token(token)
-        if not user:
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Token ungueltig oder abgelaufen"},
-            )
-    except Exception as e:
-        logger.error(f"Auth verification error: {e}")
-        return JSONResponse(
-            status_code=401,
-            content={"detail": "Authentifizierung fehlgeschlagen"},
-        )
-
-    return await call_next(request)
+async def service_auth(request: Request, call_next):
+    """Validate X-Service-Key for protected /api/* routes (v2 BFF pattern)."""
+    return await service_key_middleware(request, call_next)
 
 # 4. Custom Middleware für Error-Handling & Caching Headers
 @app.middleware("http")

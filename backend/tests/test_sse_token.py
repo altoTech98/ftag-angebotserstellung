@@ -102,3 +102,30 @@ def test_validate_sse_token_malformed():
     assert validate_sse_token("") is None
     assert validate_sse_token("abc.def.ghi") is None  # too many dots
     assert validate_sse_token("!!!invalid-base64!!!.abcdef") is None
+
+
+# ─── SSE stream endpoint integration tests ───────────────────────────────
+
+
+def test_sse_stream_rejects_missing_token():
+    """GET /api/analyze/stream/test-job without ?token= returns 401."""
+    from fastapi.testclient import TestClient
+    from main import app
+
+    client = TestClient(app, raise_server_exceptions=False)
+    response = client.get("/api/analyze/stream/test-job")
+
+    assert response.status_code == 401
+    assert "SSE token required" in response.json().get("detail", "")
+
+
+def test_sse_stream_rejects_invalid_token():
+    """GET /api/analyze/stream/test-job?token=garbage returns 401."""
+    from fastapi.testclient import TestClient
+    from main import app
+
+    client = TestClient(app, raise_server_exceptions=False)
+    response = client.get("/api/analyze/stream/test-job?token=garbage")
+
+    assert response.status_code == 401
+    assert "Invalid or expired SSE token" in response.json().get("detail", "")
