@@ -45,7 +45,7 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 - [x] **RSLT-01**: Tabellarische Darstellung aller Anforderungen mit Filter und Sortierung
 - [x] **RSLT-02**: Aufklappbare Detail-Ansicht pro Anforderung (AI-Begruendung, Dimensionen)
 - [x] **RSLT-03**: Vergleichsansicht: Anforderung links vs. Produkt rechts
-- [ ] **RSLT-04**: Excel-Export (vollstaendige Ergebnis-Excel wie v1.0)
+- [x] **RSLT-04**: Excel-Export (vollstaendige Ergebnis-Excel wie v1.0)
 
 ### Projektverwaltung
 
@@ -143,7 +143,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | RSLT-01 | Phase 13 | Complete |
 | RSLT-02 | Phase 13 | Complete |
 | RSLT-03 | Phase 13 | Complete |
-| RSLT-04 | Phase 13 | Pending |
+| RSLT-04 | Phase 13 | Complete |
 | PROJ-01 | Phase 12 | Complete |
 | PROJ-02 | Phase 12 | Complete |
 | PROJ-03 | Phase 12 | Complete |
