@@ -35,16 +35,16 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 ### Analyse-Wizard
 
 - [x] **ANLZ-01**: Schritt 1 -- Drag & Drop Upload (PDF/DOCX/XLSX) via Vercel Blob
-- [ ] **ANLZ-02**: Schritt 2 -- Produktkatalog auswaehlen oder neu hochladen
-- [ ] **ANLZ-03**: Schritt 3 -- Schwellenwerte und Validierungsdurchlaeufe konfigurieren
-- [ ] **ANLZ-04**: Schritt 4 -- Analyse starten mit Echtzeit-Fortschrittsbalken (SSE direkt zu Python)
-- [ ] **ANLZ-05**: Schritt 5 -- Ergebnis-Ansicht mit Tabs (Matches/Gaps/Zusammenfassung)
+- [x] **ANLZ-02**: Schritt 2 -- Produktkatalog auswaehlen oder neu hochladen
+- [x] **ANLZ-03**: Schritt 3 -- Schwellenwerte und Validierungsdurchlaeufe konfigurieren
+- [x] **ANLZ-04**: Schritt 4 -- Analyse starten mit Echtzeit-Fortschrittsbalken (SSE direkt zu Python)
+- [x] **ANLZ-05**: Schritt 5 -- Ergebnis-Ansicht mit Tabs (Matches/Gaps/Zusammenfassung)
 
 ### Ergebnis-Ansicht
 
-- [ ] **RSLT-01**: Tabellarische Darstellung aller Anforderungen mit Filter und Sortierung
-- [ ] **RSLT-02**: Aufklappbare Detail-Ansicht pro Anforderung (AI-Begruendung, Dimensionen)
-- [ ] **RSLT-03**: Vergleichsansicht: Anforderung links vs. Produkt rechts
+- [x] **RSLT-01**: Tabellarische Darstellung aller Anforderungen mit Filter und Sortierung
+- [x] **RSLT-02**: Aufklappbare Detail-Ansicht pro Anforderung (AI-Begruendung, Dimensionen)
+- [x] **RSLT-03**: Vergleichsansicht: Anforderung links vs. Produkt rechts
 - [ ] **RSLT-04**: Excel-Export (vollstaendige Ergebnis-Excel wie v1.0)
 
 ### Projektverwaltung
@@ -136,13 +136,13 @@ Deferred to future release. Tracked but not in current roadmap.
 | DASH-03 | Phase 15 | Pending |
 | DASH-04 | Phase 15 | Pending |
 | ANLZ-01 | Phase 12 | Complete |
-| ANLZ-02 | Phase 13 | Pending |
-| ANLZ-03 | Phase 13 | Pending |
-| ANLZ-04 | Phase 13 | Pending |
-| ANLZ-05 | Phase 13 | Pending |
-| RSLT-01 | Phase 13 | Pending |
-| RSLT-02 | Phase 13 | Pending |
-| RSLT-03 | Phase 13 | Pending |
+| ANLZ-02 | Phase 13 | Complete |
+| ANLZ-03 | Phase 13 | Complete |
+| ANLZ-04 | Phase 13 | Complete |
+| ANLZ-05 | Phase 13 | Complete |
+| RSLT-01 | Phase 13 | Complete |
+| RSLT-02 | Phase 13 | Complete |
+| RSLT-03 | Phase 13 | Complete |
 | RSLT-04 | Phase 13 | Pending |
 | PROJ-01 | Phase 12 | Complete |
 | PROJ-02 | Phase 12 | Complete |
