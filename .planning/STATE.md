@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Tender Matcher -- Web-Oberflaeche & Platform
 status: executing
-stopped_at: Completed 10-02-PLAN.md
-last_updated: "2026-03-11T00:17:50.568Z"
-last_activity: 2026-03-11 -- Completed Plan 10-02 (Auth UI)
+stopped_at: Completed 10-03-PLAN.md
+last_updated: "2026-03-11T00:24:58.761Z"
+last_activity: 2026-03-11 -- Completed Plan 10-03 (App Shell Layout)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 5
-  completed_plans: 3
-  percent: 60
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -26,24 +26,24 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 10 of 15 (Foundation)
-Plan: 03 of 4 (next up)
+Plan: 04 of 4 (next up)
 Status: Executing
-Last activity: 2026-03-11 -- Completed Plan 10-02 (Auth UI)
+Last activity: 2026-03-11 -- Completed Plan 10-03 (App Shell Layout)
 
-Progress: [######....] 60%
+Progress: [########..] 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3 (v2.0)
+- Total plans completed: 4 (v2.0)
 - Average duration: 6min
-- Total execution time: 18min
+- Total execution time: 22min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 10-foundation | 3/5 | 18min | 6min |
+| 10-foundation | 4/5 | 22min | 6min |
 
 ## Accumulated Context
 
@@ -63,6 +63,9 @@ Progress: [######....] 60%
 - [Phase 10-01]: Import Prisma from @/generated/prisma/client (Prisma 7 pattern, not @prisma/client)
 - [Phase 10-foundation]: Used Better Auth emailOTP client methods for password reset flow
 - [Phase 10-foundation]: Session warning modal is non-dismissable -- user must explicitly extend or logout
+- [Phase 10-03]: Created AppShell client wrapper to bridge server layout with client-side SidebarProvider context
+- [Phase 10-03]: Better Auth userHasPermission returns { success } directly, not { data: { success } }
+- [Phase 10-03]: shadcn v4 dropdown-menu uses base-ui without asChild prop
 
 ### Pending Todos
 
@@ -76,6 +79,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T00:17:50.564Z
-Stopped at: Completed 10-02-PLAN.md
-Resume file: .planning/phases/10-foundation/10-02-SUMMARY.md
+Last session: 2026-03-11T00:24:00.000Z
+Stopped at: Completed 10-03-PLAN.md
+Resume file: .planning/phases/10-foundation/10-03-SUMMARY.md

@@ -19,9 +19,9 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 ### Design System & Layout
 
 - [x] **UI-01**: Rot/Weiss Design-System (Tailwind CSS 4 + shadcn/ui) nach Spezifikation
-- [ ] **UI-02**: Responsive Layout (Desktop, Tablet, Mobil)
-- [ ] **UI-03**: Sidebar-Navigation mit rotem Akzent fuer aktives Item
-- [ ] **UI-04**: Breadcrumb-Navigation auf allen Seiten
+- [x] **UI-02**: Responsive Layout (Desktop, Tablet, Mobil)
+- [x] **UI-03**: Sidebar-Navigation mit rotem Akzent fuer aktives Item
+- [x] **UI-04**: Breadcrumb-Navigation auf allen Seiten
 - [ ] **UI-05**: Keyboard-Shortcuts fuer Power-User (N=Neue Analyse etc.)
 - [ ] **UI-06**: Skeleton-Loader statt Spinner, benutzerfreundliche Fehlermeldungen
 
@@ -126,9 +126,9 @@ Deferred to future release. Tracked but not in current roadmap.
 | AUTH-05 | Phase 10 | Complete |
 | AUTH-06 | Phase 11 | Pending |
 | UI-01 | Phase 10 | Complete |
-| UI-02 | Phase 10 | Pending |
-| UI-03 | Phase 10 | Pending |
-| UI-04 | Phase 10 | Pending |
+| UI-02 | Phase 10 | Complete |
+| UI-03 | Phase 10 | Complete |
+| UI-04 | Phase 10 | Complete |
 | UI-05 | Phase 15 | Pending |
 | UI-06 | Phase 15 | Pending |
 | DASH-01 | Phase 15 | Pending |
