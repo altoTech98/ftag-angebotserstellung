@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Tender Matcher -- Web-Oberflaeche & Platform
 status: executing
-stopped_at: Completed 15-03-PLAN.md
-last_updated: "2026-03-11T15:48:42.446Z"
-last_activity: 2026-03-11 -- Completed Plan 15-03 (Email, Shortcuts, Skeletons)
+stopped_at: Completed 16-01-PLAN.md
+last_updated: "2026-03-11T16:22:45Z"
+last_activity: 2026-03-11 -- Completed Plan 16-01 (Fix Analysis-to-Python Bridge)
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 23
-  completed_plans: 23
+  total_phases: 8
+  completed_phases: 7
+  total_plans: 24
+  completed_plans: 24
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** 100% korrekte Zuordnung jeder Anforderung zum richtigen Produkt -- oder eine explizite, begruendete Gap-Meldung.
-**Current focus:** Phase 15 - Admin, Dashboard & Polish
+**Current focus:** Phase 16 - Fix Analysis-Python Bridge
 
 ## Current Position
 
-Phase: 15 of 15 (Admin, Dashboard & Polish)
-Plan: 4 of 4 (15-03 complete)
+Phase: 16 of 17 (Fix Analysis-Python Bridge)
+Plan: 1 of 1 (16-01 complete)
 Status: In Progress
-Last activity: 2026-03-11 -- Completed Plan 15-03 (Email, Shortcuts, Skeletons)
+Last activity: 2026-03-11 -- Completed Plan 16-01 (Fix Analysis-to-Python Bridge)
 
 Progress: [██████████] 100%
 
@@ -52,6 +52,7 @@ Progress: [██████████] 100%
 | Phase 15 P01 | 4min | 2 tasks | 6 files |
 | Phase 15 P02 | 3min | 2 tasks | 6 files |
 | Phase 15 P03 | 4min | 2 tasks | 14 files |
+| Phase 16 P01 | 2min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,7 @@ Progress: [██████████] 100%
 - [Phase 15]: Resend constructor uses placeholder key when RESEND_API_KEY not set (prevents test failures)
 - [Phase 15]: ShortcutProvider placed inside AppShell (client boundary) rather than server layout
 - [Phase 15]: Analysis completion email extracts stats from result JSON match_items/gap_items arrays
+- [Phase 16-01]: Fixed email JSON keys (matched/unmatched) inline rather than deferring to Phase 17 -- same file, avoids duplicate plan
 
 ### Pending Todos
 
@@ -129,6 +131,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T15:43:50.254Z
-Stopped at: Completed 15-03-PLAN.md
+Last session: 2026-03-11T16:22:45Z
+Stopped at: Completed 16-01-PLAN.md
 Resume file: None

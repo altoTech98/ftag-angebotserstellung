@@ -37,7 +37,7 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 - [x] **ANLZ-01**: Schritt 1 -- Drag & Drop Upload (PDF/DOCX/XLSX) via Vercel Blob
 - [x] **ANLZ-02**: Schritt 2 -- Produktkatalog auswaehlen oder neu hochladen
 - [x] **ANLZ-03**: Schritt 3 -- Schwellenwerte und Validierungsdurchlaeufe konfigurieren
-- [ ] **ANLZ-04**: Schritt 4 -- Analyse starten mit Echtzeit-Fortschrittsbalken (SSE direkt zu Python)
+- [x] **ANLZ-04**: Schritt 4 -- Analyse starten mit Echtzeit-Fortschrittsbalken (SSE direkt zu Python)
 - [x] **ANLZ-05**: Schritt 5 -- Ergebnis-Ansicht mit Tabs (Matches/Gaps/Zusammenfassung)
 
 ### Ergebnis-Ansicht
@@ -138,7 +138,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | ANLZ-01 | Phase 12 | Complete |
 | ANLZ-02 | Phase 13 | Complete |
 | ANLZ-03 | Phase 13 | Complete |
-| ANLZ-04 | Phase 16 | Pending |
+| ANLZ-04 | Phase 16 | Complete |
 | ANLZ-05 | Phase 13 | Complete |
 | RSLT-01 | Phase 13 | Complete |
 | RSLT-02 | Phase 13 | Complete |
