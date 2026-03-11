@@ -64,9 +64,9 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 ### Admin-Bereich
 
 - [ ] **ADMIN-01**: Benutzerverwaltung (anlegen, bearbeiten, deaktivieren, Rollen zuweisen)
-- [ ] **ADMIN-02**: Aktivitaets-Log / Audit-Trail
-- [ ] **ADMIN-03**: System-Einstellungen (Standard-Schwellenwerte, Max-Upload-Groesse, Session-Timeout)
-- [ ] **ADMIN-04**: API-Key-Verwaltung (Claude API Key etc.)
+- [x] **ADMIN-02**: Aktivitaets-Log / Audit-Trail
+- [x] **ADMIN-03**: System-Einstellungen (Standard-Schwellenwerte, Max-Upload-Groesse, Session-Timeout)
+- [x] **ADMIN-04**: API-Key-Verwaltung (Claude API Key etc.)
 
 ### Infrastruktur
 
@@ -74,7 +74,7 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 - [x] **INFRA-02**: Python/FastAPI auf Railway deployen mit Service-Auth
 - [x] **INFRA-03**: BFF-Pattern: Next.js API Routes proxyen zu Python-Backend
 - [x] **INFRA-04**: Vercel Blob Storage fuer Datei-Uploads (signed URLs)
-- [ ] **INFRA-05**: E-Mail-Versand (Passwort-Reset, Analyse-fertig-Benachrichtigung)
+- [x] **INFRA-05**: E-Mail-Versand (Passwort-Reset, Analyse-fertig-Benachrichtigung)
 
 ## v3.0+ Requirements
 
@@ -153,14 +153,14 @@ Deferred to future release. Tracked but not in current roadmap.
 | KAT-03 | Phase 14 | Complete |
 | KAT-04 | Phase 14 | Complete |
 | ADMIN-01 | Phase 15 | Pending |
-| ADMIN-02 | Phase 15 | Pending |
-| ADMIN-03 | Phase 15 | Pending |
-| ADMIN-04 | Phase 15 | Pending |
+| ADMIN-02 | Phase 15 | Complete |
+| ADMIN-03 | Phase 15 | Complete |
+| ADMIN-04 | Phase 15 | Complete |
 | INFRA-01 | Phase 10 | Complete |
 | INFRA-02 | Phase 11 | Complete |
 | INFRA-03 | Phase 11 | Complete |
 | INFRA-04 | Phase 12 | Complete |
-| INFRA-05 | Phase 15 | Pending |
+| INFRA-05 | Phase 15 | Complete |
 
 **Coverage:**
 - v2.0 requirements: 42 total
