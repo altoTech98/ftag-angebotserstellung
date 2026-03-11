@@ -1,13 +1,20 @@
 'use client';
 
-import { useReducer } from 'react';
-import { ArrowLeft, ArrowRight, BarChart3 } from 'lucide-react';
+import { useReducer, useState, useCallback } from 'react';
+import { ArrowLeft, ArrowRight, BarChart3, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { WizardStepper } from '@/components/analysis/wizard-stepper';
 import { StepFiles } from '@/components/analysis/step-files';
 import { StepCatalog } from '@/components/analysis/step-catalog';
 import { StepConfig } from '@/components/analysis/step-config';
+import { StepProgress } from '@/components/analysis/step-progress';
+import {
+  prepareFilesForPython,
+  createAnalysis,
+  saveAnalysisResult,
+} from '@/lib/actions/analysis-actions';
 import type {
   WizardState,
   WizardAction,
@@ -61,7 +68,8 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       };
     }
     case 'GO_TO_STEP': {
-      if (!state.completedSteps.has(action.step)) return state;
+      // Allow going to completed steps, or back to step 3 (from failure/cancel)
+      if (!state.completedSteps.has(action.step) && action.step > state.currentStep) return state;
       return {
         ...state,
         currentStep: action.step,
@@ -125,6 +133,8 @@ function stepIsValid(state: WizardState, step: number): boolean {
 
 export function AnalyseWizardClient({ project }: AnalyseWizardClientProps) {
   const [state, dispatch] = useReducer(wizardReducer, undefined, createInitialState);
+  const [isStarting, setIsStarting] = useState(false);
+  const [expandedRow, setExpandedRow] = useState<number | null>(null);
 
   const canGoBack = state.currentStep > 1 && !state.isAnalyzing;
   const canGoForward =
@@ -133,7 +143,86 @@ export function AnalyseWizardClient({ project }: AnalyseWizardClientProps) {
     stepIsValid(state, state.currentStep);
   const showBackButton = state.currentStep > 1;
   const showForwardButton = state.currentStep < 4;
+  const isStep3 = state.currentStep === 3;
   const isStep4 = state.currentStep === 4;
+
+  // Start analysis: prepare files -> create record -> trigger Python -> advance to step 4
+  const handleStartAnalysis = useCallback(async () => {
+    setIsStarting(true);
+    try {
+      // 1. Transfer Blob files to Python cache
+      const prepareResult = await prepareFilesForPython(project.id, state.selectedFileIds);
+      if ('error' in prepareResult) {
+        toast.error(prepareResult.error);
+        setIsStarting(false);
+        return;
+      }
+
+      // 2. Create Analysis record in Prisma
+      const analysisResult = await createAnalysis(project.id);
+      if ('error' in analysisResult) {
+        toast.error(analysisResult.error);
+        setIsStarting(false);
+        return;
+      }
+
+      // 3. Start analysis on Python backend
+      const response = await fetch('/api/backend/analyze/project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: project.id }),
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: 'Analyse konnte nicht gestartet werden' }));
+        toast.error(errData.error || 'Analyse konnte nicht gestartet werden');
+        setIsStarting(false);
+        return;
+      }
+      const { job_id } = await response.json();
+
+      // 4. Dispatch and advance to step 4
+      dispatch({ type: 'START_ANALYSIS', jobId: job_id, analysisId: analysisResult.analysisId });
+      dispatch({ type: 'NEXT_STEP' }); // move to step 4
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unbekannter Fehler');
+    } finally {
+      setIsStarting(false);
+    }
+  }, [project.id, state.selectedFileIds]);
+
+  // Handle analysis completion from StepProgress
+  const handleAnalysisComplete = useCallback(
+    async (result: AnalysisResult) => {
+      if (state.analysisId) {
+        await saveAnalysisResult(state.analysisId, result);
+      }
+      dispatch({ type: 'SET_RESULT', result });
+      toast.success('Analyse abgeschlossen');
+    },
+    [state.analysisId]
+  );
+
+  // Handle analysis failure from StepProgress
+  const handleAnalysisFailed = useCallback((error: string) => {
+    dispatch({ type: 'ANALYSIS_FAILED', error });
+    toast.error(error);
+    dispatch({ type: 'GO_TO_STEP', step: 3 });
+  }, []);
+
+  // Handle cancel from StepProgress
+  const handleAnalysisCancel = useCallback(() => {
+    dispatch({ type: 'ANALYSIS_FAILED', error: 'Analyse abgebrochen' });
+    dispatch({ type: 'GO_TO_STEP', step: 3 });
+  }, []);
+
+  // Step 3 "Weiter" triggers analysis start instead of simple next
+  const handleNextClick = useCallback(() => {
+    if (isStep3) {
+      handleStartAnalysis();
+    } else {
+      dispatch({ type: 'NEXT_STEP' });
+    }
+  }, [isStep3, handleStartAnalysis]);
 
   return (
     <div className="space-y-6">
@@ -190,19 +279,28 @@ export function AnalyseWizardClient({ project }: AnalyseWizardClientProps) {
           )}
 
           {state.currentStep === 4 && (
+            <StepProgress
+              jobId={state.jobId}
+              onComplete={handleAnalysisComplete}
+              onFailed={handleAnalysisFailed}
+              onCancel={handleAnalysisCancel}
+            />
+          )}
+
+          {state.currentStep === 5 && state.analysisResult && (
             <div className="flex flex-col items-center py-12 text-center">
               <BarChart3 className="mb-4 size-12 text-muted-foreground" />
               <p className="text-muted-foreground">
-                Wird in Plan 02 implementiert
+                Ergebnisse -- wird in Task 2 implementiert
               </p>
             </div>
           )}
 
-          {state.currentStep === 5 && (
+          {state.currentStep === 5 && !state.analysisResult && (
             <div className="flex flex-col items-center py-12 text-center">
               <BarChart3 className="mb-4 size-12 text-muted-foreground" />
               <p className="text-muted-foreground">
-                Wird in Plan 02 implementiert
+                Keine Analyseergebnisse vorhanden
               </p>
             </div>
           )}
@@ -212,7 +310,7 @@ export function AnalyseWizardClient({ project }: AnalyseWizardClientProps) {
       {/* Navigation bar */}
       <div className="flex items-center justify-between">
         <div>
-          {showBackButton && !isStep4 && (
+          {showBackButton && !isStep4 && state.currentStep !== 5 && (
             <Button
               variant="outline"
               disabled={!canGoBack}
@@ -223,26 +321,31 @@ export function AnalyseWizardClient({ project }: AnalyseWizardClientProps) {
               Zurueck
             </Button>
           )}
-          {isStep4 && (
-            <Button
-              variant="outline"
-              disabled={!state.isAnalyzing}
-              className="gap-2"
-            >
-              Analyse abbrechen
-            </Button>
-          )}
         </div>
 
         <div>
           {showForwardButton && (
             <Button
-              disabled={!canGoForward}
-              onClick={() => dispatch({ type: 'NEXT_STEP' })}
+              disabled={!canGoForward || isStarting}
+              onClick={handleNextClick}
               className="gap-2"
             >
-              Weiter
-              <ArrowRight className="size-4" />
+              {isStarting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Analyse wird gestartet...
+                </>
+              ) : isStep3 ? (
+                <>
+                  Analyse starten
+                  <ArrowRight className="size-4" />
+                </>
+              ) : (
+                <>
+                  Weiter
+                  <ArrowRight className="size-4" />
+                </>
+              )}
             </Button>
           )}
         </div>
