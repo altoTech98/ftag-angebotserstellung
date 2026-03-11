@@ -29,6 +29,7 @@ interface AnalyseWizardClientProps {
     name: string;
     files: ProjectFile[];
   };
+  initialResult?: AnalysisResult | null;
 }
 
 function createInitialState(): WizardState {
@@ -132,18 +133,35 @@ function stepIsValid(state: WizardState, step: number): boolean {
   }
 }
 
-export function AnalyseWizardClient({ project }: AnalyseWizardClientProps) {
-  const [state, dispatch] = useReducer(wizardReducer, undefined, createInitialState);
+export function AnalyseWizardClient({ project, initialResult }: AnalyseWizardClientProps) {
+  const [state, dispatch] = useReducer(
+    wizardReducer,
+    undefined,
+    () => {
+      if (initialResult) {
+        return {
+          ...createInitialState(),
+          currentStep: 5,
+          completedSteps: new Set([1, 2, 3, 4, 5]),
+          analysisResult: initialResult,
+        };
+      }
+      return createInitialState();
+    }
+  );
+
+  const isViewingPastResult = !!initialResult;
   const [isStarting, setIsStarting] = useState(false);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
 
-  const canGoBack = state.currentStep > 1 && !state.isAnalyzing;
+  const canGoBack = state.currentStep > 1 && !state.isAnalyzing && !isViewingPastResult;
   const canGoForward =
     state.currentStep < 5 &&
     state.currentStep !== 4 &&
-    stepIsValid(state, state.currentStep);
-  const showBackButton = state.currentStep > 1;
-  const showForwardButton = state.currentStep < 4;
+    stepIsValid(state, state.currentStep) &&
+    !isViewingPastResult;
+  const showBackButton = state.currentStep > 1 && !isViewingPastResult;
+  const showForwardButton = state.currentStep < 4 && !isViewingPastResult;
   const isStep3 = state.currentStep === 3;
   const isStep4 = state.currentStep === 4;
 

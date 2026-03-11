@@ -5,12 +5,14 @@ import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import prisma from '@/lib/prisma';
 import { AnalyseWizardClient } from './client';
+import type { AnalysisResult } from '@/components/analysis/types';
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ analysisId?: string }>;
 }
 
-export default async function AnalysePage({ params }: PageProps) {
+export default async function AnalysePage({ params, searchParams }: PageProps) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect('/auth/login');
 
@@ -26,6 +28,7 @@ export default async function AnalysePage({ params }: PageProps) {
   if (!hasPermission?.success) redirect('/projekte');
 
   const { id } = await params;
+  const { analysisId } = await searchParams;
   const userId = session.user.id;
 
   const project = await prisma.project.findUnique({
@@ -57,6 +60,19 @@ export default async function AnalysePage({ params }: PageProps) {
 
   if (!isOwner && !isShared && !isAdmin) notFound();
 
+  // If analysisId is provided, load the saved result
+  let initialResult: AnalysisResult | null = null;
+  if (analysisId) {
+    const analysis = await prisma.analysis.findUnique({
+      where: { id: analysisId },
+    });
+    if (analysis && analysis.projectId === id && analysis.result) {
+      initialResult = analysis.result as unknown as AnalysisResult;
+    }
+  }
+
+  const breadcrumbTitle = initialResult ? 'Analyseergebnis' : 'Neue Analyse';
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
@@ -72,10 +88,10 @@ export default async function AnalysePage({ params }: PageProps) {
           {project.name}
         </Link>
         <ChevronRight className="size-3" />
-        <span className="text-foreground">Neue Analyse</span>
+        <span className="text-foreground">{breadcrumbTitle}</span>
       </nav>
 
-      <h1 className="text-2xl font-semibold tracking-tight">Neue Analyse</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{breadcrumbTitle}</h1>
 
       <AnalyseWizardClient
         project={{
@@ -83,6 +99,7 @@ export default async function AnalysePage({ params }: PageProps) {
           name: project.name,
           files: project.files,
         }}
+        initialResult={initialResult}
       />
     </div>
   );

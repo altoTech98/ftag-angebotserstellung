@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Archive, Trash2, BarChart3, Share2 } from 'lucide-react';
+import Link from 'next/link';
+import { Archive, Trash2, BarChart3, ChevronRight, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FileDropzone } from '@/components/upload/file-dropzone';
 import { FileList, type FileData } from '@/components/upload/file-list';
@@ -117,42 +118,80 @@ export function ProjectDetailClient({ project }: ProjectDetailClientProps) {
 
       {/* Analyses Section */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Analysen</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Analysen</h2>
+          {project.status !== 'archived' && project.analyses.length > 0 && (
+            <Link href={`/projekte/${project.id}/analyse`}>
+              <Button variant="default" size="sm" className="gap-2">
+                <BarChart3 className="size-4" />
+                Neue Analyse
+              </Button>
+            </Link>
+          )}
+        </div>
         {project.analyses.length === 0 ? (
           <div className="flex flex-col items-center rounded-lg border border-dashed border-border bg-muted/30 py-8 text-center">
             <BarChart3 className="mb-3 size-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
               Noch keine Analysen durchgefuehrt
             </p>
-            <p className="text-xs text-muted-foreground">
-              Analyse-Funktion wird in Phase 13 freigeschaltet.
-            </p>
+            {project.status !== 'archived' && (
+              <Link href={`/projekte/${project.id}/analyse`} className="mt-3">
+                <Button variant="default" className="gap-2">
+                  <BarChart3 className="size-4" />
+                  Neue Analyse starten
+                </Button>
+              </Link>
+            )}
           </div>
         ) : (
           <ul className="divide-y divide-border rounded-lg border border-border">
-            {project.analyses.map((analysis) => (
-              <li
-                key={analysis.id}
-                className="flex items-center justify-between px-4 py-3"
-              >
-                <div className="flex items-center gap-3">
-                  <BarChart3 className="size-4 text-muted-foreground" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      {analysisStatusBadge(analysis.status)}
+            {project.analyses.map((analysis) => {
+              const isCompleted = analysis.status === 'completed';
+              const content = (
+                <li
+                  key={analysis.id}
+                  className={`flex items-center justify-between px-4 py-3 ${
+                    isCompleted ? 'cursor-pointer hover:bg-muted/50 transition-colors' : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <BarChart3 className="size-4 text-muted-foreground" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        {analysisStatusBadge(analysis.status)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Gestartet: {formatDateTime(analysis.startedAt)}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Gestartet: {formatDateTime(analysis.startedAt)}
-                    </p>
                   </div>
-                </div>
-                {analysis.endedAt && (
-                  <span className="text-xs text-muted-foreground">
-                    Abgeschlossen: {formatDateTime(analysis.endedAt)}
-                  </span>
-                )}
-              </li>
-            ))}
+                  <div className="flex items-center gap-2">
+                    {analysis.endedAt && (
+                      <span className="text-xs text-muted-foreground">
+                        Abgeschlossen: {formatDateTime(analysis.endedAt)}
+                      </span>
+                    )}
+                    {isCompleted && (
+                      <ChevronRight className="size-4 text-muted-foreground" />
+                    )}
+                  </div>
+                </li>
+              );
+
+              if (isCompleted) {
+                return (
+                  <Link
+                    key={analysis.id}
+                    href={`/projekte/${project.id}/analyse?analysisId=${analysis.id}`}
+                    className="block"
+                  >
+                    {content}
+                  </Link>
+                );
+              }
+              return <div key={analysis.id}>{content}</div>;
+            })}
           </ul>
         )}
       </section>
