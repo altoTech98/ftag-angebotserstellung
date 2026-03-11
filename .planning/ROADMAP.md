@@ -180,7 +180,7 @@ Plans:
   1. `handleStartAnalysis` forwards `state.catalogId` to the Python `/api/analyze/project` endpoint, and Python uses the specified catalog for analysis
   2. `/neue-analyse` page either redirects to project selection with analysis intent or renders a project picker that leads to the wizard
   3. All `redirect('/auth/login')` calls in project pages are corrected to `redirect('/login')`
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 18-01-PLAN.md -- Fix catalogId passthrough, /neue-analyse routing, and auth redirect paths
