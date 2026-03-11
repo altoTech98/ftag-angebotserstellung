@@ -34,7 +34,7 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 
 ### Analyse-Wizard
 
-- [ ] **ANLZ-01**: Schritt 1 -- Drag & Drop Upload (PDF/DOCX/XLSX) via Vercel Blob
+- [x] **ANLZ-01**: Schritt 1 -- Drag & Drop Upload (PDF/DOCX/XLSX) via Vercel Blob
 - [ ] **ANLZ-02**: Schritt 2 -- Produktkatalog auswaehlen oder neu hochladen
 - [ ] **ANLZ-03**: Schritt 3 -- Schwellenwerte und Validierungsdurchlaeufe konfigurieren
 - [ ] **ANLZ-04**: Schritt 4 -- Analyse starten mit Echtzeit-Fortschrittsbalken (SSE direkt zu Python)
@@ -49,7 +49,7 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 
 ### Projektverwaltung
 
-- [ ] **PROJ-01**: Projekte anlegen (Name, Kunde, Frist, Beschreibung)
+- [x] **PROJ-01**: Projekte anlegen (Name, Kunde, Frist, Beschreibung)
 - [ ] **PROJ-02**: Mehrere Analysen pro Projekt mit Historie
 - [ ] **PROJ-03**: Projekte archivieren und loeschen
 - [ ] **PROJ-04**: Projekte mit anderen Benutzern teilen
@@ -73,7 +73,7 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 - [x] **INFRA-01**: Next.js 16 App Router + Prisma 7 + Neon Postgres (via Vercel)
 - [x] **INFRA-02**: Python/FastAPI auf Railway deployen mit Service-Auth
 - [x] **INFRA-03**: BFF-Pattern: Next.js API Routes proxyen zu Python-Backend
-- [ ] **INFRA-04**: Vercel Blob Storage fuer Datei-Uploads (signed URLs)
+- [x] **INFRA-04**: Vercel Blob Storage fuer Datei-Uploads (signed URLs)
 - [ ] **INFRA-05**: E-Mail-Versand (Passwort-Reset, Analyse-fertig-Benachrichtigung)
 
 ## v3.0+ Requirements
@@ -135,7 +135,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | DASH-02 | Phase 15 | Pending |
 | DASH-03 | Phase 15 | Pending |
 | DASH-04 | Phase 15 | Pending |
-| ANLZ-01 | Phase 12 | Pending |
+| ANLZ-01 | Phase 12 | Complete |
 | ANLZ-02 | Phase 13 | Pending |
 | ANLZ-03 | Phase 13 | Pending |
 | ANLZ-04 | Phase 13 | Pending |
@@ -144,7 +144,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | RSLT-02 | Phase 13 | Pending |
 | RSLT-03 | Phase 13 | Pending |
 | RSLT-04 | Phase 13 | Pending |
-| PROJ-01 | Phase 12 | Pending |
+| PROJ-01 | Phase 12 | Complete |
 | PROJ-02 | Phase 12 | Pending |
 | PROJ-03 | Phase 12 | Pending |
 | PROJ-04 | Phase 12 | Pending |
@@ -159,7 +159,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | INFRA-01 | Phase 10 | Complete |
 | INFRA-02 | Phase 11 | Complete |
 | INFRA-03 | Phase 11 | Complete |
-| INFRA-04 | Phase 12 | Pending |
+| INFRA-04 | Phase 12 | Complete |
 | INFRA-05 | Phase 15 | Pending |
 
 **Coverage:**

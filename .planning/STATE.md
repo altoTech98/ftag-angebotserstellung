@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Tender Matcher -- Web-Oberflaeche & Platform
-status: completed
-stopped_at: Completed 11-03 (SSE Token Encoding Fix)
-last_updated: "2026-03-11T03:15:01.966Z"
-last_activity: 2026-03-11 -- Completed Plan 11-03 (SSE Token Encoding Fix)
+status: in-progress
+stopped_at: Completed 12-01 (Data Foundation)
+last_updated: "2026-03-11T09:25:00Z"
+last_activity: 2026-03-11 -- Completed Plan 12-01 (Data Foundation)
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 10
+  completed_plans: 10
   percent: 100
 ---
 
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** 100% korrekte Zuordnung jeder Anforderung zum richtigen Produkt -- oder eine explizite, begruendete Gap-Meldung.
-**Current focus:** Phase 11 - Python Backend Integration (BFF + Service Auth)
+**Current focus:** Phase 12 - File Handling & Project Management
 
 ## Current Position
 
-Phase: 11 of 15 (Python Backend Integration)
-Plan: 3 of 3 (complete)
-Status: Phase 11 Complete
-Last activity: 2026-03-11 -- Completed Plan 11-03 (SSE Token Encoding Fix)
+Phase: 12 of 15 (File Handling & Project Management)
+Plan: 1 of 3 (in progress)
+Status: Executing Phase 12
+Last activity: 2026-03-11 -- Completed Plan 12-01 (Data Foundation)
 
 Progress: [##########] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9 (v2.0)
+- Total plans completed: 10 (v2.0)
 - Average duration: 4.2min
-- Total execution time: 38min
+- Total execution time: 42min
 
 **By Phase:**
 
@@ -45,6 +45,7 @@ Progress: [##########] 100%
 |-------|-------|-------|----------|
 | 10-foundation | 6/6 | 27min | 4.5min |
 | 11-python-backend | 3/3 | 11min | 3.7min |
+| 12-file-handling | 1/? | 4min | 4.0min |
 
 ## Accumulated Context
 
@@ -77,6 +78,8 @@ Progress: [##########] 100%
 - [Phase 11-03]: Token format contract: base64url(payload).hex(HMAC-SHA256) -- hex chosen over base64url for signature to match Python hexdigest()
 - [Phase 11-02]: Analysis endpoints get 300s timeout; all others get 30s default
 - [Phase 11-02]: SSE client retries 3x with linear backoff then falls back to polling every 3s
+- [Phase 12-01]: Created migration SQL manually (prisma migrate dev hangs on remote Neon DB in dev env)
+- [Phase 12-01]: Server Actions pattern: auth.api.getSession -> userHasPermission -> prisma query -> revalidatePath
 
 ### Pending Todos
 
@@ -90,6 +93,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T02:50:47Z
-Stopped at: Completed 11-03 (SSE Token Encoding Fix)
+Last session: 2026-03-11T09:20:42Z
+Stopped at: Completed 12-01 (Data Foundation)
 Resume file: None
