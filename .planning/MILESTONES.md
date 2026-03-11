@@ -1,5 +1,29 @@
 # Milestones
 
+## v2.0 AI Tender Matcher -- Web-Oberflaeche & Platform (Shipped: 2026-03-11)
+
+**Phases completed:** 9 phases, 26 plans
+**Timeline:** 10 days (2026-03-02 → 2026-03-11)
+**Stats:** ~40,759 lines TypeScript (frontend), 366 files modified, 143 commits
+**Execution time:** 88 min total (3.9 min avg/plan)
+
+**Key accomplishments:**
+- Next.js 16 SaaS app with Better Auth RBAC (4 roles), Prisma 7/Neon DB, and FTAG Rot/Weiss design system
+- BFF proxy layer connecting Next.js to Python/FastAPI with service auth and SSE streaming
+- Vercel Blob file uploads, project CRUD with history, archiving, and sharing
+- 5-step analysis wizard with SSE progress and full results view (filtering, detail expansion, Excel export)
+- Product catalog upload, browse, search, versioning, and individual product CRUD
+- Admin panel with user management, audit log, system settings, dashboard KPIs, keyboard shortcuts, and email notifications
+
+**Requirements:** 42/42 satisfied (audit: tech_debt — 11 items, 1 data quality issue with Excel payload)
+
+**Archives:**
+- `.planning/milestones/v2.0-ROADMAP.md`
+- `.planning/milestones/v2.0-REQUIREMENTS.md`
+- `.planning/milestones/v2.0-MILESTONE-AUDIT.md`
+
+---
+
 ## v1.0 KI-Angebotserstellung v2 Pipeline (Shipped: 2026-03-10)
 
 **Phases completed:** 9 phases, 21 plans

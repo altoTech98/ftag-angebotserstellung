@@ -65,7 +65,7 @@ Each task was committed atomically:
 
 1. **Task 1: Create analysis test stub files** - `72313a0` (test)
 
-**Plan metadata:** pending
+**Plan metadata:** `bd944e6` (docs: complete plan)
 
 ## Files Created/Modified
 - `frontend/src/__tests__/analysis/step-catalog.test.tsx` - Catalog selection step stubs (ANLZ-02)

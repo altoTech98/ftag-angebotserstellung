@@ -58,7 +58,7 @@ Each task was committed atomically:
 
 1. **Task 1: Create test stub files for all catalog components** - `355b662` (test)
 
-**Plan metadata:** TBD (docs: complete plan)
+**Plan metadata:** `3ae878f` (docs: complete plan)
 
 ## Files Created/Modified
 - `frontend/src/__tests__/catalog/catalog-upload.test.tsx` - KAT-01 CatalogUpload stubs (4 tests)
