@@ -29,7 +29,7 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 
 - [x] **DASH-01**: Status-Karten: Laufende / Abgeschlossene / Fehlerhafte Analysen
 - [x] **DASH-02**: Letzte Aktivitaeten Feed (wer hat was wann gemacht)
-- [ ] **DASH-03**: Statistik-Widget: Gesamtzahl Matches, Gaps, Durchschnitts-Konfidenz
+- [x] **DASH-03**: Statistik-Widget: Gesamtzahl Matches, Gaps, Durchschnitts-Konfidenz
 - [x] **DASH-04**: Schnellzugriff-Button "Neue Analyse starten"
 
 ### Analyse-Wizard
@@ -74,7 +74,7 @@ Requirements for the SaaS platform milestone. Each maps to roadmap phases.
 - [x] **INFRA-02**: Python/FastAPI auf Railway deployen mit Service-Auth
 - [x] **INFRA-03**: BFF-Pattern: Next.js API Routes proxyen zu Python-Backend
 - [x] **INFRA-04**: Vercel Blob Storage fuer Datei-Uploads (signed URLs)
-- [ ] **INFRA-05**: E-Mail-Versand (Passwort-Reset, Analyse-fertig-Benachrichtigung)
+- [x] **INFRA-05**: E-Mail-Versand (Passwort-Reset, Analyse-fertig-Benachrichtigung)
 
 ## v3.0+ Requirements
 
@@ -133,7 +133,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | UI-06 | Phase 15 | Complete |
 | DASH-01 | Phase 15 | Complete |
 | DASH-02 | Phase 15 | Complete |
-| DASH-03 | Phase 17 | Pending |
+| DASH-03 | Phase 17 | Complete |
 | DASH-04 | Phase 15 | Complete |
 | ANLZ-01 | Phase 12 | Complete |
 | ANLZ-02 | Phase 13 | Complete |
@@ -160,7 +160,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | INFRA-02 | Phase 11 | Complete |
 | INFRA-03 | Phase 11 | Complete |
 | INFRA-04 | Phase 12 | Complete |
-| INFRA-05 | Phase 17 | Pending |
+| INFRA-05 | Phase 17 | Complete |
 
 **Coverage:**
 - v2.0 requirements: 42 total
