@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { NoPermission } from "@/components/layout/no-permission";
+import { listUsers, getSystemSettings } from "@/lib/actions/admin-actions";
+import AdminClient from "./client";
 
 export default async function AdminPage() {
   const session = await auth.api.getSession({
@@ -18,6 +20,11 @@ export default async function AdminPage() {
     return <NoPermission />;
   }
 
+  const [usersResult, settings] = await Promise.all([
+    listUsers(),
+    getSystemSettings(),
+  ]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -28,11 +35,11 @@ export default async function AdminPage() {
           Benutzerverwaltung und Systemeinstellungen
         </p>
       </div>
-      <div className="rounded-lg border border-border bg-card p-6 text-card-foreground">
-        <p className="text-sm text-muted-foreground">
-          Admin-Bereich wird in Phase 15 implementiert
-        </p>
-      </div>
+      <AdminClient
+        initialUsers={usersResult.users}
+        initialTotal={usersResult.total}
+        initialSettings={settings}
+      />
     </div>
   );
 }
