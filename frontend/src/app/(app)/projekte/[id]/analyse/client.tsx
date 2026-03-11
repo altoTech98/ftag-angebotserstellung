@@ -10,6 +10,7 @@ import { StepFiles } from '@/components/analysis/step-files';
 import { StepCatalog } from '@/components/analysis/step-catalog';
 import { StepConfig } from '@/components/analysis/step-config';
 import { StepProgress } from '@/components/analysis/step-progress';
+import { StepResults } from '@/components/analysis/step-results';
 import {
   prepareFilesForPython,
   createAnalysis,
@@ -288,12 +289,12 @@ export function AnalyseWizardClient({ project }: AnalyseWizardClientProps) {
           )}
 
           {state.currentStep === 5 && state.analysisResult && (
-            <div className="flex flex-col items-center py-12 text-center">
-              <BarChart3 className="mb-4 size-12 text-muted-foreground" />
-              <p className="text-muted-foreground">
-                Ergebnisse -- wird in Task 2 implementiert
-              </p>
-            </div>
+            <StepResults
+              result={state.analysisResult}
+              config={state.config}
+              onExpandRow={(index) => setExpandedRow(expandedRow === index ? null : index)}
+              expandedRow={expandedRow}
+            />
           )}
 
           {state.currentStep === 5 && !state.analysisResult && (
