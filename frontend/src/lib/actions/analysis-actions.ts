@@ -160,19 +160,21 @@ export async function sendAnalysisCompleteEmail(analysisId: string) {
     // Parse result for stats
     const result = analysis.result as Record<string, unknown> | null;
     const matchItems = Array.isArray(result?.matched) ? result.matched : [];
+    const partialItems = Array.isArray(result?.partial) ? result.partial : [];
     const gapItems = Array.isArray(result?.unmatched) ? result.unmatched : [];
-    const matchCount = matchItems.length;
+    const matchCount = matchItems.length + partialItems.length;
     const gapCount = gapItems.length;
 
-    // Calculate average confidence from match items
+    // Calculate average confidence from matched + partial items
     let avgConfidence = 0;
-    if (matchCount > 0) {
-      const totalConfidence = matchItems.reduce(
+    const allMatchedItems = [...matchItems, ...partialItems];
+    if (allMatchedItems.length > 0) {
+      const totalConfidence = allMatchedItems.reduce(
         (sum: number, item: Record<string, unknown>) =>
           sum + (typeof item.confidence === 'number' ? item.confidence : 0),
         0
       );
-      avgConfidence = Math.round((totalConfidence / matchCount) * 100);
+      avgConfidence = Math.round((totalConfidence / allMatchedItems.length) * 100);
     }
 
     const resultUrl = `${process.env.BETTER_AUTH_URL}/projekte/${analysis.projectId}`;
