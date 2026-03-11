@@ -23,7 +23,7 @@ export function useBreadcrumbs(): BreadcrumbItem[] {
     .filter((segment) => segment.length > 0);
 
   const breadcrumbs: BreadcrumbItem[] = [
-    { label: "Start", href: "/dashboard" },
+    { label: "Start", href: "/" },
   ];
 
   let currentPath = "";
