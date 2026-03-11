@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Tender Matcher -- Web-Oberflaeche & Platform
 status: executing
-stopped_at: Completed 10-00-PLAN.md
-last_updated: "2026-03-10T23:55:22.998Z"
-last_activity: 2026-03-11 -- Completed Plan 10-00 (Test Infrastructure)
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-03-11T00:09:46.000Z"
+last_activity: 2026-03-11 -- Completed Plan 10-01 (Next.js + Auth + Design System)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
-  percent: 20
+  completed_plans: 2
+  percent: 40
 ---
 
 # Project State
@@ -26,24 +26,24 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 10 of 15 (Foundation)
-Plan: 01 of 4 (next up)
+Plan: 02 of 4 (next up)
 Status: Executing
-Last activity: 2026-03-11 -- Completed Plan 10-00 (Test Infrastructure)
+Last activity: 2026-03-11 -- Completed Plan 10-01 (Next.js + Auth + Design System)
 
-Progress: [##........] 20%
+Progress: [####......] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1 (v2.0)
-- Average duration: 2min
-- Total execution time: 2min
+- Total plans completed: 2 (v2.0)
+- Average duration: 8min
+- Total execution time: 15min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 10-foundation | 1/5 | 2min | 2min |
+| 10-foundation | 2/5 | 15min | 8min |
 
 ## Accumulated Context
 
@@ -58,6 +58,9 @@ Progress: [##........] 20%
 - Tailwind CSS 4 with CSS-first @theme config (no tailwind.config.js)
 - shadcn/ui CLI v4 for FTAG-branded components
 - [Phase 10-foundation]: Initialized frontend/package.json for v2.0 test infrastructure (frontend/ directory had no package.json)
+- [Phase 10-01]: Kept globals.css in src/app/ (shadcn default) instead of src/styles/ to match components.json config
+- [Phase 10-01]: Skipped prisma.config.ts -- Prisma 7.4.2 failed to parse it on Windows; generate works without it
+- [Phase 10-01]: Import Prisma from @/generated/prisma/client (Prisma 7 pattern, not @prisma/client)
 
 ### Pending Todos
 
@@ -71,6 +74,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-10T23:53:58Z
-Stopped at: Completed 10-00-PLAN.md
-Resume file: .planning/phases/10-foundation/10-00-SUMMARY.md
+Last session: 2026-03-11T00:09:46Z
+Stopped at: Completed 10-01-PLAN.md
+Resume file: .planning/phases/10-foundation/10-01-SUMMARY.md
