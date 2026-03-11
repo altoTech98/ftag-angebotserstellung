@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: AI Tender Matcher -- Web-Oberflaeche & Platform
 status: executing
-stopped_at: Completed 10-03-PLAN.md
-last_updated: "2026-03-11T00:24:58.761Z"
-last_activity: 2026-03-11 -- Completed Plan 10-03 (App Shell Layout)
+stopped_at: Completed 10-04-PLAN.md
+last_updated: "2026-03-11T01:30:00.000Z"
+last_activity: 2026-03-11 -- Completed Plan 10-04 (Integration & Polish)
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -26,24 +26,24 @@ See: .planning/PROJECT.md (updated 2026-03-10)
 ## Current Position
 
 Phase: 10 of 15 (Foundation)
-Plan: 04 of 4 (next up)
-Status: Executing
-Last activity: 2026-03-11 -- Completed Plan 10-03 (App Shell Layout)
+Plan: 4 of 4 (complete)
+Status: Phase 10 Complete
+Last activity: 2026-03-11 -- Completed Plan 10-04 (Integration & Polish)
 
-Progress: [########..] 80%
+Progress: [##########] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4 (v2.0)
-- Average duration: 6min
-- Total execution time: 22min
+- Total plans completed: 5 (v2.0)
+- Average duration: 5min
+- Total execution time: 25min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 10-foundation | 4/5 | 22min | 6min |
+| 10-foundation | 5/5 | 25min | 5min |
 
 ## Accumulated Context
 
@@ -66,6 +66,8 @@ Progress: [########..] 80%
 - [Phase 10-03]: Created AppShell client wrapper to bridge server layout with client-side SidebarProvider context
 - [Phase 10-03]: Better Auth userHasPermission returns { success } directly, not { data: { success } }
 - [Phase 10-03]: shadcn v4 dropdown-menu uses base-ui without asChild prop
+- [Phase 10-04]: AppShellClient is a dedicated client component wrapping session timeout logic separately from AppShell
+- [Phase 10-04]: Root page uses server-side session check for redirect (no client-side flash)
 
 ### Pending Todos
 
@@ -79,6 +81,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-11T00:24:00.000Z
-Stopped at: Completed 10-03-PLAN.md
-Resume file: .planning/phases/10-foundation/10-03-SUMMARY.md
+Last session: 2026-03-11T01:30:00.000Z
+Stopped at: Completed 10-04-PLAN.md (Phase 10 complete)
+Resume file: .planning/phases/10-foundation/10-04-SUMMARY.md
