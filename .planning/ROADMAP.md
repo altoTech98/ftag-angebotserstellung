@@ -133,12 +133,13 @@ Plans:
   3. All users see a dashboard with status cards (running/completed/failed analyses), recent activity feed, match/gap statistics, and a quick-action button to start a new analysis
   4. Power users can use keyboard shortcuts (e.g., N for new analysis) and all pages show skeleton loaders instead of spinners during loading
   5. System sends email notifications for password reset and analysis completion
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 15-01: TBD
-- [ ] 15-02: TBD
-- [ ] 15-03: TBD
+- [ ] 15-00-PLAN.md -- Wave 0: Prisma schema (AuditLog, SystemSettings), migration, Resend install, test stubs, shared lib files
+- [ ] 15-01-PLAN.md -- Admin page: user management table with CRUD, audit log with filters, tabbed system settings
+- [ ] 15-02-PLAN.md -- Dashboard: stat cards, activity feed, statistics widget, quick-action button
+- [ ] 15-03-PLAN.md -- Email templates (Resend + React Email), keyboard shortcuts with help dialog, skeleton loaders
 
 ## Progress
 
@@ -162,4 +163,4 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14 -> 15
 | 12. File Handling + Projects | 3/3 | Complete    | 2026-03-11 | - |
 | 13. Analysis Wizard + Results | 4/4 | Complete    | 2026-03-11 | - |
 | 14. Catalog Management | 3/3 | Complete    | 2026-03-11 | - |
-| 15. Admin + Dashboard + Polish | v2.0 | 0/? | Not started | - |
+| 15. Admin + Dashboard + Polish | v2.0 | 0/4 | Not started | - |
