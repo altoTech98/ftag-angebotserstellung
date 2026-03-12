@@ -39,17 +39,32 @@ except ImportError:
 # LIFESPAN MANAGEMENT
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _verify_pydantic_version():
+    """Verify pydantic >= 2.7.0 is installed (required for anthropic SDK compatibility)."""
+    from importlib.metadata import version as get_version
+    pydantic_version = get_version("pydantic")
+    parts = [int(x) for x in pydantic_version.split(".")[:2]]
+    if parts[0] < 2 or (parts[0] == 2 and parts[1] < 7):
+        msg = f"pydantic {pydantic_version} is too old. Requires >= 2.7.0 for anthropic SDK by_alias compatibility."
+        logger.error(f"[FATAL] {msg}")
+        raise RuntimeError(msg)
+    logger.info(f"[OK] pydantic version: {pydantic_version}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Application lifespan: startup and shutdown hooks.
     Pre-loads critical resources und säuberung beim Shutdown.
     """
+    # Step 0: Verify pydantic version (fail fast before anything else)
+    _verify_pydantic_version()
+
     logger.info(f"[START] Starting Frank Tueren AG Backend | Environment: {settings.ENVIRONMENT.value}")
-    
+
     # ─────── STARTUP ────────────
     startup_errors = []
-    
+
     # 0. Initialize Database
     try:
         from db.engine import init_db

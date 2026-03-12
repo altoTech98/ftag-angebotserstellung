@@ -129,55 +129,95 @@ def parse_document(file_path: str) -> str:
 def parse_pdf_specs_bytes(content: bytes, max_chars: int = 8000) -> str:
     """
     Parst Spezifikations-PDF mit limitierter Länge.
-    
+
     Args:
         content: PDF-Bytes
-        max_chars: Max Zeichen zum Extrahieren
-        
+        max_chars: Max Zeichen zum Extrahieren (0 = unbegrenzt)
+
     Returns:
         Extrahierter Text (limitiert)
     """
     if not content:
         return ""
-    
+
+    # max_chars=0 means unlimited
+    effective_limit = max_chars if max_chars > 0 else 999_999_999
+
     try:
-        import pdfplumber
-        
         text_parts = []
         total_chars = 0
-        
-        with pdfplumber.open(io.BytesIO(content)) as pdf:
-            for page_num, page in enumerate(pdf.pages[:30], 1):  # Max 30 Seiten
-                if total_chars >= max_chars:
+
+        # ── PyMuPDF text extraction (no page cap) ──
+        try:
+            import fitz  # PyMuPDF
+
+            doc = fitz.open(stream=content, filetype="pdf")
+            total_pages = len(doc)
+            logger.info(f"[PDF] Spec parsing: {total_pages} pages (PyMuPDF), max_chars={max_chars}")
+
+            for page_num in range(total_pages):
+                if total_chars >= effective_limit:
                     break
-                
-                # Text extrahieren
+
                 try:
-                    page_text = page.extract_text()
+                    page = doc[page_num]
+                    page_text = page.get_text()
                     if page_text and page_text.strip():
-                        text_parts.append(f"--- Seite {page_num} ---\n{page_text}")
+                        text_parts.append(f"--- Seite {page_num + 1} ---\n{page_text}")
                         total_chars += len(page_text)
                 except Exception as e:
-                    logger.warning(f"Text-Extraktion Seite {page_num} fehlgeschlagen: {e}")
-                
-                # Tabellen extrahieren
-                try:
-                    tables = page.extract_tables()
-                    for table in tables or []:
-                        if table and total_chars < max_chars:
-                            table_text = _table_to_text(table)
-                            if table_text:
-                                text_parts.append(f"[Tabelle Seite {page_num}]\n{table_text}")
-                                total_chars += len(table_text)
-                except Exception as e:
-                    logger.debug(f"Tabellen-Extraktion Seite {page_num} fehlgeschlagen: {e}")
-        
+                    logger.warning(f"Text-Extraktion Seite {page_num + 1} fehlgeschlagen: {e}")
+
+                # Progress logging every 50 pages and on last page
+                if (page_num + 1) % 50 == 0 or page_num + 1 == total_pages:
+                    logger.info(f"[PDF] Spec text extraction: {page_num + 1}/{total_pages} pages")
+
+            doc.close()
+
+        except ImportError:
+            import pdfplumber
+            logger.warning("[PDF] PyMuPDF not installed, falling back to pdfplumber for spec parsing")
+            with pdfplumber.open(io.BytesIO(content)) as pdf:
+                total_pages = len(pdf.pages)
+                logger.info(f"[PDF] Spec parsing: {total_pages} pages (pdfplumber fallback), max_chars={max_chars}")
+                for page_num, page in enumerate(pdf.pages, 1):
+                    if total_chars >= effective_limit:
+                        break
+                    try:
+                        page_text = page.extract_text()
+                        if page_text and page_text.strip():
+                            text_parts.append(f"--- Seite {page_num} ---\n{page_text}")
+                            total_chars += len(page_text)
+                    except Exception as e:
+                        logger.warning(f"Text-Extraktion Seite {page_num} fehlgeschlagen: {e}")
+
+        # ── pdfplumber table extraction ──
+        try:
+            import pdfplumber
+            with pdfplumber.open(io.BytesIO(content)) as pdf:
+                for page_num, page in enumerate(pdf.pages, 1):
+                    if total_chars >= effective_limit:
+                        break
+                    try:
+                        tables = page.extract_tables()
+                        for table in tables or []:
+                            if table and total_chars < effective_limit:
+                                table_text = _table_to_text(table)
+                                if table_text:
+                                    text_parts.append(f"[Tabelle Seite {page_num}]\n{table_text}")
+                                    total_chars += len(table_text)
+                    except Exception as e:
+                        logger.debug(f"Tabellen-Extraktion Seite {page_num} fehlgeschlagen: {e}")
+        except Exception as e:
+            logger.debug(f"[PDF] Table extraction pass failed: {e}")
+
         text = "\n\n".join(text_parts)
-        if len(text) > max_chars:
+        if max_chars > 0 and len(text) > max_chars:
             text = text[:max_chars] + "\n[... Text gekürzt]"
-        
+
+        logger.info(f"PDF spec parsed: {len(text_parts)} parts, {total_chars} chars extracted")
         return text if text.strip() else "[PDF konnte nicht vollständig gelesen werden]"
-    
+
     except Exception as e:
         logger.exception(f"PDF-Specs Parsing fehlgeschlagen")
         return f"[PDF konnte nicht gelesen werden: {str(e)}]"
@@ -306,39 +346,81 @@ def _ocr_pdf_bytes(content: bytes, max_pages: int = 30) -> str:
 
 
 def _parse_pdf_bytes(content: bytes) -> str:
-    """Extrahiert Text aus PDF mit pdfplumber, OCR-Fallback für gescannte Dokumente"""
+    """Extrahiert Text aus PDF mit PyMuPDF (schnell), pdfplumber für Tabellen, OCR-Fallback für gescannte Dokumente"""
     import pdfplumber
-    
+
     text_parts = []
-    
+
     try:
-        with pdfplumber.open(io.BytesIO(content)) as pdf:
-            if not pdf.pages:
+        # ── PyMuPDF text extraction (10-50x faster than pdfplumber) ──
+        try:
+            import fitz  # PyMuPDF
+
+            doc = fitz.open(stream=content, filetype="pdf")
+            total_pages = len(doc)
+
+            if total_pages == 0:
+                doc.close()
                 raise FileError(
                     ErrorCode.FILE_PARSE_ERROR,
                     "PDF hat keine Seiten",
                     filename=".pdf"
                 )
-            
-            for page_num, page in enumerate(pdf.pages, 1):
+
+            logger.info(f"[PDF] Starting PyMuPDF text extraction: {total_pages} pages")
+
+            for page_num in range(total_pages):
                 try:
-                    # Text
-                    page_text = page.extract_text()
+                    page = doc[page_num]
+                    page_text = page.get_text()
                     if page_text and page_text.strip():
-                        text_parts.append(f"--- Seite {page_num} ---\n{page_text}")
-                    
-                    # Tabellen
-                    tables = page.extract_tables()
-                    for table in tables or []:
-                        if table:
-                            table_text = _table_to_text(table)
-                            if table_text:
-                                text_parts.append(f"[Tabelle Seite {page_num}]\n{table_text}")
-                
+                        text_parts.append(f"--- Seite {page_num + 1} ---\n{page_text}")
                 except Exception as e:
-                    logger.warning(f"Seite {page_num} Extraktion fehlgeschlagen: {e}")
+                    logger.warning(f"Seite {page_num + 1} Text-Extraktion fehlgeschlagen: {e}")
                     continue
-        
+
+                # Progress logging every 50 pages and on last page
+                if (page_num + 1) % 50 == 0 or page_num + 1 == total_pages:
+                    logger.info(f"[PDF] Text extraction: {page_num + 1}/{total_pages} pages")
+
+            doc.close()
+
+        except ImportError:
+            logger.warning("[PDF] PyMuPDF not installed, falling back to pdfplumber")
+            # Fallback: pdfplumber text extraction
+            with pdfplumber.open(io.BytesIO(content)) as pdf:
+                if not pdf.pages:
+                    raise FileError(
+                        ErrorCode.FILE_PARSE_ERROR,
+                        "PDF hat keine Seiten",
+                        filename=".pdf"
+                    )
+                for page_num, page in enumerate(pdf.pages, 1):
+                    try:
+                        page_text = page.extract_text()
+                        if page_text and page_text.strip():
+                            text_parts.append(f"--- Seite {page_num} ---\n{page_text}")
+                    except Exception as e:
+                        logger.warning(f"Seite {page_num} Extraktion fehlgeschlagen: {e}")
+                        continue
+
+        # ── pdfplumber table extraction (PyMuPDF not good at tables) ──
+        try:
+            with pdfplumber.open(io.BytesIO(content)) as pdf:
+                for page_num, page in enumerate(pdf.pages, 1):
+                    try:
+                        tables = page.extract_tables()
+                        for table in tables or []:
+                            if table:
+                                table_text = _table_to_text(table)
+                                if table_text:
+                                    text_parts.append(f"[Tabelle Seite {page_num}]\n{table_text}")
+                    except Exception as e:
+                        logger.debug(f"Tabellen-Extraktion Seite {page_num} fehlgeschlagen: {e}")
+                        continue
+        except Exception as e:
+            logger.debug(f"[PDF] Table extraction pass failed: {e}")
+
         result = "\n\n".join(text_parts)
 
         # OCR fallback for scanned PDFs (no text extracted)
@@ -402,7 +484,7 @@ def _parse_pdf_bytes(content: bytes) -> str:
                     logger.debug(f"[PDF] Vision fallback failed: {e}")
 
         return result[:DocumentParser.MAX_TEXT_LENGTH]
-    
+
     except FileError:
         raise
     except Exception as e:
