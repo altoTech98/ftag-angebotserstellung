@@ -46,8 +46,14 @@ echo [OK] cloudflared bereit
 if not exist "%SCRIPTS_DIR%\nssm.exe" (
     echo Lade NSSM herunter...
     powershell -Command ^
+        "$urls = @('https://nssm.cc/release/nssm-2.24.zip', 'https://github.com/nicehash/nssm/releases/download/v2.24/nssm-2.24.zip'); " ^
         "$zip = '%TEMP%\nssm.zip'; " ^
-        "Invoke-WebRequest -Uri 'https://nssm.cc/release/nssm-2.24.zip' -OutFile $zip; " ^
+        "$downloaded = $false; " ^
+        "foreach ($url in $urls) { " ^
+        "  try { Invoke-WebRequest -Uri $url -OutFile $zip -TimeoutSec 15; $downloaded = $true; break } " ^
+        "  catch { Write-Host \"Mirror $url fehlgeschlagen, versuche naechsten...\" } " ^
+        "}; " ^
+        "if (-not $downloaded) { Write-Host 'NSSM Download fehlgeschlagen'; exit 1 }; " ^
         "Expand-Archive -Path $zip -DestinationPath '%TEMP%\nssm-extract' -Force; " ^
         "Copy-Item (Get-ChildItem '%TEMP%\nssm-extract' -Recurse -Filter 'nssm.exe' | Where-Object { $_.Directory.Name -eq 'win64' } | Select-Object -First 1).FullName '%SCRIPTS_DIR%\nssm.exe'; " ^
         "Remove-Item $zip -Force; Remove-Item '%TEMP%\nssm-extract' -Recurse -Force"

@@ -19,10 +19,15 @@ if not errorlevel 1 (
 
 echo Lade NSSM herunter...
 powershell -Command ^
-    "$url = 'https://nssm.cc/release/nssm-2.24.zip'; " ^
+    "$urls = @('https://nssm.cc/release/nssm-2.24.zip', 'https://github.com/nicehash/nssm/releases/download/v2.24/nssm-2.24.zip'); " ^
     "$zip = '%TEMP%\nssm.zip'; " ^
     "$extract = '%TEMP%\nssm-extract'; " ^
-    "Invoke-WebRequest -Uri $url -OutFile $zip; " ^
+    "$downloaded = $false; " ^
+    "foreach ($url in $urls) { " ^
+    "  try { Invoke-WebRequest -Uri $url -OutFile $zip -TimeoutSec 15; $downloaded = $true; break } " ^
+    "  catch { Write-Host \"Mirror $url fehlgeschlagen, versuche naechsten...\" } " ^
+    "}; " ^
+    "if (-not $downloaded) { Write-Host 'Alle Download-Quellen fehlgeschlagen'; exit 1 }; " ^
     "Expand-Archive -Path $zip -DestinationPath $extract -Force; " ^
     "Copy-Item (Get-ChildItem -Path $extract -Recurse -Filter 'nssm.exe' | Where-Object { $_.Directory.Name -eq 'win64' } | Select-Object -First 1).FullName -Destination '%~dp0nssm.exe'; " ^
     "Remove-Item $zip -Force; " ^
