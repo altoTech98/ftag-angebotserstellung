@@ -43,7 +43,14 @@ Ein KI-gestuetztes System fuer Frank Tueren AG, das Ausschreibungsunterlagen (PD
 
 ### Active
 
-(None — define with `/gsd:new-milestone`)
+## Current Milestone: v2.1 Analyse-Pipeline Stabilisierung
+
+**Goal:** Fix the 3 interconnected bugs that prevent project analyses from completing and delivering results to the frontend.
+
+**Target fixes:**
+- PDF-Parsing: max_chars=0 Bug + pdfplumber Performance (10 Min fuer 45 Zeichen)
+- SSE-Streaming: Verbindungsabbruch markiert Analyse als fehlgeschlagen, Polling-Fallback funktioniert nicht
+- Ergebnis-Zustellung: Analyse schliesst im Backend ab, Frontend zeigt nie Ergebnis an
 
 ### Out of Scope
 
@@ -105,4 +112,4 @@ Ein KI-gestuetztes System fuer Frank Tueren AG, das Ausschreibungsunterlagen (PD
 | Railway for Python backend | No timeout limits unlike Vercel Functions | ✓ Good — long-running AI analysis works |
 
 ---
-*Last updated: 2026-03-11 after v2.0 milestone completion*
+*Last updated: 2026-03-12 after v2.1 milestone start*

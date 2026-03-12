@@ -1,38 +1,42 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: AI Tender Matcher -- Web-Oberflaeche & Platform
-status: shipped
-stopped_at: Milestone v2.0 archived
-last_updated: "2026-03-11T23:45:00.000Z"
-last_activity: 2026-03-11 -- Milestone v2.0 archived and tagged
+milestone: v2.1
+milestone_name: Analyse-Pipeline Stabilisierung
+status: active
+stopped_at: Defining requirements
+last_updated: "2026-03-12T02:30:00.000Z"
+last_activity: 2026-03-12 -- Milestone v2.1 started
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 26
-  completed_plans: 26
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-11)
+See: .planning/PROJECT.md (updated 2026-03-12)
 
 **Core value:** 100% korrekte Zuordnung jeder Anforderung zum richtigen Produkt -- oder eine explizite, begruendete Gap-Meldung.
-**Current focus:** Planning next milestone
+**Current focus:** v2.1 Analyse-Pipeline Stabilisierung
 
 ## Current Position
 
-Milestone v2.0 shipped. All 9 phases (26 plans) complete.
-Next step: `/gsd:new-milestone` to define v3.0.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-12 — Milestone v2.1 started
 
 ## Accumulated Context
 
 ### Decisions
 
-(Archived to PROJECT.md Key Decisions table)
+- Pydantic upgraded 2.5.3 → 2.12.5 to fix anthropic SDK by_alias incompatibility
+- SSE retries increased 3 → 10, onError no longer calls onFailed
+- max_chars=0 in parse_pdf_specs_bytes now treated as unlimited (effective_limit)
 
 ### Pending Todos
 
@@ -40,10 +44,12 @@ None.
 
 ### Blockers/Concerns
 
-None (all resolved during v2.0).
+- 4 zombie analysis threads may still be running from previous attempts
+- pdfplumber.open() inherently slow on large PDFs (286 pages = ~10 min just to open)
+- Document scanner also uses AI calls per document which adds latency
 
 ## Session Continuity
 
-Last session: 2026-03-11
-Stopped at: Milestone v2.0 archived
+Last session: 2026-03-12
+Stopped at: Defining requirements for v2.1
 Resume file: None
