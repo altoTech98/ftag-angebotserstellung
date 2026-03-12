@@ -214,6 +214,68 @@ class TestTableToText:
         assert "C" in result
 
 
+class TestPyMuPDFParsing:
+    """Tests for PyMuPDF-based PDF text extraction."""
+
+    def test_pymupdf_installed(self):
+        """Verify PyMuPDF is importable and identifies itself."""
+        import fitz
+        assert "PyMuPDF" in (fitz.__doc__ or "")
+
+    def test_parse_pdf_uses_pymupdf_markers(self):
+        """parse_document_bytes produces page markers in '--- Seite N ---' format."""
+        pdf = _make_pdf(["Ausschreibung Tueren", "Position 1.01 Brandschutztuere"])
+        result = parse_document_bytes(pdf, ".pdf")
+        assert "--- Seite 1 ---" in result
+
+    def test_max_chars_zero_unlimited(self):
+        """parse_pdf_specs_bytes with max_chars=0 extracts all content without truncation."""
+        pdf = _make_pdf(["Spezifikation Brandschutz " * 20])
+        result = parse_pdf_specs_bytes(pdf, max_chars=0)
+        # Should contain page content, no truncation marker
+        assert "Spezifikation" in result or "Brandschutz" in result
+        assert "[... Text gekuerzt]" not in result
+        assert "[... Text gekürzt]" not in result
+
+    def test_specs_positive_max_chars_truncates(self):
+        """parse_pdf_specs_bytes with small max_chars truncates and adds suffix."""
+        pdf = _make_pdf(["A very long specification text " * 50])
+        result = parse_pdf_specs_bytes(pdf, max_chars=100)
+        # Result should be around 100 chars or less (plus possible truncation marker)
+        # If content exceeds limit, truncation marker is appended
+        assert len(result) <= 200  # 100 chars + truncation marker
+
+    def test_table_extraction_still_works(self):
+        """_table_to_text still produces correct table formatting."""
+        table = [["Position", "Beschreibung", "Preis"], ["1.01", "Stahltuere T30", "1500"]]
+        result = _table_to_text(table)
+        assert "Position | Beschreibung | Preis" in result
+        assert "1.01 | Stahltuere T30 | 1500" in result
+
+    def test_parse_pdf_empty_raises(self):
+        """Empty PDF (0 pages) raises FileError."""
+        # Minimal PDF with 0 pages
+        empty_pdf = b"""%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [] /Count 0 >>
+endobj
+xref
+0 3
+0000000000 65535 f
+0000000009 00000 n
+0000000058 00000 n
+trailer
+<< /Size 3 /Root 1 0 R >>
+startxref
+115
+%%EOF"""
+        with pytest.raises(FileError):
+            parse_document_bytes(empty_pdf, ".pdf")
+
+
 class TestHybridPdfParsing:
     """Tests for hybrid PDF analysis (pdfplumber + Vision)."""
 

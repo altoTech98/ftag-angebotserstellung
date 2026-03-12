@@ -17,6 +17,7 @@ numpy==1.26.4
 
 # ─── Document Processing ───
 pdfplumber==0.11.4
+PyMuPDF>=1.24.0  # Fast PDF text (C-based MuPDF); import as 'fitz'
 python-docx==1.1.2
 Pillow==10.2.0  # Image processing for OCR
 pytesseract==0.3.10  # OCR for scanned PDFs
@@ -48,8 +49,8 @@ python-multipart==0.0.20
 slowapi>=0.1.9  # Rate limiting middleware
 
 # ─── Validation ───
-pydantic==2.5.3
-pydantic-settings==2.1.0
+pydantic>=2.7.0,<3.0
+pydantic-settings>=2.2.0,<3.0
 
 # ─── Environment & Config ───
 python-dotenv==1.0.1
